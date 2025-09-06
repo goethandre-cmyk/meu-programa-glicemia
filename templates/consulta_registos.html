@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Consulta de Registos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Consulta de Registos</h1>
+        <a href="{{ url_for('dashboard') }}" class="back-link">Voltar para o Dashboard</a>
+
+        {% if role == 'admin' %}
+        <div class="filter-section">
+            <form method="get" action="{{ url_for('consulta_registos') }}">
+                <label for="utilizador">Filtrar por Utilizador:</label>
+                <select id="utilizador" name="utilizador" onchange="this.form.submit()">
+                    <option value="Todos" {% if utilizador_selecionado == 'Todos' %}selected{% endif %}>Todos</option>
+                    {% for user in lista_utilizadores %}
+                    <option value="{{ user }}" {% if utilizador_selecionado == user %}selected{% endif %}>{{ user }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Utilizador</th>
+                        <th>Tipo</th>
+                        <th>Valor</th>
+                        <th>Descrição</th>
+                        <th>Refeição</th>
+                        <th>Classificação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registo in registos %}
+                    <tr>
+                        <td>{{ registo.data.strftime('%d-%m-%Y %H:%M:%S') }}</td>
+                        <td>{{ registo.utilizador }}</td>
+                        <td>{{ registo.tipo.capitalize() }}</td>
+                        <td>{{ registo.valor }}</td>
+                        <td>{{ registo.descricao }}</td>
+                        <td>{{ registo.refeicao }}</td>
+                        <td>
+                            {% if registo.classificacao == 'Normal' %}
+                                <span style="color: green;">Normal</span>
+                            {% elif registo.classificacao == 'Pré-diabetes' %}
+                                <span style="color: orange;">Pré-diabetes</span>
+                            {% else %}
+                                <span style="color: red;">Diabetes</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

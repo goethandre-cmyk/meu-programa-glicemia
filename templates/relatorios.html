@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatórios{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-chart-line me-2"></i>Relatórios de Glicemia
+    </h1>
+
+    <div class="card p-4 shadow-sm">
+        <h5 class="card-title">Histórico de Glicemia</h5>
+        <canvas id="graficoGlicemia"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const labels = {{ labels| safe
+    }};
+    const data = {{ data| safe }};
+
+    const ctx = document.getElementById('graficoGlicemia').getContext('2d');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Valor da Glicemia (mg/dL)',
+                data: data,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: function (context) {
+                    const valor = context.dataset.data[context.dataIndex];
+                    if (valor < 70) {
+                        return 'red'; // Hipoglicemia
+                    } else if (valor >= 70 && valor <= 120) {
+                        return 'green'; // Normal
+                    } else if (valor > 120 && valor <= 180) {
+                        return 'orange'; // Elevada
+                    } else {
+                        return 'red'; // Hiperglicemia
+                    }
+                },
+                pointBorderColor: function (context) {
+                    const valor = context.dataset.data[context.dataIndex];
+                    if (valor < 70) {
+                        return 'red';
+                    } else if (valor >= 70 && valor <= 120) {
+                        return 'green';
+                    } else if (valor > 120 && valor <= 180) {
+                        return 'orange';
+                    } else {
+                        return 'red';
+                    }
+                },
+                pointRadius: 5,
+                fill: false,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Data e Hora'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Glicemia (mg/dL)'
+                    },
+                    min: 0,
+                    suggestedMax: 200
+                }
+            }
+        }
+    });
+    });
+</script>
+{% endblock %}

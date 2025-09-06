@@ -1,0 +1,31 @@
+{
+    "teste": {
+        "username": "teste",
+        "password": "teste",
+        "role": "admin",
+        "data_nascimento": "2025-09-01",
+        "sexo": "M",
+        "razao_ic": 0.9,
+        "fator_sensibilidade": 9.0,
+        "email": "goethandre@gmail.com"
+    },
+    "marcus": {
+        "username": "marcus",
+        "password": "marcus",
+        "role": "admin",
+        "data_nascimento": "1969-11-24",
+        "sexo": "masculino",
+        "razao_ic": 1.0,
+        "fator_sensibilidade": 375.0,
+        "email": "goethandre@gmail.com"
+    },
+    "Davi Lucas Siqueira Goeth": {
+        "password": "$2b$12$CIB9HpHIYMAlRaOpJXX4mugNUaMZ9ZJ/ynxO5/HzKo7bDgMEJ1kkm",
+        "role": "user",
+        "email": "",
+        "razao_ic": null,
+        "fator_sensibilidade": null,
+        "data_nascimento": "2023-06-30",
+        "sexo": "masculino"
+    }
+}

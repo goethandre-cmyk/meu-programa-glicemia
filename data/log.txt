@@ -1,0 +1,112 @@
+[2025-09-02 02:01:48] Usuário: teste | Ação: login
+[2025-09-02 02:01:48] Usuário: teste | Ação: acesso ao dashboard
+[2025-09-02 02:06:54] Usuário: teste | Ação: login
+[2025-09-02 02:06:54] Usuário: teste | Ação: acesso ao dashboard
+[2025-09-02 02:08:56] Usuário: teste | Ação: login
+[2025-09-02 02:08:56] Usuário: teste | Ação: acesso ao dashboard
+[2025-09-02 02:15:38] Usuário: teste | Ação: login
+[2025-09-02 02:15:38] Usuário: teste | Ação: acesso ao dashboard
+[2025-09-02 02:21:36] Usuário: teste | Ação: login
+[2025-09-02 02:21:36] Usuário: teste | Ação: acesso ao dashboard
+[2025-09-02 02:38:12] Usuário: teste | Ação: login
+[2025-09-02 02:38:12] Usuário: teste | Ação: acesso ao dashboard
+[2025-09-02 02:43:24] Usuário: teste | Ação: login
+[2025-09-02 02:43:24] Usuário: teste | Ação: acesso ao dashboard
+[2025-09-02 02:47:00] Usuário: marcus | Ação: cadastro
+[2025-09-02 02:47:09] Usuário: marcus | Ação: login
+[2025-09-02 02:47:09] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 02:58:38] Usuário: marcus | Ação: login
+[2025-09-02 02:58:38] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:03:58] Usuário: marcus | Ação: login
+[2025-09-02 03:03:58] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:08:04] Usuário: marcus | Ação: login
+[2025-09-02 03:08:04] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:12:20] Usuário: marcus | Ação: login
+[2025-09-02 03:12:20] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:17:54] Usuário: marcus | Ação: login
+[2025-09-02 03:17:54] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:21:07] Usuário: marcus | Ação: login
+[2025-09-02 03:21:07] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:23:08] Usuário: marcus | Ação: login
+[2025-09-02 03:23:08] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:28:04] Usuário: marcus | Ação: login
+[2025-09-02 03:28:04] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:39:47] Usuário: marcus | Ação: login
+[2025-09-02 03:39:47] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 03:55:46] Usuário: marcus | Ação: login
+[2025-09-02 03:55:46] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 04:02:44] Usuário: marcus | Ação: login
+[2025-09-02 04:02:44] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 04:02:49] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 04:06:20] Usuário: marcus | Ação: login
+[2025-09-02 04:06:20] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 04:10:25] Usuário: marcus | Ação: login
+[2025-09-02 04:10:25] Usuário: marcus | Ação: acesso ao dashboard
+[2025-09-02 04:22:15] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-02 04:29:57] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-02 23:31:44] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-02 23:46:31] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-02 23:47:26] Usuário: Novo alimento registrado: Pescada, filé, com farinha de trigo, frito | Ação: marcus
+[2025-09-02 23:53:04] Usuário: Novo alimento registrado: Farinha, de centeio, integral | Ação: marcus
+[2025-09-02 23:59:23] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 00:07:44] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 00:08:03] Usuário: Registro de glicemia: 286.0 | Ação: marcus
+[2025-09-03 00:18:58] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 00:21:33] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 00:33:33] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 00:34:07] Usuário: Perfil de usuário atualizado. | Ação: marcus
+[2025-09-03 00:49:31] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 00:49:39] Usuário: Perfil de usuário atualizado. | Ação: marcus
+[2025-09-03 00:50:47] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 00:51:07] Usuário: Login bem-sucedido | Ação: teste
+[2025-09-03 14:44:42] Usuário: Login bem-sucedido | Ação: teste
+[2025-09-03 14:45:14] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-03 23:59:38] Usuário: Login bem-sucedido | Ação: marcus
+[2025-09-04 01:07:27] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 01:20:44] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 01:22:51] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 01:48:56] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 03:49:22] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 22:14:07] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 22:21:02] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 22:23:57] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 22:32:40] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 23:15:37] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-04 23:49:22] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 00:13:36] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 00:50:31] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 01:39:41] Usuário: marcus | Ação: Perfil do usuário teste editado
+[2025-09-05 02:11:50] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 02:44:15] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 03:01:44] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 03:15:54] Usuário: marcus | Ação: Cálculo de Fator de Sensibilidade: 375.0 mg/dL
+[2025-09-05 03:26:22] Usuário: marcus | Ação: Cálculo de Fator de Sensibilidade: 600.0 mg/dL
+[2025-09-05 03:28:56] Usuário: marcus | Ação: Perfil de usuário atualizado.
+[2025-09-05 03:29:39] Usuário: marcus | Ação: Cálculo de Fator de Sensibilidade: 375.0 mg/dL
+[2025-09-05 03:30:04] Usuário: marcus | Ação: Perfil de usuário atualizado.
+[2025-09-05 03:30:16] Usuário: marcus | Ação: Cálculo de bolus: 89.06 UI
+[2025-09-05 04:55:25] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 11:34:43] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 12:17:17] Usuário: marcus | Ação: Cálculo de Fator de Sensibilidade: 450.0 mg/dL
+[2025-09-05 12:36:09] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 12:52:29] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 12:55:36] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 13:29:44] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 13:40:47] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 15:39:54] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 18:27:36] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-05 19:18:44] Usuário: marcus | Ação: Registro de glicemia e refeição: 123.0
+[2025-09-05 20:08:04] Usuário: marcus | Ação: Registro de glicemia e refeição: 123.0
+[2025-09-05 20:14:52] Usuário: marcus | Ação: Registro de glicemia e refeição: 123.0
+[2025-09-06 00:02:56] Usuário: marcus | Ação: Registro de glicemia e refeição: 124.0
+[2025-09-06 00:18:14] Usuário: marcus | Ação: Registro de glicemia e refeição: 200.0
+[2025-09-06 00:58:51] Usuário: marcus | Ação: Registro de glicemia e refeição: 223.0
+[2025-09-06 01:05:36] Usuário: marcus | Ação: Registro de glicemia e refeição: 123.0
+[2025-09-06 01:13:36] Usuário: marcus | Ação: Registro de glicemia e refeição: 234.0
+[2025-09-06 01:21:31] Usuário: marcus | Ação: Registo de ID 7 atualizado
+[2025-09-06 01:21:48] Usuário: marcus | Ação: Registo de ID 9 excluído
+[2025-09-06 01:23:41] Usuário: marcus | Ação: Registo de ID 3 atualizado
+[2025-09-06 01:53:22] Usuário: marcus | Ação: Login bem-sucedido
+[2025-09-06 02:46:09] Usuário: davi | Ação: Tentativa de login falhada
+[2025-09-06 03:33:02] Usuário: davi | Ação: Tentativa de login falhada
+[2025-09-06 03:33:22] Usuário: marcus | Ação: Login bem-sucedido

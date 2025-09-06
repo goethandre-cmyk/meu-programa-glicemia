@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Gráfico de Glicemia</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Gráfico de Glicemia</h1>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Voltar</a>
+        </div>
+        
+        <p>Acompanhe a sua evolução de glicemia ao longo do tempo.</p>
+        
+        <div class="card" style="height: 400px;">
+            <canvas id="glicemiaChart"></canvas>
+        </div>
+
+    </div>
+
+    <script>
+        // Quando a página carregar, vamos buscar os dados e desenhar o gráfico
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/dados_glicemia')
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('glicemiaChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.rotulos,
+                            datasets: [{
+                                label: 'Nível de Glicemia (mg/dL)',
+                                data: data.valores,
+                                borderColor: 'rgb(0, 123, 255)',
+                                backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                                fill: true,
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Valor de Glicemia (mg/dL)'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Data e Hora'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => console.error('Erro ao carregar os dados do gráfico:', error));
+        });
+    </script>
+</body>
+</html>

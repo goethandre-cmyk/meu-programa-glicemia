@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciar Usuários{% endblock %}
+
+{% block content %}
+<div class="card p-4 shadow-sm">
+    <h1 class="mb-4">Gerenciar Usuários</h1>
+
+    <a href="{{ url_for('cadastrar_usuario') }}" class="btn btn-primary mb-3">Adicionar Novo Usuário</a>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Nome de Usuário</th>
+                    <th>Email</th>
+                    <th>Função</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for username, usuario in usuarios.items() %}
+                <tr>
+                    <td>{{ username }}</td>
+                    <td>{{ usuario.email or 'N/A' }}</td>
+                    <td>{{ usuario.role or 'padrão' }}</td>
+                    <td>
+                        <a href="{{ url_for('editar_usuario', username=username) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-3">Voltar ao Painel</a>
+</div>
+{% endblock %}

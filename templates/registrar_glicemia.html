@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}Registrar Glicemia e Refeição{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-plus-circle me-2"></i>Registrar Glicemia e Refeição
+    </h1>
+
+    <div class="card p-4 shadow-sm">
+        <form id="form-registro" action="{{ url_for('registrar_glicemia') }}" method="post">
+            <div class="mb-3 input-group">
+                <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
+                <input type="number" step="0.1" class="form-control" id="valor" name="valor" placeholder="Valor da Glicemia (mg/dL)" required>
+            </div>
+            
+            <div class="mb-3 input-group">
+                <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                <input type="datetime-local" class="form-control" id="data_hora" name="data_hora" required>
+            </div>
+
+            <div class="mb-3 input-group">
+                <span class="input-group-text"><i class="fas fa-utensils"></i></span>
+                <select class="form-select" id="refeicao" name="refeicao" required>
+                    <option value="" disabled selected>Selecione a Refeição...</option>
+                    <option value="Jejum">Jejum</option>
+                    <option value="Café da Manhã">Café da Manhã</option>
+                    <option value="Almoço">Almoço</option>
+                    <option value="Janta">Janta</option>
+                    <option value="Lanche">Lanche</option>
+                    <option value="Colação">Colação</option>
+                </select>
+            </div>
+            
+            <div class="form-group mb-3">
+                <label for="alimento_busca">Procurar Alimento:</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" id="alimento_busca" class="form-control" placeholder="Digite 3 ou mais letras para pesquisar...">
+                </div>
+            </div>
+            
+            <div id="resultados_busca_alimentos" class="list-group mb-3">
+                </div>
+
+            <div class="mb-3">
+                <label>Alimentos Selecionados:</label>
+                <ul id="lista_alimentos_selecionados" class="list-group">
+                    </ul>
+            </div>
+            
+            <div class="mb-3 text-end">
+                <strong>Total de Carboidratos:</strong>
+                <span id="total_carbs_refeicao" class="fw-bold">0.0</span>g
+            </div>
+
+            <div class="mb-3 input-group">
+                <span class="input-group-text"><i class="fas fa-comment-dots"></i></span>
+                <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Observações (opcional)"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="fas fa-save me-2"></i>Registrar
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const refeicaoSelect = document.getElementById('refeicao');
+        const searchInput = document.getElementById('alimento_busca');
+        const resultsContainer = document.getElementById('resultados_busca_alimentos');
+        const listaAlimentos = document.getElementById('lista_alimentos_selecionados');
+        const totalCarbsElement = document.getElementById('total_carbs_refeicao');
+        
+        let timeoutId;
+
+        refeicaoSelect.addEventListener('change', function() {
+            if (this.value === 'Jejum') {
+                searchInput.value = '';
+                resultsContainer.innerHTML = '';
+                listaAlimentos.innerHTML = '';
+                atualizarTotalCarbs();
+            }
+        });
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(timeoutId);
+
+            const termo = searchInput.value;
+            
+            if (termo.length < 3) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            timeoutId = setTimeout(() => {
+                fetch('/buscar_alimento', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `termo_pesquisa=${encodeURIComponent(termo)}`
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro na resposta do servidor.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.erro) {
+                        console.error('Erro na busca:', data.erro);
+                        resultsContainer.innerHTML = '<p class="list-group-item text-danger">Erro ao buscar alimentos.</p>';
+                        return;
+                    }
+                    
+                    exibirResultados(data.resultados);
+                })
+                .catch(error => {
+                    console.error('Erro na requisição:', error);
+                    resultsContainer.innerHTML = '<p class="list-group-item text-danger">Erro ao conectar com o servidor.</p>';
+                });
+            }, 500);
+        });
+
+        function exibirResultados(alimentos) {
+            let html = '';
+            if (alimentos.length === 0) {
+                html = '<div class="list-group-item">Nenhum alimento encontrado.</div>';
+            } else {
+                alimentos.forEach(alimento => {
+                    // Use as chaves corretas do seu arquivo CSV, que são case-sensitive
+                    const nome = alimento['ALIMENTO'];
+                    const carbs = alimento['CHO (g)'];
+                    const medida = alimento['MEDIDA CASEIRA'];
+                    
+                    html += `
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${nome}</strong>
+                                <br>
+                                <small>Carboidratos: ${carbs}g | Medida: ${medida}</small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary adicionar-alimento-btn" 
+                                    data-nome="${nome}" data-carbs="${carbs}">
+                                Adicionar
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+            resultsContainer.innerHTML = html;
+            
+            document.querySelectorAll('.adicionar-alimento-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const nome = this.dataset.nome;
+                    const carbs = parseFloat(this.dataset.carbs);
+                    adicionarAlimentoNaLista(nome, carbs);
+                    searchInput.value = '';
+                    resultsContainer.innerHTML = '';
+                });
+            });
+        }
+
+        function adicionarAlimentoNaLista(nome, carbs) {
+            const novoAlimentoHtml = `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>
+                        <strong>${nome}</strong> - Carbs: <span class="carbs-value">${carbs}</span>g
+                    </span>
+                    <input type="hidden" name="alimento_selecionado[]" value="${nome}">
+                    <input type="hidden" name="carbs[]" value="${carbs}" class="input-carbs">
+                    <button type="button" class="btn btn-sm btn-outline-danger remover-alimento-btn">
+                        Remover
+                    </button>
+                </li>
+            `;
+            listaAlimentos.insertAdjacentHTML('beforeend', novoAlimentoHtml);
+            
+            atualizarTotalCarbs();
+        }
+        
+        listaAlimentos.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remover-alimento-btn')) {
+                const li = e.target.closest('li');
+                li.remove();
+                atualizarTotalCarbs();
+            }
+        });
+
+        function atualizarTotalCarbs() {
+            let total = 0;
+            document.querySelectorAll('.input-carbs').forEach(input => {
+                total += parseFloat(input.value) || 0;
+            });
+            totalCarbsElement.textContent = total.toFixed(2);
+        }
+    });
+</script>
+{% endblock %}
