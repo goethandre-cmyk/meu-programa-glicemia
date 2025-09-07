@@ -25,7 +25,7 @@
                     <td>{{ usuario.email or 'N/A' }}</td>
                     <td>{{ usuario.role or 'padrão' }}</td>
                     <td>
-                        <a href="{{ url_for('editar_usuario', username=username) }}" class="btn btn-sm btn-outline-primary">Editar</a>
+                        <a href="{{ url_for('editar_usuario', username=username) }}" class="btn btn-sm btn-primary">Editar</a>
                     </td>
                 </tr>
                 {% endfor %}

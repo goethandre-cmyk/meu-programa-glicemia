@@ -1,0 +1,59 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+            Meu App de Glicemia
+        </a>
+        {% if 'username' in session %}
+        <span class="nav-link text-white d-none d-lg-block me-3">Olá, {{ session['username'] }}</span>
+        {% endif %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('registrar_glicemia') }}">
+                        <i class="fas fa-plus me-1"></i>Registrar Glicemia
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('registros') }}">
+                        <i class="fas fa-clipboard-list me-1"></i>Meus Registros
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('registrar_alimento') }}">
+                        <i class="fas fa-utensils me-1"></i>Registrar Alimento
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('calcular_bolus') }}">
+                        <i class="fas fa-calculator me-1"></i>Calculadora Bolus
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('relatorios') }}">
+                        <i class="fas fa-chart-line me-1"></i>Relatórios
+                    </a>
+                </li>
+                {% if is_admin %}
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('gerenciar_usuarios') }}">
+                        <i class="fas fa-user-cog me-1"></i>Gerenciar Usuários
+                    </a>
+                </li>
+                {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('perfil') }}">
+                        <i class="fas fa-user-circle me-1"></i>Perfil
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-white" href="{{ url_for('logout') }}">
+                        <i class="fas fa-sign-out-alt me-1"></i>Sair
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>

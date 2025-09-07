@@ -3,88 +3,90 @@
 {% block title %}Guia Completo sobre Insulina{% endblock %}
 
 {% block content %}
-<div class="card p-4 shadow-sm">
-    <h1 class="mb-4 text-center">Guia Completo sobre Insulina</h1>
-    <p class="text-muted text-center">Conhecimento prático e baseado em evidências para o manejo do diabetes.</p>
-
-    <hr class="my-4">
-
-    <div class="container-fluid">
-        
-        <h2 class="mb-3">1. Desvendando a Insulina: Tipos, Ações e Sua Importância</h2>
-        <p>A insulina é um hormônio vital produzido pelas células beta do pâncreas, essencial para o metabolismo da glicose. Sua principal função é permitir que a glicose (energia proveniente dos alimentos) entre nas células para ser utilizada como combustível.</p>
-        <p>Em pacientes com diabetes, essa engrenagem metabólica encontra-se comprometida, e a **insulinoterapia** surge como um pilar fundamental no tratamento, buscando mimetizar a secreção fisiológica do pâncreas saudável.</p>
-        
-        <h3 class="mt-4">Tipos de Insulina:</h3>
-        <ul>
-            <li>
-                <strong>Insulinas Basais:</strong> Fornecem um suprimento contínuo e prolongado, cobrindo as necessidades do corpo entre as refeições e durante a noite.
-                <br><em>Exemplos: Insulina NPH, glargina, detemir, degludeca.</em>
-            </li>
-            <li>
-                <strong>Insulinas Prandiais (de Bolus):</strong> Agem rapidamente para controlar o aumento da glicemia que ocorre após as refeições.
-                <br><em>Exemplos: Insulina regular, lispro, asparte, glulisina.</em>
-            </li>
-        </ul>
-        <p>A escolha do tipo de insulina, a dosagem e o momento da aplicação são decisões médicas que devem ser estritamente individualizadas.</p>
-        
-        <hr class="my-4">
-
-        <h2 class="mb-3">2. Iniciando a Insulinoterapia: Quando e Como Calcular a Dose</h2>
-        <p>A decisão de iniciar a insulinoterapia é um passo crucial, e a dose inicial é sempre individualizada. Ela é necessária para restaurar o controle metabólico e prevenir complicações.</p>
-        
-        <h3 class="mt-4">Quando a Insulina se Torna Necessária?</h3>
-        <ul>
-            <li>
-                <strong>Diabetes Tipo 1 (DM1):</strong> A insulina é essencial e vital desde o diagnóstico.
-            </li>
-            <li>
-                <strong>Diabetes Tipo 2 (DM2):</strong> Considerada em casos de hiperglicemia grave, falha de outras terapias, ou sintomas como perda de peso e cetonúria.
-            </li>
-            <li>
-                <strong>Diabetes Gestacional (DMG):</strong> Indicada quando o controle glicêmico não é alcançado apenas com dieta e exercícios.
-            </li>
-        </ul>
-
-        <h3 class="mt-4">Cálculo da Dose Inicial Diária Total (DDTI):</h3>
-        <p>A faixa usual é de <strong>0,2 a 1,0 UI/kg/dia</strong>, variando conforme o quadro do paciente (tipo de diabetes, peso, uso de corticoides, etc.).</p>
-        
-        <hr class="my-4">
-
-        <h2 class="mb-3">3. Ajuste de Doses de Insulina: Guia Prático</h2>
-        <p>O ajuste correto das doses é fundamental para o controle glicêmico ótimo. A regra de ouro é:</p>
-        <ul>
-            <li>A <strong>insulina basal</strong> é ajustada com base nas glicemias de jejum e pré-refeições.</li>
-            <li>A <strong>insulina prandial</strong> é ajustada com base nas glicemias pós-refeições (1-2 horas após a refeição).</li>
-        </ul>
-        <p>Doses de correção podem ser adicionadas para corrigir hiperglicemia pré-refeição, usando o <strong>Fator de Sensibilidade (FS)</strong>.</p>
-
-        <hr class="my-4">
-        
-        <h2 class="mb-3">4. Insulina em Situações Especiais</h2>
-        <p>Cenários clínicos complexos como cetoacidose diabética (CAD), cirurgias e internações exigem ajustes precisos e acompanhamento médico rigoroso.</p>
-        
-        <h3 class="mt-4">Manejo em Situações Críticas:</h3>
-        <ul>
-            <li>
-                <strong>Cetoacidose Diabética (CAD):</strong> Uma emergência médica. Inicia-se com insulina regular endovenosa (EV) após hidratação e correção do potássio.
-            </li>
-            <li>
-                <strong>Cirurgias:</strong> Medicação oral é suspensa e a insulina é ajustada. Insulinas prandiais são suspensas no dia da cirurgia, e a dose basal é reduzida para evitar hipoglicemia.
-            </li>
-        </ul>
+<div class="container my-5">
+    <div class="card p-4 shadow-lg border-0 rounded-4">
+        <h1 class="mb-2 text-center text-primary fw-bold display-5">Guia Completo sobre Insulina</h1>
+        <p class="text-muted text-center lead">Conhecimento prático e baseado em evidências para o manejo do diabetes.</p>
 
         <hr class="my-4">
 
-        <h2 class="mb-3">5. Estratégias Avançadas de Insulinoterapia</h2>
-        <p>Para um controle glicêmico otimizado, o <strong>Esquema Basal-Bolus</strong> é considerado o padrão-ouro. Ele combina a insulina basal para necessidades contínuas com a prandial para cobrir as refeições.</p>
-        
-        <p>Ferramentas como a <strong>Contagem de Carboidratos</strong> e o <strong>Fator de Sensibilidade</strong> são cruciais para ajustes precisos. O monitoramento contínuo de glicose (CGM) e a educação do paciente são fundamentais para o sucesso a longo prazo.</p>
+        <div class="row g-4">
+            
+            <div class="col-lg-6">
+                <div class="p-4 bg-light rounded-3 h-100">
+                    <h2 class="mb-3 fs-3 fw-semibold text-dark"><i class="fas fa-syringe me-2 text-primary"></i>1. Desvendando a Insulina</h2>
+                    <p class="text-secondary">A insulina é um hormônio vital produzido pelas células beta do pâncreas, essencial para o metabolismo da glicose. Em pacientes com diabetes, a **insulinoterapia** surge como um pilar fundamental no tratamento, buscando mimetizar a secreção fisiológica do pâncreas saudável.</p>
+                    
+                    <h3 class="mt-4 fs-5 text-dark">Tipos de Insulina:</h3>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-clock text-info me-3"></i>
+                            <div>
+                                <strong>Insulinas Basais:</strong> Fornecem um suprimento contínuo e prolongado.
+                                <br><small class="text-muted"><em>Exemplos: Insulina NPH, glargina, detemir, degludeca.</em></small>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-drumstick-bite text-warning me-3"></i>
+                            <div>
+                                <strong>Insulinas Prandiais (de Bolus):</strong> Agem rapidamente para controlar a glicemia após as refeições.
+                                <br><small class="text-muted"><em>Exemplos: Insulina regular, lispro, asparte, glulisina.</em></small>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
 
-    </div>
+            <div class="col-lg-6 d-flex align-items-center justify-content-center">
+                <img src="{{ url_for('static', filename='imagens/insulina.jpg') }}" class="img-fluid rounded-4 shadow-sm" alt="Ilustração de cuidados com a insulina">
+            </div>
 
-    <div class="text-center mt-4">
-        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Voltar ao Painel</a>
+            <div class="col-12"><hr class="my-4"></div>
+
+            <div class="col-lg-6">
+                <div class="p-4 bg-light rounded-3 h-100">
+                    <h2 class="mb-3 fs-3 fw-semibold text-dark"><i class="fas fa-calculator me-2 text-primary"></i>2. Iniciando e Calculando a Dose</h2>
+                    <p class="text-secondary">A decisão de iniciar a insulinoterapia é um passo crucial. A dose inicial é sempre individualizada.</p>
+                    <h3 class="mt-4 fs-5 text-dark">Quando a Insulina é Necessária?</h3>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><i class="fas fa-check-circle text-success me-2"></i><strong>DM1:</strong> Essencial e vital.</li>
+                        <li class="list-group-item"><i class="fas fa-check-circle text-success me-2"></i><strong>DM2:</strong> Considerada em hiperglicemia grave ou falha de outras terapias.</li>
+                        <li class="list-group-item"><i class="fas fa-check-circle text-success me-2"></i><strong>DMG:</strong> Indicada quando dieta e exercícios não são suficientes.</li>
+                    </ul>
+                    
+                    <h3 class="mt-4 fs-5 text-dark"><i class="fas fa-chart-line me-2 text-primary"></i>3. Ajuste de Doses: Guia Prático</h3>
+                    <p class="text-secondary">O ajuste correto das doses é fundamental. A regra de ouro é: insulina basal ajustada pela glicemia de jejum, e insulina prandial pela glicemia pós-refeição.</p>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>Basal:</strong> Glicemias de jejum e pré-refeições.</li>
+                        <li class="list-group-item"><strong>Prandial:</strong> Glicemias 1-2 horas após as refeições.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="p-4 bg-light rounded-3 h-100">
+                    <h2 class="mb-3 fs-3 fw-semibold text-dark"><i class="fas fa-hospital me-2 text-primary"></i>4. Insulina em Situações Especiais</h2>
+                    <p class="text-secondary">Cenários clínicos complexos como cetoacidose diabética (CAD), cirurgias e internações exigem ajustes precisos e acompanhamento médico rigoroso.</p>
+                    <h3 class="mt-4 fs-5 text-dark">Manejo em Situações Críticas:</h3>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <strong>Cetoacidose Diabética (CAD):</strong> Uma emergência médica. Inicia-se com insulina regular endovenosa.
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Cirurgias:</strong> Medicação oral é suspensa, e a dose basal de insulina é ajustada para evitar hipoglicemia.
+                        </li>
+                    </ul>
+
+                    <h2 class="mb-3 mt-4 fs-3 fw-semibold text-dark"><i class="fas fa-cogs me-2 text-primary"></i>5. Estratégias Avançadas</h2>
+                    <p class="text-secondary">Para um controle otimizado, o <strong>Esquema Basal-Bolus</strong> é o padrão-ouro. Ferramentas como a <strong>Contagem de Carboidratos</strong> e o <strong>Fator de Sensibilidade</strong> são cruciais.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="text-center mt-5">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg">Voltar ao Painel</a>
+        </div>
     </div>
 </div>
 {% endblock %}

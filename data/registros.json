@@ -369,5 +369,22 @@
         "alimentos_refeicao": [],
         "total_carbs": 0,
         "observacoes": ""
+    },
+    {
+        "id": 33,
+        "data_hora": "2025-09-07T18:30:00",
+        "tipo": "Refeição",
+        "valor": 123.0,
+        "descricao": "Café da Manhã: Café com leite meio a meio\r\n(com açúcar) - Carbs: 19.0g. Total Carbs: 19.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Café da Manhã",
+        "alimentos_refeicao": [
+            {
+                "nome": "Café com leite meio a meio\r\n(com açúcar)",
+                "carbs": 19.0
+            }
+        ],
+        "total_carbs": 19.0,
+        "observacoes": ""
     }
 ]
