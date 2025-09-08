@@ -386,5 +386,153 @@
         ],
         "total_carbs": 19.0,
         "observacoes": ""
+    },
+    {
+        "id": 34,
+        "data_hora": "2025-09-08T00:24:00",
+        "tipo": "Refeição",
+        "valor": 123.0,
+        "descricao": "Jejum: Total Carbs: 0g. ",
+        "usuario": "goeth",
+        "refeicao": "Jejum",
+        "alimentos_refeicao": [],
+        "total_carbs": 0,
+        "observacoes": ""
+    },
+    {
+        "id": 35,
+        "data_hora": "2025-09-08T00:27:00",
+        "tipo": "Refeição",
+        "valor": 321.0,
+        "descricao": "Café da Manhã: Abacate (picado) - Carbs: 3.0g. Total Carbs: 3.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Café da Manhã",
+        "alimentos_refeicao": [
+            {
+                "nome": "Abacate (picado)",
+                "carbs": 3.0
+            }
+        ],
+        "total_carbs": 3.0,
+        "observacoes": ""
+    },
+    {
+        "id": 36,
+        "data_hora": "2025-09-08T00:29:00",
+        "tipo": "Refeição",
+        "valor": 321.0,
+        "descricao": "Café da Manhã: Arroz à grega - Carbs: 18.0g. Total Carbs: 18.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Café da Manhã",
+        "alimentos_refeicao": [
+            {
+                "nome": "Arroz à grega",
+                "carbs": 18.0
+            }
+        ],
+        "total_carbs": 18.0,
+        "observacoes": ""
+    },
+    {
+        "id": 37,
+        "data_hora": "2025-09-08T00:31:00",
+        "tipo": "Refeição",
+        "valor": 123.0,
+        "descricao": "Almoço: Banana à milanesa - Carbs: 120.0g. Total Carbs: 120.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Almoço",
+        "alimentos_refeicao": [
+            {
+                "nome": "Banana à milanesa",
+                "carbs": 120.0
+            }
+        ],
+        "total_carbs": 120.0,
+        "observacoes": ""
+    },
+    {
+        "id": 38,
+        "data_hora": "2025-09-08T00:32:00",
+        "tipo": "Refeição",
+        "valor": 32.0,
+        "descricao": "Almoço: Big Mac (McDonald’s®) - Carbs: 135.0g. Total Carbs: 135.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Almoço",
+        "alimentos_refeicao": [
+            {
+                "nome": "Big Mac (McDonald’s®)",
+                "carbs": 135.0
+            }
+        ],
+        "total_carbs": 135.0,
+        "observacoes": ""
+    },
+    {
+        "id": 39,
+        "data_hora": "2025-09-08T00:37:00",
+        "tipo": "Refeição",
+        "valor": 123.0,
+        "descricao": "Janta: Big Mac (McDonald’s®) - Carbs: 45.0g, Angu - Carbs: 9.0g, Arroz à grega - Carbs: 18.0g. Total Carbs: 72.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Janta",
+        "alimentos_refeicao": [
+            {
+                "nome": "Big Mac (McDonald’s®)",
+                "carbs": 45.0
+            },
+            {
+                "nome": "Angu",
+                "carbs": 9.0
+            },
+            {
+                "nome": "Arroz à grega",
+                "carbs": 18.0
+            }
+        ],
+        "total_carbs": 72.0,
+        "observacoes": ""
+    },
+    {
+        "id": 40,
+        "data_hora": "2025-09-08T00:49:00",
+        "tipo": "Refeição",
+        "valor": 145.0,
+        "descricao": "Café da Manhã: Big Bob (Bob’s®) - Carbs: 37.0g, Big Mac (McDonald’s®) - Carbs: 45.0g. Total Carbs: 82.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Café da Manhã",
+        "alimentos_refeicao": [
+            {
+                "nome": "Big Bob (Bob’s®)",
+                "carbs": 37.0
+            },
+            {
+                "nome": "Big Mac (McDonald’s®)",
+                "carbs": 45.0
+            }
+        ],
+        "total_carbs": 82.0,
+        "observacoes": ""
+    },
+    {
+        "id": 41,
+        "data_hora": "2025-09-08T00:54:00",
+        "tipo": "Refeição",
+        "valor": 123.0,
+        "descricao": "Café da Manhã: Big Bob Artesanal (Bob’s®) - Carbs: 34.0g, Big Mac (McDonald’s®) - Carbs: 45.0g. Total Carbs: 79.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Café da Manhã",
+        "alimentos_refeicao": [
+            {
+                "nome": "Big Bob Artesanal (Bob’s®)",
+                "carbs": 34.0
+            },
+            {
+                "nome": "Big Mac (McDonald’s®)",
+                "carbs": 45.0
+            }
+        ],
+        "total_carbs": 79.0,
+        "total_calorias": 316.0,
+        "observacoes": ""
     }
 ]

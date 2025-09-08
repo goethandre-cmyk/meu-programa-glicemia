@@ -218,6 +218,7 @@ class AppCore:
         with open(LOG_FILE, 'a', encoding='utf-8') as f:
             f.write(log_entry)
 
+    # NOVO: Adiciona total_calorias aos parâmetros
     def adicionar_registro(self, **kwargs):
         """Adiciona um novo registro e salva."""
         next_id = 1
@@ -252,6 +253,7 @@ class AppCore:
             pass
         return None
 
+    # NOVO: Atualiza o registro com o novo campo total_calorias
     def atualizar_registro(self, id_str, **kwargs):
         """Atualiza um registro existente."""
         registo = self.encontrar_registro(id_str)

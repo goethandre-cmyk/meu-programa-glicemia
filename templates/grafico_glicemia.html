@@ -1,69 +1,115 @@
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-    <meta charset="UTF-8">
-    <title>Gráfico de Glicemia</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Gráfico de Glicemia</h1>
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Voltar</a>
-        </div>
-        
-        <p>Acompanhe a sua evolução de glicemia ao longo do tempo.</p>
-        
-        <div class="card" style="height: 400px;">
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-chart-line me-2"></i>Dashboard
+    </h1>
+
+    <div class="card p-4 shadow-sm mb-4">
+        <h5 class="card-title text-center">Níveis de Glicemia</h5>
+        <div style="height: 350px;">
             <canvas id="glicemiaChart"></canvas>
         </div>
-
     </div>
 
-    <script>
-        // Quando a página carregar, vamos buscar os dados e desenhar o gráfico
-        document.addEventListener('DOMContentLoaded', function() {
-            fetch('/dados_glicemia')
-                .then(response => response.json())
-                .then(data => {
-                    const ctx = document.getElementById('glicemiaChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: data.rotulos,
-                            datasets: [{
-                                label: 'Nível de Glicemia (mg/dL)',
-                                data: data.valores,
-                                borderColor: 'rgb(0, 123, 255)',
-                                backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                                fill: true,
-                                tension: 0.1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    title: {
-                                        display: true,
-                                        text: 'Valor de Glicemia (mg/dL)'
-                                    }
-                                },
-                                x: {
-                                    title: {
-                                        display: true,
-                                        text: 'Data e Hora'
-                                    }
+    <div class="card p-4 shadow-sm">
+        <h5 class="card-title text-center">Consumo de Calorias Diárias</h5>
+        <div style="height: 350px;">
+            <canvas id="caloriasChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Script para o gráfico de glicemia (o seu código original)
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/dados_glicemia')
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('glicemiaChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.rotulos,
+                        datasets: [{
+                            label: 'Nível de Glicemia (mg/dL)',
+                            data: data.valores,
+                            borderColor: 'rgb(0, 123, 255)',
+                            backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Valor de Glicemia (mg/dL)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Data e Hora'
                                 }
                             }
                         }
-                    });
-                })
-                .catch(error => console.error('Erro ao carregar os dados do gráfico:', error));
-        });
-    </script>
-</body>
-</html>
+                    }
+                });
+            })
+            .catch(error => console.error('Erro ao carregar os dados do gráfico de glicemia:', error));
+    });
+
+    // ---
+
+    // Novo script para o gráfico de calorias
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/dados_calorias_diarias')
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('caloriasChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar', // Gráfico de barras é ideal para totais diários
+                    data: {
+                        labels: data.rotulos_dias,
+                        datasets: [{
+                            label: 'Calorias Totais (kcal)',
+                            data: data.valores_calorias,
+                            backgroundColor: 'rgba(255, 159, 64, 0.5)', // Corlaranja
+                            borderColor: 'rgb(255, 159, 64)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Calorias (kcal)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Data'
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error('Erro ao carregar os dados do gráfico de calorias:', error));
+    });
+</script>
+{% endblock %}

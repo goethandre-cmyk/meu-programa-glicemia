@@ -10,6 +10,53 @@
         <hr class="my-4">
         <p>Acesse as ferramentas e calculadoras abaixo para um acompanhamento mais completo.</p>
     </div>
+    <div class="card p-3 shadow-sm">
+        <h5 class="card-title">Total de Calorias (Hoje)</h5>
+        <p class="card-text fs-2 fw-bold text-success">{{ total_calorias_diarias }} kcal</p>
+    </div>
+    {% if resumo_dados['ultimo_registro'] %}
+    <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido</h2>
+    <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0 bg-secondary text-white text-center">
+                <div class="card-body">
+                    <i class="fas fa-arrow-circle-right fa-2x mb-2"></i>
+                    <h5 class="card-title">Último Registro</h5>
+                    <h2 class="card-text display-6">{{ resumo_dados['ultimo_registro']['valor'] }} mg/dL</h2>
+                    <p class="card-text"><small>{{ resumo_dados['tempo_desde_ultimo'] }}</small></p>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0 bg-info text-dark text-center">
+                <div class="card-body">
+                    <i class="fas fa-chart-bar fa-2x mb-2"></i>
+                    <h5 class="card-title">Média (Últimos 7 Dias)</h5>
+                    <h2 class="card-text display-6">
+                        {% if resumo_dados['media_ultima_semana'] %}
+                        {{ resumo_dados['media_ultima_semana'] }} mg/dL
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </h2>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0 text-white text-center" style="background-color: #6c757d;">
+                <div class="card-body">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                    <h5 class="card-title">Eventos Extremos</h5>
+                    <p class="card-text">
+                        <span class="text-warning">Hiper: {{ resumo_dados['hiperglicemia_count'] }}</span>
+                        <span class="mx-2">|</span>
+                        <span class="text-danger">Hipo: {{ resumo_dados['hipoglicemia_count'] }}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <h2 class="text-center mb-4 text-secondary">Ferramentas Diárias</h2>
     <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">

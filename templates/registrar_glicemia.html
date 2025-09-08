@@ -42,12 +42,12 @@
             </div>
             
             <div id="resultados_busca_alimentos" class="list-group mb-3">
-                </div>
+            </div>
 
             <div class="mb-3">
                 <label>Alimentos Selecionados:</label>
                 <ul id="lista_alimentos_selecionados" class="list-group">
-                    </ul>
+                </ul>
             </div>
             
             <div class="mb-3 text-end">
@@ -75,21 +75,25 @@
         const resultsContainer = document.getElementById('resultados_busca_alimentos');
         const listaAlimentos = document.getElementById('lista_alimentos_selecionados');
         const totalCarbsElement = document.getElementById('total_carbs_refeicao');
-        
+
         let timeoutId;
 
+        // Lógica de desabilitar a busca de alimentos em jejum
         refeicaoSelect.addEventListener('change', function() {
             if (this.value === 'Jejum') {
                 searchInput.value = '';
                 resultsContainer.innerHTML = '';
                 listaAlimentos.innerHTML = '';
                 atualizarTotalCarbs();
+                searchInput.disabled = true;
+            } else {
+                searchInput.disabled = false;
             }
         });
 
+        // Evento de digitação no campo de busca com delay
         searchInput.addEventListener('input', function() {
             clearTimeout(timeoutId);
-
             const termo = searchInput.value;
             
             if (termo.length < 3) {
@@ -112,12 +116,6 @@
                     return response.json();
                 })
                 .then(data => {
-                    if (data.erro) {
-                        console.error('Erro na busca:', data.erro);
-                        resultsContainer.innerHTML = '<p class="list-group-item text-danger">Erro ao buscar alimentos.</p>';
-                        return;
-                    }
-                    
                     exibirResultados(data.resultados);
                 })
                 .catch(error => {
@@ -127,16 +125,17 @@
             }, 500);
         });
 
+        // Exibe os resultados da busca na tela
         function exibirResultados(alimentos) {
             let html = '';
             if (alimentos.length === 0) {
-                html = '<div class="list-group-item">Nenhum alimento encontrado.</div>';
+                html = '<div class="list-group-item text-muted">Nenhum alimento encontrado.</div>';
             } else {
                 alimentos.forEach(alimento => {
-                    // Use as chaves corretas do seu arquivo CSV, que são case-sensitive
                     const nome = alimento['ALIMENTO'];
                     const carbs = alimento['CHO (g)'];
                     const medida = alimento['MEDIDA CASEIRA'];
+                    const peso = alimento['PESO (g/ml)'];
                     
                     html += `
                         <div class="list-group-item d-flex justify-content-between align-items-center">
@@ -146,7 +145,7 @@
                                 <small>Carboidratos: ${carbs}g | Medida: ${medida}</small>
                             </div>
                             <button type="button" class="btn btn-sm btn-primary adicionar-alimento-btn" 
-                                    data-nome="${nome}" data-carbs="${carbs}">
+                                    data-nome="${nome}" data-carbs="${carbs}" data-medida="${medida}" data-peso="${peso}">
                                 Adicionar
                             </button>
                         </div>
@@ -155,43 +154,82 @@
             }
             resultsContainer.innerHTML = html;
             
+            // Adiciona evento de clique aos botões 'Adicionar'
             document.querySelectorAll('.adicionar-alimento-btn').forEach(button => {
                 button.addEventListener('click', function() {
-                    const nome = this.dataset.nome;
-                    const carbs = parseFloat(this.dataset.carbs);
-                    adicionarAlimentoNaLista(nome, carbs);
+                    const { nome, carbs, medida, peso } = this.dataset;
+                    adicionarAlimentoNaLista(nome, parseFloat(carbs), medida, parseFloat(peso));
                     searchInput.value = '';
                     resultsContainer.innerHTML = '';
                 });
             });
         }
 
-        function adicionarAlimentoNaLista(nome, carbs) {
-            const novoAlimentoHtml = `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>
-                        <strong>${nome}</strong> - Carbs: <span class="carbs-value">${carbs}</span>g
-                    </span>
+        // Adiciona o alimento selecionado na lista de refeição
+        function adicionarAlimentoNaLista(nome, carbsPorMedida, medidaCaseira, pesoGrama) {
+            const novoItemHtml = `
+                <li class="list-group-item d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><strong>${nome}</strong></span>
+                        <button type="button" class="btn btn-sm btn-outline-danger remover-alimento-btn">Remover</button>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label d-block text-muted small">Carboidratos por medida:</label>
+                            <span class="text-primary fw-bold">${carbsPorMedida}g</span> / 
+                            <span class="text-muted small">${medidaCaseira} (${pesoGrama}g)</span>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label d-block text-muted small">Quantidade consumida:</label>
+                            <div class="input-group">
+                                <input type="number" step="0.1" class="form-control form-control-sm input-quantidade" value="1" min="0.1">
+                                <span class="input-group-text">${medidaCaseira}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-end">
+                        <span class="fw-bold">Total:</span> <span class="carbs-calculados fw-bold text-success">0.0</span>g
+                    </div>
                     <input type="hidden" name="alimento_selecionado[]" value="${nome}">
-                    <input type="hidden" name="carbs[]" value="${carbs}" class="input-carbs">
-                    <button type="button" class="btn btn-sm btn-outline-danger remover-alimento-btn">
-                        Remover
-                    </button>
+                    <input type="hidden" name="carbs[]" class="input-carbs" value="0">
                 </li>
             `;
-            listaAlimentos.insertAdjacentHTML('beforeend', novoAlimentoHtml);
             
+            listaAlimentos.insertAdjacentHTML('beforeend', novoItemHtml);
+            
+            const novoItem = listaAlimentos.lastElementChild;
+            const inputQuantidade = novoItem.querySelector('.input-quantidade');
+            
+            inputQuantidade.addEventListener('input', function() {
+                recalcularItem(novoItem, carbsPorMedida, pesoGrama);
+                atualizarTotalCarbs();
+            });
+            
+            novoItem.querySelector('.remover-alimento-btn').addEventListener('click', function() {
+                novoItem.remove();
+                atualizarTotalCarbs();
+            });
+
+            recalcularItem(novoItem, carbsPorMedida, pesoGrama);
             atualizarTotalCarbs();
         }
         
-        listaAlimentos.addEventListener('click', function(e) {
-            if (e.target.classList.contains('remover-alimento-btn')) {
-                const li = e.target.closest('li');
-                li.remove();
-                atualizarTotalCarbs();
+        // Recalcula os carboidratos de um único item
+        function recalcularItem(item, carbsPorMedida, pesoGrama) {
+            const quantidade = parseFloat(item.querySelector('.input-quantidade').value) || 0;
+            let totalItemCarbs = 0;
+            
+            if (!isNaN(pesoGrama) && pesoGrama > 0) {
+                totalItemCarbs = (carbsPorMedida / pesoGrama) * (quantidade * pesoGrama);
+            } else {
+                totalItemCarbs = quantidade * carbsPorMedida;
             }
-        });
-
+            
+            item.querySelector('.carbs-calculados').textContent = totalItemCarbs.toFixed(2);
+            item.querySelector('.input-carbs').value = totalItemCarbs.toFixed(2);
+        }
+        
+        // Atualiza o total de carboidratos exibido na página
         function atualizarTotalCarbs() {
             let total = 0;
             document.querySelectorAll('.input-carbs').forEach(input => {
@@ -199,6 +237,12 @@
             });
             totalCarbsElement.textContent = total.toFixed(2);
         }
+
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
     });
 </script>
 {% endblock %}

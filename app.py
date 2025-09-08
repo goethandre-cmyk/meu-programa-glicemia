@@ -15,7 +15,8 @@ from flask import (
     flash,
     get_flashed_messages
 )
-from datetime import datetime
+# Alteração aqui: importa a classe 'datetime' diretamente
+from datetime import datetime, timedelta, date # NOVO: Importando 'date' para lidar com datas
 import bcrypt
 
 # Importa as classes e funções utilitárias do seu módulo logica.py
@@ -117,8 +118,73 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Exibe o dashboard principal da aplicação, com informações do usuário."""
-    return render_template('dashboard.html')
+    username = session['username']
+    
+    # Busca todos os registros do usuário
+    registros = app_core.mostrar_registros(usuario_filtro=username)
+    
+    # Inicializa as variáveis de resumo
+    resumo_dados = {
+        'media_ultima_semana': None,
+        'hipoglicemia_count': 0,
+        'hiperglicemia_count': 0,
+        'ultimo_registro': None,
+        'tempo_desde_ultimo': None
+    }
+    
+    # NOVO: Inicializa o total de calorias
+    total_calorias_diarias = 0.0
+
+    if registros:
+        # Encontra o último registro
+        ultimo_registro = registros[0]
+        resumo_dados['ultimo_registro'] = ultimo_registro
+        
+        # Calcula o tempo desde o último registro
+        agora = datetime.now()
+        delta = agora - ultimo_registro['data_hora']
+        
+        # Converte o delta em texto amigável
+        if delta.days > 0:
+            resumo_dados['tempo_desde_ultimo'] = f"{delta.days} dias atrás"
+        elif delta.seconds >= 3600:
+            horas = delta.seconds // 3600
+            resumo_dados['tempo_desde_ultimo'] = f"{horas} horas atrás"
+        else:
+            minutos = delta.seconds // 60
+            resumo_dados['tempo_desde_ultimo'] = f"{minutos} minutos atrás"
+
+        # Filtra registros da última semana e calcula média, hipo e hiper
+        sete_dias_atras = agora - timedelta(days=7)
+        glicemias_ultima_semana = [
+            reg['valor'] 
+            for reg in registros 
+            if reg['data_hora'] > sete_dias_atras
+        ]
+        
+        if glicemias_ultima_semana:
+            media = sum(glicemias_ultima_semana) / len(glicemias_ultima_semana)
+            resumo_dados['media_ultima_semana'] = round(media, 2)
+        
+        # Conta episódios de hipoglicemia e hiperglicemia
+        for reg in registros:
+            if reg['valor'] < 70:
+                resumo_dados['hipoglicemia_count'] += 1
+            if reg['valor'] > 180:
+                resumo_dados['hiperglicemia_count'] += 1
+
+        # NOVO: Calcula o total de calorias do dia
+        hoje = date.today()
+        for reg in registros:
+            if 'total_calorias' in reg and reg['data_hora'].date() == hoje:
+                total_calorias_diarias += reg['total_calorias']
+    
+    # NOVO: Passa o valor de calorias para o template
+    return render_template('dashboard.html', 
+                            username=username, 
+                            resumo_dados=resumo_dados,
+                            total_calorias_diarias=round(total_calorias_diarias, 2)
+                          )
 
 @app.route('/guia_insulina')
 @login_required
@@ -182,6 +248,9 @@ def registrar_glicemia():
                 if alimento_nome:
                     alimentos_refeicao.append({'nome': alimento_nome, 'carbs': carbs_valor})
                     total_carbs += carbs_valor
+            
+            # NOVO: Calcular total de calorias (1g de carboidrato = 4 kcal)
+            total_calorias = total_carbs * 4
 
             descricao_completa = f"{refeicao}: "
             if alimentos_refeicao:
@@ -190,6 +259,7 @@ def registrar_glicemia():
 
             descricao_completa += f"Total Carbs: {total_carbs}g. {observacoes}"
 
+            # NOVO: Passar total_calorias para o método de adicionar registro
             app_core.adicionar_registro(
                 tipo="Refeição",
                 valor=valor,
@@ -199,6 +269,7 @@ def registrar_glicemia():
                 refeicao=refeicao,
                 alimentos_refeicao=alimentos_refeicao,
                 total_carbs=total_carbs,
+                total_calorias=total_calorias, # NOVO: Campo de calorias
                 observacoes=observacoes
             )
 
@@ -378,9 +449,9 @@ def registros():
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
 
     return render_template('registros.html',
-                             registros=registros,
-                             get_cor_glicemia=get_cor_glicemia,
-                             get_cor_classificacao=get_cor_classificacao)
+                            registros=registros,
+                            get_cor_glicemia=get_cor_glicemia,
+                            get_cor_classificacao=get_cor_classificacao)
 
 @app.route('/excluir_registo/<id>', methods=['POST'])
 @login_required
@@ -399,6 +470,28 @@ def excluir_registo(id):
 def grafico_glicemia():
     """Exibe a página com os gráficos de glicemia."""
     return render_template('grafico_glicemia.html')
+
+# NOVO: Rota para fornecer dados de calorias para o gráfico
+@app.route('/dados_calorias_diarias')
+@login_required
+def dados_calorias_diarias():
+    """Fornece dados de calorias diárias para um gráfico em formato JSON."""
+    registros = app_core.mostrar_registros(usuario_filtro=session['username'])
+    
+    calorias_por_dia = {}
+    
+    # Processa apenas os registros que têm total de calorias
+    for reg in registros:
+        if 'total_calorias' in reg and isinstance(reg['data_hora'], datetime):
+            dia = reg['data_hora'].strftime('%d/%m')
+            # Soma as calorias para o dia correspondente
+            calorias_por_dia[dia] = calorias_por_dia.get(dia, 0) + reg['total_calorias']
+            
+    # Prepara os dados para o JSON
+    rotulos = sorted(calorias_por_dia.keys())
+    valores = [calorias_por_dia[dia] for dia in rotulos]
+    
+    return jsonify({'rotulos_dias': rotulos, 'valores_calorias': valores})
 
 @app.route('/calcular_bolus', methods=['GET', 'POST'])
 @login_required
@@ -499,6 +592,9 @@ def editar_registo(id):
                 if alimento:
                     alimentos_refeicao.append({'nome': alimento, 'carbs': carbs})
                     total_carbs += carbs
+            
+            # NOVO: Calcular total de calorias
+            total_calorias = total_carbs * 4
 
             descricao = f"{refeicao_tipo}: "
             if alimentos_refeicao:
@@ -506,6 +602,7 @@ def editar_registo(id):
                 descricao += " - ".join(alimentos_descricao)
             descricao += f" Total Carbs: {total_carbs}g. {observacoes}"
 
+            # NOVO: Passar total_calorias para o método de atualizar
             app_core.atualizar_registro(
                 id,
                 tipo="Refeição",
@@ -515,6 +612,7 @@ def editar_registo(id):
                 refeicao=refeicao_tipo,
                 alimentos_refeicao=alimentos_refeicao,
                 total_carbs=total_carbs,
+                total_calorias=total_calorias, # NOVO: Campo de calorias
                 observacoes=observacoes
             )
 
@@ -528,9 +626,9 @@ def editar_registo(id):
 
     else:
         return render_template('editar_registo.html',
-                                 registo=registo_para_editar,
-                                 alimentos_refeicao=registo_para_editar.get('alimentos_refeicao', []),
-                                 total_carbs=registo_para_editar.get('total_carbs', 0.0))
+                                registo=registo_para_editar,
+                                alimentos_refeicao=registo_para_editar.get('alimentos_refeicao', []),
+                                total_carbs=registo_para_editar.get('total_carbs', 0.0))
 
 @app.route('/relatorios')
 @login_required
