@@ -11,9 +11,9 @@
     "goeth": {
         "password": "$2b$12$jTLtgOEqOcSl18KYOKSlAO5lVg.dAFC7pLtPKc/2nXAktUHe8id4i",
         "role": "admin",
-        "email": "",
-        "razao_ic": null,
-        "fator_sensibilidade": null,
+        "email": "goethandre@gmail.com",
+        "razao_ic": 1.0,
+        "fator_sensibilidade": 1.0,
         "data_nascimento": "1969-11-24",
         "sexo": "masculino"
     }

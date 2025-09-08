@@ -4,7 +4,17 @@
 import os
 import json
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    jsonify,
+    flash,
+    get_flashed_messages
+)
 from datetime import datetime
 import bcrypt
 
@@ -42,7 +52,6 @@ def login_required(f):
     return decorated_function
 
 # --- Rotas da Aplicação ---
-
 @app.route('/')
 def home():
     """Redireciona para o dashboard se o usuário estiver logado, ou para o login caso contrário."""
@@ -56,11 +65,12 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
+
         usuario_logado, mensagem = auth_manager.verificar_login(username, password)
-        
+
         if usuario_logado:
             session['username'] = username
+            session['role'] = usuario_logado.get('role', 'user')
             flash("Login bem-sucedido!", "success")
             app_core.salvar_log_acao('Login bem-sucedido', username)
             return redirect(url_for('dashboard'))
@@ -78,27 +88,29 @@ def cadastro():
         email = request.form.get('email')
         razao_ic = request.form.get('razao_ic')
         fator_sensibilidade = request.form.get('fator_sensibilidade')
-        
+
         sucesso, mensagem = auth_manager.salvar_usuario(
-            username, 
-            password, 
-            email=email, 
-            razao_ic=razao_ic, 
+            username,
+            password,
+            email=email,
+            razao_ic=razao_ic,
             fator_sensibilidade=fator_sensibilidade
         )
-        
+
         if sucesso:
             flash("Cadastro realizado com sucesso! Faça login para continuar.", "success")
             app_core.salvar_log_acao('Cadastro de novo usuário', username)
             return redirect(url_for('login'))
         else:
             flash(mensagem, "warning")
+            app_core.salvar_log_acao('Tentativa de cadastro falhada', username)
     return render_template('cadastro.html')
 
 @app.route('/logout')
 def logout():
-    """Encerra a sessão do usuário, removendo o username da sessão."""
+    """Encerra a sessão do usuário, removendo o username e a role da sessão."""
     session.pop('username', None)
+    session.pop('role', None)
     flash("Sessão encerrada.", "info")
     return redirect(url_for('login'))
 
@@ -106,13 +118,7 @@ def logout():
 @login_required
 def dashboard():
     """Exibe o dashboard principal da aplicação, com informações do usuário."""
-    username = session['username']
-    usuarios = data_manager.carregar_usuarios()
-    usuario_atual = usuarios.get(username)
-    
-    is_admin = usuario_atual and usuario_atual.get('role') == 'admin'
-    
-    return render_template('dashboard.html', is_admin=is_admin)
+    return render_template('dashboard.html')
 
 @app.route('/guia_insulina')
 @login_required
@@ -125,27 +131,27 @@ def guia_insulina():
 def perfil():
     """Permite ao usuário visualizar e editar suas informações de perfil."""
     username = session['username']
-    
+
     if request.method == 'POST':
         try:
             usuarios = data_manager.carregar_usuarios()
             usuario_atual = usuarios.get(username, {})
-            
+
             usuario_atual['email'] = request.form.get('email')
             usuario_atual['data_nascimento'] = request.form.get('data_nascimento')
             usuario_atual['sexo'] = request.form.get('sexo')
             usuario_atual['razao_ic'] = float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None
             usuario_atual['fator_sensibilidade'] = float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None
 
-            data_manager.salvar_usuarios(usuarios) 
-            
+            data_manager.salvar_usuarios(usuarios)
+
             flash("Perfil atualizado com sucesso!", "success")
             app_core.salvar_log_acao("Perfil de usuário atualizado.", username)
             return redirect(url_for('perfil'))
         except (ValueError, KeyError):
             flash("Por favor, insira valores válidos para todos os campos.", "error")
             return redirect(url_for('perfil'))
-    
+
     else:
         usuarios = data_manager.carregar_usuarios()
         usuario_atual = usuarios.get(username, {})
@@ -161,27 +167,27 @@ def registrar_glicemia():
             refeicao = request.form.get('refeicao', '')
             observacoes = request.form.get('observacoes', '')
             data_hora_str = request.form.get('data_hora')
-            
+
             data_hora = datetime.strptime(data_hora_str, '%Y-%m-%dT%H:%M')
-            
+
             alimentos_selecionados = request.form.getlist('alimento_selecionado[]')
             carbs_list = request.form.getlist('carbs[]')
-            
+
             alimentos_refeicao = []
             total_carbs = 0
-            
+
             for i in range(len(alimentos_selecionados)):
                 alimento_nome = alimentos_selecionados[i]
                 carbs_valor = float(carbs_list[i]) if carbs_list[i] else 0
                 if alimento_nome:
                     alimentos_refeicao.append({'nome': alimento_nome, 'carbs': carbs_valor})
                     total_carbs += carbs_valor
-            
+
             descricao_completa = f"{refeicao}: "
             if alimentos_refeicao:
                 alimentos_descricao = [f"{a['nome']} - Carbs: {a['carbs']}g" for a in alimentos_refeicao]
                 descricao_completa += f"{', '.join(alimentos_descricao)}. "
-            
+
             descricao_completa += f"Total Carbs: {total_carbs}g. {observacoes}"
 
             app_core.adicionar_registro(
@@ -195,7 +201,7 @@ def registrar_glicemia():
                 total_carbs=total_carbs,
                 observacoes=observacoes
             )
-            
+
             if valor > 300:
                 flash("Atenção: Glicemia elevada. A redução da glicose deve ser gradual (idealmente 50-70 mg/dL por hora). Consulte um profissional de saúde.", "warning")
             elif valor < 70:
@@ -205,22 +211,19 @@ def registrar_glicemia():
 
             app_core.salvar_log_acao(f'Registro de glicemia e refeição: {valor}', session['username'])
             return redirect(url_for('registros'))
-        
+
         except ValueError:
             flash("Por favor, insira valores numéricos válidos.", "error")
             return redirect(url_for('registrar_glicemia'))
-    
+
     return render_template('registrar_glicemia.html')
 
 @app.route('/gerenciar_usuarios')
 @login_required
 def gerenciar_usuarios():
     """Rota para administradores gerenciarem usuários."""
-    username = session['username']
-    usuarios = data_manager.carregar_usuarios()
-    usuario_atual = usuarios.get(username)
-
-    if usuario_atual and usuario_atual.get('role') == 'admin':
+    if session.get('role') == 'admin':
+        usuarios = data_manager.carregar_usuarios()
         return render_template('gerenciar_usuarios.html', usuarios=usuarios)
     else:
         flash("Acesso não autorizado.", "error")
@@ -231,9 +234,7 @@ def gerenciar_usuarios():
 @login_required
 def cadastrar_usuario():
     """Permite ao admin cadastrar um novo usuário com role e dados específicos."""
-    usuarios = data_manager.carregar_usuarios()
-    usuario_logado = usuarios.get(session.get('username'))
-    if not usuario_logado or usuario_logado.get('role') != 'admin':
+    if not session.get('role') == 'admin':
         flash("Acesso não autorizado.", "error")
         return redirect(url_for('dashboard'))
 
@@ -246,7 +247,7 @@ def cadastrar_usuario():
         fator_sensibilidade = request.form.get('fator_sensibilidade')
 
         sucesso, mensagem = auth_manager.salvar_usuario(
-            username, password, email=email, role=role, 
+            username, password, email=email, role=role,
             razao_ic=razao_ic, fator_sensibilidade=fator_sensibilidade
         )
 
@@ -264,12 +265,11 @@ def cadastrar_usuario():
 @login_required
 def editar_usuario(username):
     """Permite ao admin editar as informações de um usuário existente."""
-    usuarios = data_manager.carregar_usuarios()
-    usuario_logado = usuarios.get(session.get('username'))
-    if not usuario_logado or usuario_logado.get('role') != 'admin':
+    if not session.get('role') == 'admin':
         flash("Acesso não autorizado.", "error")
         return redirect(url_for('dashboard'))
 
+    usuarios = data_manager.carregar_usuarios()
     usuario_a_editar = usuarios.get(username)
     if not usuario_a_editar:
         flash("Usuário não encontrado.", "error")
@@ -278,19 +278,19 @@ def editar_usuario(username):
     if request.method == 'POST':
         try:
             nova_senha = request.form.get('password')
-            
+
             usuario_a_editar['email'] = request.form.get('email')
             usuario_a_editar['role'] = request.form.get('role')
             razao_ic_str = request.form.get('razao_ic')
             fator_sensibilidade_str = request.form.get('fator_sensibilidade')
-            
+
             if nova_senha:
                 hashed_password = bcrypt.hashpw(nova_senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 usuario_a_editar['password'] = hashed_password
-            
+
             usuario_a_editar['razao_ic'] = float(razao_ic_str) if razao_ic_str else None
             usuario_a_editar['fator_sensibilidade'] = float(fator_sensibilidade_str) if fator_sensibilidade_str else None
-            
+
             data_manager.salvar_usuarios(usuarios)
 
             flash(f"Perfil do usuário {username} atualizado com sucesso!", "success")
@@ -299,23 +299,22 @@ def editar_usuario(username):
         except (ValueError, KeyError) as e:
             flash(f"Erro ao processar o formulário: {e}", "error")
             return redirect(url_for('editar_usuario', username=username))
-    
+
     return render_template('editar_usuario.html', usuario=usuario_a_editar, username=username)
 
 @app.route('/excluir_usuario/<username>', methods=['GET'])
 @login_required
 def excluir_usuario(username):
     """Permite ao admin excluir um usuário."""
-    usuarios = data_manager.carregar_usuarios()
-    usuario_logado = usuarios.get(session.get('username'))
-    if not usuario_logado or usuario_logado.get('role') != 'admin':
+    if not session.get('role') == 'admin':
         flash("Acesso não autorizado.", "error")
         return redirect(url_for('dashboard'))
 
     if username == session.get('username'):
         flash("Não é possível excluir a si mesmo.", "warning")
         return redirect(url_for('gerenciar_usuarios'))
-    
+
+    usuarios = data_manager.carregar_usuarios()
     if username in usuarios:
         del usuarios[username]
         data_manager.salvar_usuarios(usuarios)
@@ -323,7 +322,7 @@ def excluir_usuario(username):
         app_core.salvar_log_acao(f'Usuário {username} excluído', session['username'])
     else:
         flash("Usuário não encontrado.", "error")
-    
+
     return redirect(url_for('gerenciar_usuarios'))
 
 # --- FIM DAS ROTAS DE ADMIN ---
@@ -347,12 +346,12 @@ def registrar_alimento():
         except (ValueError, KeyError):
             flash("Por favor, insira valores numéricos válidos.", "error")
             return redirect(url_for('registrar_alimento'))
-        
+
         app_core.salvar_alimento_csv(nome, tipo, carbs, protein, fat, acucares, gord_sat, sodio, medida_caseira, peso_g)
         flash(f"Alimento '{nome}' salvo com sucesso!", "success")
         app_core.salvar_log_acao(f'Novo alimento registrado: {nome}', session['username'])
         return redirect(url_for('registrar_alimento'))
-    
+
     return render_template('registrar_alimento.html')
 
 @app.route('/buscar_alimento', methods=['POST'])
@@ -367,7 +366,7 @@ def buscar_alimento():
     try:
         resultados = app_core.pesquisar_alimentos(termo)
         return jsonify({'resultados': resultados})
-    
+
     except Exception as e:
         print(f"Erro ao buscar alimentos: {e}")
         return jsonify({'erro': 'Erro interno ao buscar alimentos.'}), 500
@@ -377,11 +376,11 @@ def buscar_alimento():
 def registros():
     """Exibe a lista de registros de glicemia e refeições do usuário."""
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
-    
-    return render_template('registros.html', 
-                           registros=registros, 
-                           get_cor_glicemia=get_cor_glicemia, 
-                           get_cor_classificacao=get_cor_classificacao)
+
+    return render_template('registros.html',
+                             registros=registros,
+                             get_cor_glicemia=get_cor_glicemia,
+                             get_cor_classificacao=get_cor_classificacao)
 
 @app.route('/excluir_registo/<id>', methods=['POST'])
 @login_required
@@ -392,7 +391,7 @@ def excluir_registo(id):
         flash('Registro excluído com sucesso!', 'success')
     else:
         flash('Erro ao excluir o registro.', 'danger')
-        
+
     return redirect(url_for('registros'))
 
 @app.route('/grafico_glicemia')
@@ -409,9 +408,9 @@ def calcular_bolus():
         try:
             glicemia_momento = float(request.form['glicemia_momento'])
             carboidratos_refeicao = float(request.form['carboidratos_refeicao'])
-            
+
             usuario = data_manager.carregar_usuarios().get(session['username'])
-            
+
             razao_ic = usuario.get('razao_ic')
             fator_sensibilidade = usuario.get('fator_sensibilidade')
             meta_glicemia = usuario.get('meta_glicemia', 100)
@@ -427,14 +426,14 @@ def calcular_bolus():
                 razao_ic,
                 fator_sensibilidade
             )
-            
+
             session['resultado_bolus'] = resultado_bolus
             session['glicemia_momento'] = glicemia_momento
             session['carboidratos_refeicao'] = carboidratos_refeicao
-            
+
             app_core.salvar_log_acao(f'Cálculo de bolus: {resultado_bolus["bolus_total"]} UI', session['username'])
             return redirect(url_for('calcular_bolus'))
-            
+
         except (ValueError, KeyError) as e:
             flash(f"Valores inválidos. Por favor, insira números válidos. Erro: {e}", "error")
             return redirect(url_for('calcular_bolus'))
@@ -442,7 +441,7 @@ def calcular_bolus():
     resultado_bolus = session.pop('resultado_bolus', None)
     glicemia_momento = session.pop('glicemia_momento', None)
     carboidratos_refeicao = session.pop('carboidratos_refeicao', None)
-    
+
     return render_template(
         'calculadora_bolus.html',
         resultado_bolus=resultado_bolus,
@@ -454,24 +453,19 @@ def calcular_bolus():
 @login_required
 def calcular_fs():
     """Permite ao usuário calcular o Fator de Sensibilidade à Insulina (FS)."""
-    resultado_fs = None  # Inicializa o resultado como nulo
+    resultado_fs = None
     if request.method == 'POST':
         try:
             dtdi = float(request.form['dtdi'])
             tipo_insulina = request.form['tipo_insulina']
-            
-            resultado_fs = calcular_fator_sensibilidade(dtdi, tipo_insulina)
 
-            # Salva a ação no log
+            resultado_fs = calcular_fator_sensibilidade(dtdi, tipo_insulina)
             app_core.salvar_log_acao(f'Cálculo de Fator de Sensibilidade: {resultado_fs} mg/dL', session['username'])
-            
-            # Flasha a mensagem de sucesso (será exibida na próxima renderização)
             flash("Cálculo realizado com sucesso!", "success")
 
         except (ValueError, KeyError):
             flash("Valores inválidos. Por favor, insira números válidos.", "error")
-            
-    # Sempre renderiza a página, passando o resultado (se houver)
+
     return render_template('calcular_fs.html', resultado_fs=resultado_fs)
 
 @app.route('/editar_registo/<id>', methods=['GET', 'POST'])
@@ -483,7 +477,7 @@ def editar_registo(id):
     if not registo_para_editar:
         flash('Registro não encontrado.', 'danger')
         return redirect(url_for('registros'))
-    
+
     if isinstance(registo_para_editar.get('data_hora'), datetime):
         registo_para_editar['data_hora_str'] = registo_para_editar['data_hora'].isoformat()
 
@@ -493,7 +487,7 @@ def editar_registo(id):
             data_hora_str = request.form.get('data_hora')
             refeicao_tipo = request.form.get('refeicao')
             observacoes = request.form.get('observacoes', '')
-            
+
             alimentos_refeicao = []
             total_carbs = 0.0
             alimentos_selecionados = request.form.getlist('alimento_selecionado[]')
@@ -513,9 +507,9 @@ def editar_registo(id):
             descricao += f" Total Carbs: {total_carbs}g. {observacoes}"
 
             app_core.atualizar_registro(
-                id, 
-                tipo="Refeição", 
-                valor=valor, 
+                id,
+                tipo="Refeição",
+                valor=valor,
                 descricao=descricao,
                 data_hora=datetime.fromisoformat(data_hora_str),
                 refeicao=refeicao_tipo,
@@ -527,30 +521,27 @@ def editar_registo(id):
             flash('Registro atualizado com sucesso!', 'success')
             app_core.salvar_log_acao(f'Registro {id} editado', session['username'])
             return redirect(url_for('registros'))
-            
+
         except (ValueError, KeyError) as e:
             flash(f'Erro ao processar os dados: {e}', 'danger')
             return redirect(url_for('editar_registo', id=id))
 
     else:
-        return render_template('editar_registo.html', 
-                               registo=registo_para_editar,
-                               alimentos_refeicao=registo_para_editar.get('alimentos_refeicao', []),
-                               total_carbs=registo_para_editar.get('total_carbs', 0.0))
+        return render_template('editar_registo.html',
+                                 registo=registo_para_editar,
+                                 alimentos_refeicao=registo_para_editar.get('alimentos_refeicao', []),
+                                 total_carbs=registo_para_editar.get('total_carbs', 0.0))
 
 @app.route('/relatorios')
 @login_required
 def relatorios():
     """Gera a página de relatórios com os dados de glicemia para o gráfico."""
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
-    
-    # Extrai os dados de glicemia e data de todos os registros
+
     datas = [reg['data_hora'] for reg in registros if 'valor' in reg]
     valores = [reg['valor'] for reg in registros if 'valor' in reg]
-    
-    # Formata as datas para o gráfico (ex: '06/09 10:30')
     datas_formatadas = [d.strftime('%d/%m %H:%M') for d in datas]
-    
+
     return render_template('relatorios.html', labels=datas_formatadas, data=valores)
 
 # --- Inicialização da Aplicação ---
