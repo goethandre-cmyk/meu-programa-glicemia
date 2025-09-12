@@ -10,11 +10,15 @@
 
         <hr class="my-4">
 
-        <div class="row g-4">
-            
+        <div class="row g-4 align-items-center mb-5">
             <div class="col-lg-6">
-                <div class="p-4 bg-light rounded-3 h-100">
-                    <h2 class="mb-3 fs-3 fw-semibold text-dark"><i class="fas fa-syringe me-2 text-primary"></i>1. Desvendando a Insulina</h2>
+                <div class="p-4 bg-light rounded-4 h-100 info-card">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-circle bg-primary text-white me-3">
+                            <i class="fas fa-syringe"></i>
+                        </div>
+                        <h2 class="mb-0 fs-3 fw-semibold text-dark">1. Desvendando a Insulina</h2>
+                    </div>
                     <p class="text-secondary">A insulina é um hormônio vital produzido pelas células beta do pâncreas, essencial para o metabolismo da glicose. Em pacientes com diabetes, a **insulinoterapia** surge como um pilar fundamental no tratamento, buscando mimetizar a secreção fisiológica do pâncreas saudável.</p>
                     
                     <h3 class="mt-4 fs-5 text-dark">Tipos de Insulina:</h3>
@@ -36,16 +40,20 @@
                     </ul>
                 </div>
             </div>
-
-            <div class="col-lg-6 d-flex align-items-center justify-content-center">
-                <img src="{{ url_for('static', filename='imagens/insulina.jpg') }}" class="img-fluid rounded-4 shadow-sm" alt="Ilustração de cuidados com a insulina">
+            <div class="col-lg-6 d-flex justify-content-center">
+                <img src="{{ url_for('static', filename='imagens/insulina.jpg') }}" class="img-fluid rounded-4 shadow" alt="Ilustração de cuidados com a insulina">
             </div>
+        </div>
 
-            <div class="col-12"><hr class="my-4"></div>
-
+        <div class="row g-4 align-items-center flex-row-reverse mb-5">
             <div class="col-lg-6">
-                <div class="p-4 bg-light rounded-3 h-100">
-                    <h2 class="mb-3 fs-3 fw-semibold text-dark"><i class="fas fa-calculator me-2 text-primary"></i>2. Iniciando e Calculando a Dose</h2>
+                <div class="p-4 bg-light rounded-4 h-100 info-card">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-circle bg-primary text-white me-3">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                        <h2 class="mb-0 fs-3 fw-semibold text-dark">2. Iniciando e Calculando a Dose</h2>
+                    </div>
                     <p class="text-secondary">A decisão de iniciar a insulinoterapia é um passo crucial. A dose inicial é sempre individualizada.</p>
                     <h3 class="mt-4 fs-5 text-dark">Quando a Insulina é Necessária?</h3>
                     <ul class="list-group list-group-flush">
@@ -53,8 +61,22 @@
                         <li class="list-group-item"><i class="fas fa-check-circle text-success me-2"></i><strong>DM2:</strong> Considerada em hiperglicemia grave ou falha de outras terapias.</li>
                         <li class="list-group-item"><i class="fas fa-check-circle text-success me-2"></i><strong>DMG:</strong> Indicada quando dieta e exercícios não são suficientes.</li>
                     </ul>
-                    
-                    <h3 class="mt-4 fs-5 text-dark"><i class="fas fa-chart-line me-2 text-primary"></i>3. Ajuste de Doses: Guia Prático</h3>
+                </div>
+            </div>
+            <div class="col-lg-6 d-flex justify-content-center">
+                <img src="{{ url_for('static', filename='imagens/medida.jpg') }}" class="img-fluid rounded-4 shadow" alt="Ilustração de um medidor de glicemia">
+            </div>
+        </div>
+        
+        <div class="row g-4 align-items-center">
+            <div class="col-lg-6">
+                <div class="p-4 bg-light rounded-4 h-100 info-card">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-circle bg-primary text-white me-3">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h2 class="mb-0 fs-3 fw-semibold text-dark">3. Ajuste de Doses</h2>
+                    </div>
                     <p class="text-secondary">O ajuste correto das doses é fundamental. A regra de ouro é: insulina basal ajustada pela glicemia de jejum, e insulina prandial pela glicemia pós-refeição.</p>
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item"><strong>Basal:</strong> Glicemias de jejum e pré-refeições.</li>
@@ -62,26 +84,17 @@
                     </ul>
                 </div>
             </div>
-
             <div class="col-lg-6">
-                <div class="p-4 bg-light rounded-3 h-100">
-                    <h2 class="mb-3 fs-3 fw-semibold text-dark"><i class="fas fa-hospital me-2 text-primary"></i>4. Insulina em Situações Especiais</h2>
-                    <p class="text-secondary">Cenários clínicos complexos como cetoacidose diabética (CAD), cirurgias e internações exigem ajustes precisos e acompanhamento médico rigoroso.</p>
-                    <h3 class="mt-4 fs-5 text-dark">Manejo em Situações Críticas:</h3>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item">
-                            <strong>Cetoacidose Diabética (CAD):</strong> Uma emergência médica. Inicia-se com insulina regular endovenosa.
-                        </li>
-                        <li class="list-group-item">
-                            <strong>Cirurgias:</strong> Medicação oral é suspensa, e a dose basal de insulina é ajustada para evitar hipoglicemia.
-                        </li>
-                    </ul>
-
-                    <h2 class="mb-3 mt-4 fs-3 fw-semibold text-dark"><i class="fas fa-cogs me-2 text-primary"></i>5. Estratégias Avançadas</h2>
+                <div class="p-4 bg-light rounded-4 h-100 info-card">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-circle bg-primary text-white me-3">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <h2 class="mb-0 fs-3 fw-semibold text-dark">4. Estratégias Avançadas</h2>
+                    </div>
                     <p class="text-secondary">Para um controle otimizado, o <strong>Esquema Basal-Bolus</strong> é o padrão-ouro. Ferramentas como a <strong>Contagem de Carboidratos</strong> e o <strong>Fator de Sensibilidade</strong> são cruciais.</p>
                 </div>
             </div>
-
         </div>
 
         <div class="text-center mt-5">

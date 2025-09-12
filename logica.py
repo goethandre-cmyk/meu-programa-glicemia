@@ -27,6 +27,15 @@ def get_cor_classificacao(valor):
     else:
         return 'Muito Alta'
 
+def get_status_class(valor_glicemia):
+    """Retorna a classe CSS para a cor da linha da tabela com base no valor da glicemia."""
+    if valor_glicemia < 70:
+        return 'hipo'  # Hipoglicemia
+    elif valor_glicemia > 180:
+        return 'hiper' # Hiperglicemia
+    else:
+        return 'normal' # Nível normal
+
 def calcular_bolus_detalhado(carboidratos, glicemia, meta_glicemia, razao_ic, fator_sensibilidade):
     """Calcula a dose de bolus de insulina com base em carboidratos e correção de glicemia."""
     bolus_refeicao = carboidratos / razao_ic if razao_ic else 0
@@ -57,7 +66,6 @@ def _limpar_string_para_busca(texto):
         return ''
     return texto.strip().lower().replace(' ', '').replace('-', '')
 
-# Nova função para processar dados de registro e evitar duplicação de código
 def _processar_dados_registro(form_data):
     """
     Processa os dados de um formulário de registro (criação ou edição)
@@ -86,7 +94,6 @@ def _processar_dados_registro(form_data):
             alimentos_refeicao.append({'nome': alimento_nome, 'carbs': carbs_valor})
             total_carbs += carbs_valor
     
-    # Adicionado o cálculo de total_calorias
     total_calorias = total_carbs * 4
 
     descricao_completa = f"{refeicao}: "
@@ -366,14 +373,12 @@ class DatabaseManager:
             conn = self._get_connection()
             cursor = conn.cursor()
             
-            # Normaliza o nome do alimento antes de salvar
             nome_normalizado = _limpar_string_para_busca(alimento_data.get('ALIMENTO'))
             
             cursor.execute('''
                 INSERT INTO alimentos (alimento, medida_caseira, peso, kcal, carbs)
                 VALUES (?, ?, ?, ?, ?)
             ''', (
-                # Usa o nome normalizado na inserção
                 nome_normalizado,
                 alimento_data.get('MEDIDA CASEIRA'),
                 alimento_data.get('PESO (g/ml)'),
@@ -383,7 +388,6 @@ class DatabaseManager:
             conn.commit()
             return True
         except sqlite3.IntegrityError:
-            # O erro de duplicidade será capturado e False será retornado.
             return False
         finally:
             conn.close()

@@ -3,40 +3,61 @@
 {% block title %}Registrar Glicemia e Refeição{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">
-        <i class="fas fa-plus-circle me-2"></i>Registrar Glicemia e Refeição
-    </h1>
-
+<div class="container-page">
     <div class="card p-4 shadow-sm">
+        <h1 class="mb-4">
+            <i class="fas fa-plus-circle me-2"></i>Registrar Glicemia e Refeição
+        </h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         <form id="form-registro" action="{{ url_for('registrar_glicemia') }}" method="post">
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
-                <input type="number" step="0.1" class="form-control" id="valor" name="valor" placeholder="Valor da Glicemia (mg/dL)" required>
+                <div class="form-floating">
+                    <input type="number" step="0.1" class="form-control" id="valor" name="valor" placeholder="Valor da Glicemia (mg/dL)" required>
+                    <label for="valor">Valor da Glicemia (mg/dL)</label>
+                </div>
             </div>
             
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
-                <input type="datetime-local" class="form-control" id="data_hora" name="data_hora" required>
+                <div class="form-floating">
+                    <input type="datetime-local" class="form-control" id="data_hora" name="data_hora" required>
+                    <label for="data_hora">Data e Hora</label>
+                </div>
             </div>
 
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-utensils"></i></span>
-                <select class="form-select" id="refeicao" name="refeicao" required>
-                    <option value="" disabled selected>Selecione a Refeição...</option>
-                    <option value="Jejum">Jejum</option>
-                    <option value="Café da Manhã">Café da Manhã</option>
-                    <option value="Almoço">Almoço</option>
-                    <option value="Janta">Janta</option>
-                    <option value="Lanche">Lanche</option>
-                    <option value="Colação">Colação</option>
-                </select>
+                <div class="form-floating">
+                    <select class="form-select" id="refeicao" name="refeicao" required>
+                        <option value="" disabled selected>Selecione a Refeição...</option>
+                        <option value="Jejum">Jejum</option>
+                        <option value="Café da Manhã">Café da Manhã</option>
+                        <option value="Almoço">Almoço</option>
+                        <option value="Janta">Janta</option>
+                        <option value="Lanche">Lanche</option>
+                        <option value="Colação">Colação</option>
+                    </select>
+                    <label for="refeicao">Tipo de Refeição</label>
+                </div>
             </div>
             
-            <div class="form-group mb-3">
-                <label for="alimento_busca">Procurar Alimento:</label>
+            <div class="mb-3">
+                <label for="alimento_busca" class="form-label text-muted">
+                    <i class="fas fa-search me-2"></i>Procurar Alimento:
+                </label>
                 <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-search"></i></span>
                     <input type="text" id="alimento_busca" class="form-control" placeholder="Digite 3 ou mais letras para pesquisar...">
                 </div>
             </div>
@@ -45,22 +66,25 @@
             </div>
 
             <div class="mb-3">
-                <label>Alimentos Selecionados:</label>
+                <label class="form-label text-muted"><i class="fas fa-list-ul me-2"></i>Alimentos Selecionados:</label>
                 <ul id="lista_alimentos_selecionados" class="list-group">
                 </ul>
             </div>
             
-            <div class="mb-3 text-end">
+            <div class="mb-3 text-end fs-5">
                 <strong>Total de Carboidratos:</strong>
-                <span id="total_carbs_refeicao" class="fw-bold">0.0</span>g
+                <span id="total_carbs_refeicao" class="fw-bold text-success">0.0</span>g
             </div>
 
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-comment-dots"></i></span>
-                <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Observações (opcional)"></textarea>
+                <div class="form-floating">
+                    <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Observações (opcional)"></textarea>
+                    <label for="observacoes">Observações (opcional)</label>
+                </div>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100">
+            <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">
                 <i class="fas fa-save me-2"></i>Registrar
             </button>
         </form>
@@ -78,7 +102,6 @@
 
         let timeoutId;
 
-        // Lógica de desabilitar a busca de alimentos em jejum
         refeicaoSelect.addEventListener('change', function() {
             if (this.value === 'Jejum') {
                 searchInput.value = '';
@@ -91,7 +114,6 @@
             }
         });
 
-        // Evento de digitação no campo de busca com delay
         searchInput.addEventListener('input', function() {
             clearTimeout(timeoutId);
             const termo = searchInput.value;
@@ -125,14 +147,12 @@
             }, 500);
         });
 
-        // Exibe os resultados da busca na tela
         function exibirResultados(alimentos) {
             let html = '';
             if (alimentos.length === 0) {
                 html = '<div class="list-group-item text-muted">Nenhum alimento encontrado.</div>';
             } else {
                 alimentos.forEach(alimento => {
-                    // **AS CHAVES FORAM ALTERADAS AQUI**
                     const nome = alimento.alimento;
                     const carbs = alimento.carbs;
                     const medida = alimento.medida_caseira;
@@ -145,9 +165,9 @@
                                 <br>
                                 <small>Carboidratos: ${carbs}g | Medida: ${medida}</small>
                             </div>
-                            <button type="button" class="btn btn-sm btn-primary adicionar-alimento-btn" 
+                            <button type="button" class="btn btn-sm btn-outline-primary adicionar-alimento-btn" 
                                     data-nome="${nome}" data-carbs="${carbs}" data-medida="${medida}" data-peso="${peso}">
-                                Adicionar
+                                <i class="fas fa-plus"></i>
                             </button>
                         </div>
                     `;
@@ -155,7 +175,6 @@
             }
             resultsContainer.innerHTML = html;
             
-            // Adiciona evento de clique aos botões 'Adicionar'
             document.querySelectorAll('.adicionar-alimento-btn').forEach(button => {
                 button.addEventListener('click', function() {
                     const { nome, carbs, medida, peso } = this.dataset;
@@ -166,21 +185,22 @@
             });
         }
 
-        // Adiciona o alimento selecionado na lista de refeição
         function adicionarAlimentoNaLista(nome, carbsPorMedida, medidaCaseira, pesoGrama) {
             const novoItemHtml = `
-                <li class="list-group-item d-flex flex-column">
+                <li class="list-group-item d-flex flex-column bg-light rounded-3 mb-2 p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span><strong>${nome}</strong></span>
-                        <button type="button" class="btn btn-sm btn-outline-danger remover-alimento-btn">Remover</button>
+                        <button type="button" class="btn btn-sm btn-danger remover-alimento-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
                     <div class="row g-2">
-                        <div class="col-6">
+                        <div class="col-12 col-md-6">
                             <label class="form-label d-block text-muted small">Carboidratos por medida:</label>
                             <span class="text-primary fw-bold">${carbsPorMedida}g</span> / 
                             <span class="text-muted small">${medidaCaseira} (${pesoGrama}g)</span>
                         </div>
-                        <div class="col-6">
+                        <div class="col-12 col-md-6">
                             <label class="form-label d-block text-muted small">Quantidade consumida:</label>
                             <div class="input-group">
                                 <input type="number" step="0.1" class="form-control form-control-sm input-quantidade" value="1" min="0.1">
@@ -215,7 +235,6 @@
             atualizarTotalCarbs();
         }
         
-        // Recalcula os carboidratos de um único item
         function recalcularItem(item, carbsPorMedida, pesoGrama) {
             const quantidade = parseFloat(item.querySelector('.input-quantidade').value) || 0;
             let totalItemCarbs = 0;
@@ -230,7 +249,6 @@
             item.querySelector('.input-carbs').value = totalItemCarbs.toFixed(2);
         }
         
-        // Atualiza o total de carboidratos exibido na página
         function atualizarTotalCarbs() {
             let total = 0;
             document.querySelectorAll('.input-carbs').forEach(input => {

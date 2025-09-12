@@ -24,7 +24,8 @@ from logica import (
     get_cor_classificacao,
     calcular_fator_sensibilidade,
     calcular_bolus_detalhado,
-    _processar_dados_registro  # Importação da nova função
+    _processar_dados_registro,
+    get_status_class # <-- Adicione esta importação aqui
 )
 
 app = Flask(__name__)
@@ -122,7 +123,7 @@ def dashboard():
                            username=username, 
                            resumo_dados=resumo_dados,
                            total_calorias_diarias=resumo_dados.get('total_calorias_diarias', 0.0)
-                          )
+                         )
 
 @app.route('/guia_insulina')
 @login_required
@@ -354,10 +355,13 @@ def registros():
     """Exibe a lista de registros de glicemia e refeições do usuário."""
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
     
+    # Adicione get_status_class aqui para que o template possa usá-lo
     return render_template('registros.html',
                            registros=registros,
-                           get_cor_glicemia=get_cor_glicemia,
+                           get_status_class=get_status_class,
+                           get_cor_glicemia=get_cor_glicemia, # Mantenha as funções antigas se ainda estiverem em uso
                            get_cor_classificacao=get_cor_classificacao)
+
 
 @app.route('/excluir_registo/<int:id>', methods=['POST'])
 @login_required
