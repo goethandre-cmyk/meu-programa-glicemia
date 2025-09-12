@@ -29,12 +29,14 @@
                             <td>{{ registro.valor }} mg/dL</td>
                             <td>{{ registro.descricao }}</td>
                             <td>
-                                <a href="{{ url_for('editar_registo', id=registro.id) }}" class="btn btn-sm btn-outline-secondary">
-                                    <i class="fas fa-edit"></i>
+                                <a href="{{ url_for('editar_registo', id=registro.id) }}" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i> Editar
                                 </a>
-                                <form action="{{ url_for('excluir_registo', id=registro.id) }}" method="post" onsubmit="return confirm('Tem certeza que deseja excluir este registro?')">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="fas fa-trash-alt"></i>
+                                <form action="{{ url_for('excluir_registo', id=registro.id) }}" method="post" 
+                                      onsubmit="return confirm('Tem certeza que deseja excluir este registro?');"
+                                      style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-danger">
+                                        <i class="fas fa-trash-alt"></i> Excluir
                                     </button>
                                 </form>
                             </td>

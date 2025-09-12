@@ -1,0 +1,19 @@
+{% extends 'base_minimal.html' %}
+
+{% block title %}Bem-vindo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 text-center">
+        <h1 class="display-4 fw-bold text-primary mb-4">Gerencie sua Glicemia com Facilidade</h1>
+        <p class="lead mb-4">Nosso aplicativo foi projetado para simplificar o controle da sua diabetes. Registre glicemias, alimentos e calcule o bolus de insulina de forma intuitiva.</p>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg px-4 me-md-2 fw-bold">Entrar</a>
+            <a href="{{ url_for('cadastro') }}" class="btn btn-outline-secondary btn-lg px-4">Cadastre-se</a>
+        </div>
+        <div class="mt-5">
+            <p class="text-muted">Acesso a todas as ferramentas a qualquer momento.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

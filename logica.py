@@ -1,18 +1,8 @@
-# logica.py
-
-import os
-import json
-import csv
-from datetime import datetime
+import sqlite3
+from datetime import datetime, date, timedelta
 import bcrypt
-
-# --- Configuração de Arquivos ---
-USUARIOS_FILE = os.path.join('data', 'usuarios.json')
-REGISTROS_FILE = os.path.join('data', 'registros.json')
-ALIMENTOS_FILE = os.path.join('data', 'alimentos.csv')
-LOG_FILE = os.path.join('data', 'log_app.log')
-# Garante que a pasta 'data' exista
-os.makedirs('data', exist_ok=True)
+import json
+from flask import request
 
 # --- Funções Utilitárias (Independentes de classes) ---
 def get_cor_glicemia(valor):
@@ -67,222 +57,518 @@ def _limpar_string_para_busca(texto):
         return ''
     return texto.strip().lower().replace(' ', '').replace('-', '')
 
+# Nova função para processar dados de registro e evitar duplicação de código
+def _processar_dados_registro(form_data):
+    """
+    Processa os dados de um formulário de registro (criação ou edição)
+    e retorna um dicionário com os dados formatados.
+    """
+    valor = float(form_data.get('valor', 0))
+    refeicao = form_data.get('refeicao', '')
+    observacoes = form_data.get('observacoes', '')
+    data_hora_str = form_data.get('data_hora')
+    data_hora = datetime.strptime(data_hora_str, '%Y-%m-%dT%H:%M')
+
+    alimentos_selecionados = form_data.getlist('alimento_selecionado[]')
+    carbs_list = form_data.getlist('carbs[]')
+
+    alimentos_refeicao = []
+    total_carbs = 0.0
+
+    for i in range(len(alimentos_selecionados)):
+        alimento_nome = alimentos_selecionados[i]
+        try:
+            carbs_valor = float(carbs_list[i])
+        except (ValueError, IndexError):
+            carbs_valor = 0.0
+
+        if alimento_nome:
+            alimentos_refeicao.append({'nome': alimento_nome, 'carbs': carbs_valor})
+            total_carbs += carbs_valor
+    
+    # Adicionado o cálculo de total_calorias
+    total_calorias = total_carbs * 4
+
+    descricao_completa = f"{refeicao}: "
+    if alimentos_refeicao:
+        alimentos_descricao = [f"{a['nome']} - Carbs: {a['carbs']}g" for a in alimentos_refeicao]
+        descricao_completa += f"{', '.join(alimentos_descricao)}. "
+    descricao_completa += f"Total Carbs: {round(total_carbs, 2)}g. {observacoes}"
+
+    return {
+        'valor': valor,
+        'refeicao': refeicao,
+        'observacoes': observacoes,
+        'data_hora': data_hora,
+        'alimentos_refeicao': alimentos_refeicao,
+        'total_carbs': total_carbs,
+        'total_calorias': total_calorias,
+        'descricao': descricao_completa
+    }
+
 # --- Classes de Lógica de Negócio ---
 
-class DataManager:
+class DatabaseManager:
     """
-    Gerencia a leitura e escrita de todos os arquivos de dados.
+    Gerencia a conexão e as operações do banco de dados SQLite.
     """
-    def __init__(self):
-        self._inicializar_arquivos()
+    def __init__(self, db_path='glicemia.db'):
+        self.db_path = db_path
+        self._setup_db()
 
-    def _inicializar_arquivos(self):
-        if not os.path.exists(USUARIOS_FILE):
-            with open(USUARIOS_FILE, 'w', encoding='utf-8') as f:
-                json.dump({}, f)
+    def _get_connection(self):
+        """Retorna uma conexão com o banco de dados."""
+        return sqlite3.connect(self.db_path)
+
+    def _setup_db(self):
+        """
+        Cria as tabelas `usuarios` e `registros` se não existirem.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
         
-        if not os.path.exists(REGISTROS_FILE):
-            with open(REGISTROS_FILE, 'w', encoding='utf-8') as f:
-                json.dump([], f)
+        # Tabela de usuários
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INTEGER PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                email TEXT,
+                role TEXT DEFAULT 'user',
+                data_nascimento TEXT,
+                sexo TEXT,
+                razao_ic REAL,
+                fator_sensibilidade REAL,
+                meta_glicemia REAL
+            )
+        ''')
+
+        # Tabela de registros
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS registros (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                data_hora TEXT,
+                tipo TEXT,
+                valor REAL,
+                descricao TEXT,
+                refeicao TEXT,
+                alimentos_refeicao TEXT,
+                total_carbs REAL,
+                total_calorias REAL,
+                observacoes TEXT,
+                FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
+            )
+        ''')
         
-        if not os.path.exists(ALIMENTOS_FILE):
-            with open(ALIMENTOS_FILE, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f, delimiter=';')
-                writer.writerow(['ID', 'ALIMENTO', 'MEDIDA CASEIRA', 'PESO (g/ml)', 'Kcal', 'CHO (g)'])
+        # Tabela de logs
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS logs (
+                id INTEGER PRIMARY KEY,
+                timestamp TEXT,
+                acao TEXT,
+                usuario TEXT
+            )
+        ''')
+        
+        # Tabela de alimentos
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS alimentos (
+                id INTEGER PRIMARY KEY,
+                alimento TEXT UNIQUE NOT NULL,
+                medida_caseira TEXT,
+                peso REAL,
+                kcal REAL,
+                carbs REAL
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
+
+    def salvar_usuario(self, usuario):
+        """Salva um novo usuário ou atualiza um existente."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT id FROM usuarios WHERE username = ?", (usuario['username'],))
+        user_id = cursor.fetchone()
+
+        if user_id:
+            # Atualiza o usuário existente
+            cursor.execute('''
+                UPDATE usuarios SET password_hash=?, email=?, role=?, data_nascimento=?,
+                sexo=?, razao_ic=?, fator_sensibilidade=?, meta_glicemia=?
+                WHERE username=?
+            ''', (
+                usuario['password_hash'], usuario.get('email'), usuario.get('role'),
+                usuario.get('data_nascimento'), usuario.get('sexo'), usuario.get('razao_ic'),
+                usuario.get('fator_sensibilidade'), usuario.get('meta_glicemia'), usuario['username']
+            ))
+        else:
+            # Insere um novo usuário
+            cursor.execute('''
+                INSERT INTO usuarios (username, password_hash, email, role, data_nascimento, sexo, razao_ic, fator_sensibilidade, meta_glicemia)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                usuario['username'], usuario['password_hash'], usuario.get('email'),
+                usuario.get('role', 'user'), usuario.get('data_nascimento'), usuario.get('sexo'),
+                usuario.get('razao_ic'), usuario.get('fator_sensibilidade'), usuario.get('meta_glicemia')
+            ))
+        
+        conn.commit()
+        conn.close()
+
+    def carregar_usuario(self, username):
+        """Carrega um único usuário pelo nome de usuário."""
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM usuarios WHERE username=?", (username,))
+        usuario = cursor.fetchone()
+        conn.close()
+        
+        if usuario:
+            return dict(usuario)
+        return None
 
     def carregar_usuarios(self):
-        """Carrega os dados de usuários do arquivo JSON."""
-        try:
-            with open(USUARIOS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return {}
-
-    def salvar_usuarios(self, usuarios):
-        """Salva os dados de usuários no arquivo JSON."""
-        with open(USUARIOS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(usuarios, f, indent=4, ensure_ascii=False)
-
-    def carregar_registros(self):
-        """
-        Carrega os registros do ficheiro JSON e converte a string de data
-        de volta para um objeto datetime para uso no aplicativo.
-        """
-        try:
-            if os.path.exists(REGISTROS_FILE):
-                with open(REGISTROS_FILE, 'r', encoding='utf-8') as f:
-                    registros_json = json.load(f)
-                    for registro in registros_json:
-                        data_hora_str = registro.get('data_hora')
-                        if data_hora_str and isinstance(data_hora_str, str):
-                            try:
-                                registro['data_hora'] = datetime.fromisoformat(data_hora_str)
-                            except ValueError:
-                                registro['data_hora'] = None
-                    return registros_json
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
-        return []
-
-    def salvar_registros(self, registros):
-        """
-        Salva os registros no ficheiro JSON, convertendo objetos de data
-        para strings para serialização.
-        """
-        registros_salvar = []
-        for registro in registros:
-            reg_copy = registro.copy()
-            if 'data_hora' in reg_copy and isinstance(reg_copy['data_hora'], datetime):
-                reg_copy['data_hora'] = reg_copy['data_hora'].isoformat()
-            registros_salvar.append(reg_copy)
+        """Carrega todos os usuários."""
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM usuarios")
+        usuarios = cursor.fetchall()
+        conn.close()
         
-        with open(REGISTROS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(registros_salvar, f, indent=4, ensure_ascii=False)
+        return [dict(row) for row in usuarios]
 
-    def carregar_alimentos(self):
-        """Carrega a base de dados de alimentos do arquivo CSV."""
-        alimentos = []
+    def excluir_usuario(self, username):
+        """Exclui um usuário do banco de dados."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM usuarios WHERE username=?", (username,))
+        conn.commit()
+        conn.close()
+    
+    def salvar_registro(self, registro):
+        """Salva um novo registro no banco de dados."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO registros (user_id, data_hora, tipo, valor, descricao, refeicao, alimentos_refeicao, total_carbs, total_calorias, observacoes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            registro['user_id'], registro['data_hora'], registro['tipo'], registro['valor'],
+            registro['descricao'], registro.get('refeicao'), json.dumps(registro.get('alimentos_refeicao')),
+            registro.get('total_carbs'), registro.get('total_calorias'), registro.get('observacoes')
+        ))
+        conn.commit()
+        conn.close()
+
+    def carregar_registros(self, user_id=None):
+        """Carrega registros de um usuário específico ou todos os registros."""
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        query = "SELECT * FROM registros"
+        params = ()
+        
+        if user_id:
+            query += " WHERE user_id = ?"
+            params = (user_id,)
+        
+        query += " ORDER BY data_hora DESC"
+        
+        cursor.execute(query, params)
+        registros = cursor.fetchall()
+        conn.close()
+        
+        lista_registros = []
+        for row in registros:
+            reg = dict(row)
+            try:
+                if reg.get('alimentos_refeicao'):
+                    reg['alimentos_refeicao'] = json.loads(reg['alimentos_refeicao'])
+                
+                if reg.get('data_hora'):
+                    reg['data_hora'] = datetime.fromisoformat(reg['data_hora'])
+            except (json.JSONDecodeError, ValueError):
+                # Lida com dados corrompidos
+                continue
+            
+            lista_registros.append(reg)
+            
+        return lista_registros
+
+    def encontrar_registro(self, registro_id):
+        """Encontra um registro pelo seu ID."""
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM registros WHERE id=?", (registro_id,))
+        registro = cursor.fetchone()
+        conn.close()
+        
+        if registro:
+            reg = dict(registro)
+            try:
+                if reg.get('alimentos_refeicao'):
+                    reg['alimentos_refeicao'] = json.loads(reg['alimentos_refeicao'])
+                if reg.get('data_hora'):
+                    reg['data_hora'] = datetime.fromisoformat(reg['data_hora'])
+            except (json.JSONDecodeError, ValueError):
+                return None # Retorna None se o registro estiver corrompido
+            return reg
+        return None
+    
+    def atualizar_registro(self, registro):
+        """Atualiza um registro existente."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE registros SET valor=?, tipo=?, descricao=?, refeicao=?,
+            alimentos_refeicao=?, total_carbs=?, total_calorias=?, observacoes=?
+            WHERE id=?
+        ''', (
+            registro['valor'], registro['tipo'], registro['descricao'],
+            registro.get('refeicao'), json.dumps(registro.get('alimentos_refeicao')),
+            registro.get('total_carbs'), registro.get('total_calorias'),
+            registro.get('observacoes'), registro['id']
+        ))
+        conn.commit()
+        conn.close()
+    
+    def excluir_registro(self, registro_id):
+        """Exclui um registro pelo seu ID."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM registros WHERE id=?", (registro_id,))
+        conn.commit()
+        conn.close()
+    
+    def salvar_log_acao(self, acao, usuario):
+        """Salva um log de ação no banco de dados."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        timestamp = datetime.now().isoformat()
+        cursor.execute('''
+            INSERT INTO logs (timestamp, acao, usuario)
+            VALUES (?, ?, ?)
+        ''', (timestamp, acao, usuario))
+        conn.commit()
+        conn.close()
+    
+    def salvar_alimento_db(self, alimento_data):
+        """Salva um novo alimento no banco de dados."""
         try:
-            with open(ALIMENTOS_FILE, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f, delimiter=';')
-                for row in reader:
-                    alimentos.append(row)
-        except FileNotFoundError:
-            pass
-        return alimentos
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # Normaliza o nome do alimento antes de salvar
+            nome_normalizado = _limpar_string_para_busca(alimento_data.get('ALIMENTO'))
+            
+            cursor.execute('''
+                INSERT INTO alimentos (alimento, medida_caseira, peso, kcal, carbs)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                # Usa o nome normalizado na inserção
+                nome_normalizado,
+                alimento_data.get('MEDIDA CASEIRA'),
+                alimento_data.get('PESO (g/ml)'),
+                alimento_data.get('Kcal'),
+                alimento_data.get('CHO (g)')
+            ))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            # O erro de duplicidade será capturado e False será retornado.
+            return False
+        finally:
+            conn.close()
 
-    def salvar_alimento_csv(self, nome, tipo, carbs, protein, fat, acucares, gord_sat, sodio, medida_caseira, peso_g):
-        """Adiciona um novo alimento ao arquivo CSV."""
-        try:
-            alimentos_atuais = self.carregar_alimentos()
-            next_id = 1
-            if alimentos_atuais:
-                next_id = int(alimentos_atuais[-1]['ID']) + 1
+    def carregar_alimentos_db(self):
+        """Carrega todos os alimentos do banco de dados."""
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM alimentos ORDER BY alimento ASC")
+        alimentos = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in alimentos]
 
-            with open(ALIMENTOS_FILE, 'a', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f, delimiter=';')
-                writer.writerow([next_id, nome, medida_caseira, peso_g, 0, carbs])
-        except Exception as e:
-            print(f"Erro ao salvar alimento no CSV: {e}")
+    def buscar_alimentos_db(self, termo):
+        """Busca alimentos no banco de dados por termo no nome."""
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        termo = f'%{termo}%'
+        cursor.execute("SELECT * FROM alimentos WHERE alimento LIKE ? ORDER BY alimento ASC", (termo,))
+        resultados = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in resultados]
+
 
 class AuthManager:
-    """
-    Gerencia a autenticação e dados de usuário.
-    """
-    def __init__(self, data_manager):
-        self.data_manager = data_manager
+    """Gerencia a autenticação e dados de usuário."""
+    def __init__(self, db_manager):
+        self.db_manager = db_manager
 
     def salvar_usuario(self, username, password, **kwargs):
         """Cadastra ou atualiza um usuário com senha hasheada."""
-        usuarios = self.data_manager.carregar_usuarios()
-        if username in usuarios:
+        usuario_existente = self.db_manager.carregar_usuario(username)
+        if usuario_existente:
             return False, "Nome de usuário já existe."
 
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
         novo_usuario = {
-            "password": hashed_password,
+            "username": username,
+            "password_hash": hashed_password,
             "role": "user",
             **kwargs
         }
         
-        usuarios[username] = novo_usuario
-        self.data_manager.salvar_usuarios(usuarios)
+        self.db_manager.salvar_usuario(novo_usuario)
         return True, "Cadastro bem-sucedido."
 
     def verificar_login(self, username, password):
         """Verifica as credenciais do usuário com a senha hasheada."""
-        usuarios = self.data_manager.carregar_usuarios()
-        usuario = usuarios.get(username)
+        usuario = self.db_manager.carregar_usuario(username)
         if usuario:
             try:
-                if bcrypt.checkpw(password.encode('utf-8'), usuario['password'].encode('utf-8')):
+                if bcrypt.checkpw(password.encode('utf-8'), usuario['password_hash'].encode('utf-8')):
                     return usuario, "Login bem-sucedido."
             except (KeyError, ValueError, TypeError):
                 pass
         return None, "Credenciais inválidas. Tente novamente."
 
 class AppCore:
-    """
-    A camada de aplicação que coordena a lógica de negócio.
-    """
-    def __init__(self, data_manager):
-        self.data_manager = data_manager
-        self.registros = self.data_manager.carregar_registros()
-        self.alimentos = self.data_manager.carregar_alimentos()
+    """A camada de aplicação que coordena a lógica de negócio."""
+    def __init__(self, db_manager):
+        self.db_manager = db_manager
         
     def salvar_log_acao(self, acao, usuario):
-        """Salva uma ação do usuário em um arquivo de log."""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        log_entry = f"[{timestamp}] - Usuário: {usuario} - Ação: {acao}\n"
-        with open(LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(log_entry)
+        """Salva uma ação do usuário no banco de dados."""
+        self.db_manager.salvar_log_acao(acao, usuario)
+        return True
 
-    # NOVO: Adiciona total_calorias aos parâmetros
-    def adicionar_registro(self, **kwargs):
-        """Adiciona um novo registro e salva."""
-        next_id = 1
-        if self.registros:
-            max_id = max(int(reg.get('id', 0)) for reg in self.registros)
-            next_id = max_id + 1
+    def adicionar_registro(self, usuario, **kwargs):
+        """Adiciona um novo registro ao banco de dados."""
+        user_info = self.db_manager.carregar_usuario(usuario)
+        if not user_info:
+            return False, "Usuário não encontrado."
         
         novo_registro = {
-            'id': next_id,
-            'data_hora': kwargs.get('data_hora', datetime.now()),
-            **kwargs
+            'user_id': user_info['id'],
+            'data_hora': kwargs.get('data_hora', datetime.now()).isoformat(),
+            'tipo': kwargs.get('tipo'),
+            'valor': kwargs.get('valor'),
+            'descricao': kwargs.get('descricao'),
+            'refeicao': kwargs.get('refeicao'),
+            'alimentos_refeicao': kwargs.get('alimentos_refeicao', []),
+            'total_carbs': kwargs.get('total_carbs'),
+            'total_calorias': kwargs.get('total_calorias'),
+            'observacoes': kwargs.get('observacoes')
         }
-        self.registros.append(novo_registro)
-        self.data_manager.salvar_registros(self.registros)
-        
+        self.db_manager.salvar_registro(novo_registro)
+        return True, "Registro adicionado com sucesso."
+
     def mostrar_registros(self, usuario_filtro=None):
-        """Retorna a lista de registros, opcionalmente filtrada por usuário."""
+        """Retorna uma lista de registros, opcionalmente filtrada por usuário."""
         if usuario_filtro:
-            return [r for r in self.registros if r.get('usuario') == usuario_filtro]
-        return self.registros
+            user_info = self.db_manager.carregar_usuario(usuario_filtro)
+            if not user_info:
+                return []
+            return self.db_manager.carregar_registros(user_id=user_info['id'])
+        return self.db_manager.carregar_registros()
 
-    def encontrar_registro(self, id_str):
-        """Encontra um registro pelo ID, que pode vir como string."""
-        try:
-            id_int = int(id_str)
-            for registro in self.registros:
-                if isinstance(registro.get('id'), str):
-                    registro['id'] = int(registro['id'])
-                if registro.get('id') == id_int:
-                    return registro
-        except (ValueError, TypeError):
-            pass
-        return None
-
-    # NOVO: Atualiza o registro com o novo campo total_calorias
-    def atualizar_registro(self, id_str, **kwargs):
-        """Atualiza um registro existente."""
-        registo = self.encontrar_registro(id_str)
-        if registo:
-            registo.update(kwargs)
-            self.data_manager.salvar_registros(self.registros)
-            return True
-        return False
+    def encontrar_registro(self, registro_id):
+        """Encontra um registro pelo ID."""
+        return self.db_manager.encontrar_registro(registro_id)
         
-    def excluir_registro(self, id_str):
-        """Exclui um registro pelo ID."""
-        id_int = int(id_str)
-        registros_atuais = [r for r in self.registros if int(r.get('id', 0)) != id_int]
-        if len(registros_atuais) < len(self.registros):
-            self.registros = registros_atuais
-            self.data_manager.salvar_registros(self.registros)
-            return True
-        return False
+    def atualizar_registro(self, registro_id, **kwargs):
+        """Atualiza um registro existente no banco de dados."""
+        registro = self.db_manager.encontrar_registro(registro_id)
+        if not registro:
+            return False
 
-    def salvar_alimento_csv(self, nome, tipo, carbs, protein, fat, acucares, gord_sat, sodio, medida_caseira, peso_g):
-        """Chama a função para salvar um novo alimento no CSV."""
-        self.data_manager.salvar_alimento_csv(nome, tipo, carbs, protein, fat, acucares, gord_sat, sodio, medida_caseira, peso_g)
+        registro.update(kwargs)
+        if isinstance(registro.get('data_hora'), datetime):
+            registro['data_hora'] = registro['data_hora'].isoformat()
+        
+        self.db_manager.atualizar_registro(registro)
+        return True
+        
+    def excluir_registro(self, registro_id):
+        """Exclui um registro pelo ID."""
+        self.db_manager.excluir_registro(registro_id)
+        return True
+
+    def salvar_alimento_json(self, alimento_data):
+        """Salva um novo alimento na base de dados (agora no banco de dados)."""
+        return self.db_manager.salvar_alimento_db(alimento_data)
         
     def pesquisar_alimentos(self, termo_pesquisa):
-        """Busca alimentos na base de dados carregada em memória."""
-        termo_limpo = _limpar_string_para_busca(termo_pesquisa)
-        resultados = []
-        for alimento in self.alimentos:
-            nome_alimento_limpo = _limpar_string_para_busca(alimento.get('ALIMENTO', ''))
-            if termo_limpo in nome_alimento_limpo:
-                resultados.append(alimento)
-        return resultados
+        """Busca alimentos na base de dados por nome."""
+        return self.db_manager.buscar_alimentos_db(termo_pesquisa)
+        
+    def get_resumo_dashboard(self, username):
+        """
+        Retorna um dicionário com dados resumidos do dashboard para um usuário.
+        Esta lógica agora usa os registros diretamente do banco de dados.
+        """
+        registros = self.mostrar_registros(usuario_filtro=username)
+        
+        resumo_dados = {
+            'media_ultima_semana': None,
+            'hipoglicemia_count': 0,
+            'hiperglicemia_count': 0,
+            'ultimo_registro': None,
+            'tempo_desde_ultimo': None,
+            'total_calorias_diarias': 0.0
+        }
+        
+        if not registros:
+            return resumo_dados
+
+        # Encontra o último registro
+        ultimo_registro = registros[0]
+        resumo_dados['ultimo_registro'] = ultimo_registro
+        
+        # Calcula o tempo desde o último registro
+        agora = datetime.now()
+        delta = agora - ultimo_registro['data_hora']
+        if delta.days > 0:
+            resumo_dados['tempo_desde_ultimo'] = f"{delta.days} dias atrás"
+        elif delta.seconds >= 3600:
+            horas = delta.seconds // 3600
+            resumo_dados['tempo_desde_ultimo'] = f"{horas} horas atrás"
+        else:
+            minutos = delta.seconds // 60
+            resumo_dados['tempo_desde_ultimo'] = f"{minutos} minutos atrás"
+
+        # Filtra registros da última semana, conta hipo/hiper e soma calorias
+        sete_dias_atras = agora - timedelta(days=7)
+        hoje = date.today()
+        glicemias_ultima_semana = []
+        
+        for reg in registros:
+            if reg['data_hora'] > sete_dias_atras:
+                glicemias_ultima_semana.append(reg['valor'])
+            
+            if 'total_calorias' in reg and reg['data_hora'].date() == hoje:
+                resumo_dados['total_calorias_diarias'] += reg['total_calorias']
+            
+            if reg['valor'] < 70:
+                resumo_dados['hipoglicemia_count'] += 1
+            elif reg['valor'] > 180:
+                resumo_dados['hiperglicemia_count'] += 1
+                
+        if glicemias_ultima_semana:
+            media = sum(glicemias_ultima_semana) / len(glicemias_ultima_semana)
+            resumo_dados['media_ultima_semana'] = round(media, 2)
+        
+        resumo_dados['total_calorias_diarias'] = round(resumo_dados['total_calorias_diarias'], 2)
+        return resumo_dados

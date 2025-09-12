@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
+
 <body>
     <div id="app-wrapper" class="d-flex flex-column min-vh-100">
         <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
@@ -15,7 +17,9 @@
                 <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                     Meu App de Glicemia
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-collapse" aria-controls="sidebar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#sidebar-collapse" aria-controls="sidebar-collapse" aria-expanded="false"
+                    aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 {% if 'username' in session %}
@@ -55,6 +59,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="{{ url_for('calcular_fs') }}" class="nav-link text-white">
+                            <i class="fas fa-microscope me-2"></i>Calcular FS
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="{{ url_for('relatorios') }}" class="nav-link text-white">
                             <i class="fas fa-chart-line me-2"></i>Relatórios
                         </a>
@@ -81,21 +90,23 @@
 
             <div class="main-content flex-grow-1 p-3">
                 <div class="flashes">
-                    {% with messages = get_flashed_messages() %}
-                        {% if messages %}
-                            <ul class="list-unstyled">
-                                {% for category, message in messages %}
-                                <li class="{{ category }}">{{ message }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
                     {% endwith %}
                 </div>
                 {% block content %}{% endblock %}
             </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

@@ -3,36 +3,48 @@
 {% block title %}Gerenciar Usuários{% endblock %}
 
 {% block content %}
-<div class="card p-4 shadow-sm">
-    <h1 class="mb-4">Gerenciar Usuários</h1>
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-users-cog me-2"></i>Gerenciar Usuários
+    </h1>
 
-    <a href="{{ url_for('cadastrar_usuario') }}" class="btn btn-primary mb-3">Adicionar Novo Usuário</a>
-
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead class="table-dark">
-                <tr>
-                    <th>Nome de Usuário</th>
-                    <th>Email</th>
-                    <th>Função</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for username, usuario in usuarios.items() %}
-                <tr>
-                    <td>{{ username }}</td>
-                    <td>{{ usuario.email or 'N/A' }}</td>
-                    <td>{{ usuario.role or 'padrão' }}</td>
-                    <td>
-                        <a href="{{ url_for('editar_usuario', username=username) }}" class="btn btn-sm btn-primary">Editar</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card p-4 shadow-sm">
+        <div class="d-flex justify-content-end mb-3">
+            <a href="{{ url_for('cadastrar_usuario') }}" class="btn btn-success">
+                <i class="fas fa-user-plus me-2"></i>Novo Usuário
+            </a>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-primary">
+                    <tr>
+                        <th>Nome de Usuário</th>
+                        <th>Email</th>
+                        <th>Função</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td>{{ usuario.username }}</td>
+                        <td>{{ usuario.email or 'N/A' }}</td>
+                        <td>{{ usuario.role or 'padrão' }}</td>
+                        <td>
+                            <a href="{{ url_for('editar_usuario', username=usuario.username) }}" class="btn btn-sm btn-warning">
+                                <i class="fas fa-edit"></i> Editar
+                            </a>
+                            <a href="{{ url_for('excluir_usuario', username=usuario.username) }}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário?');">
+                                <i class="fas fa-trash-alt"></i> Excluir
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-3">Voltar ao Painel</a>
     </div>
-
-    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-3">Voltar ao Painel</a>
 </div>
 {% endblock %}

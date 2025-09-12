@@ -534,5 +534,23 @@
         "total_carbs": 79.0,
         "total_calorias": 316.0,
         "observacoes": ""
+    },
+    {
+        "id": 42,
+        "data_hora": "2025-09-09T00:54:00",
+        "tipo": "Refeição",
+        "valor": 145.0,
+        "descricao": "Janta: Cappuccino pronto Classic Café - Carbs: 28.0g. Total Carbs: 28.0g. ",
+        "usuario": "goeth",
+        "refeicao": "Janta",
+        "alimentos_refeicao": [
+            {
+                "nome": "Cappuccino pronto Classic Café",
+                "carbs": 28.0
+            }
+        ],
+        "total_carbs": 28.0,
+        "total_calorias": 112.0,
+        "observacoes": ""
     }
 ]

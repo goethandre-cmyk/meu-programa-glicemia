@@ -4,82 +4,61 @@
 
 {% block content %}
 <div class="container-page">
-    <div class="card p-4 shadow-sm">
-        <h1 class="mb-4">
-            <i class="fas fa-utensils me-2"></i>Registrar Novo Alimento
-        </h1>
-        <form action="{{ url_for('registrar_alimento') }}" method="post">
-            
-            <div class="mb-3">
-                <label for="nome_alimento" class="form-label">Nome do Alimento</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-leaf"></i></span>
-                    <input type="text" class="form-control" id="nome_alimento" name="nome_alimento" required>
-                </div>
-            </div>
-
-            <div class="mb-3">
-                <label for="tipo_alimento" class="form-label">Tipo (Opcional)</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-tag"></i></span>
-                    <input type="text" class="form-control" id="tipo_alimento" name="tipo_alimento">
-                </div>
-            </div>
+        <div class="card p-4 shadow-sm">
+                <h1 class="mb-4">
+                        <i class="fas fa-utensils me-2"></i>Registrar Novo Alimento
+                    </h1>
+                <form action="{{ url_for('registrar_alimento') }}" method="post">
+                       
+                        <div class="mb-3">
+                                <label for="nome_alimento" class="form-label">Nome do Alimento</label>
+                                <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-leaf"></i></span>
+                                        <input type="text" class="form-control" id="nome_alimento" name="nome_alimento"
+                        required>
+                                    </div>
+                            </div>
 
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label for="carbs" class="form-label">Carboidratos (g)</label>
+                    <label for="cho" class="form-label">Carboidratos (g)</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="fas fa-bread-slice"></i></span>
-                        <input type="number" step="0.1" class="form-control" id="carbs" name="carbs" value="0">
+                        <input type="number" step="0.1" class="form-control" id="cho" name="cho" value="0">
                     </div>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label for="protein" class="form-label">Proteína (g)</label>
+                    <label for="kcal" class="form-label">Calorias (kcal)</label>
                     <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-egg"></i></span>
-                        <input type="number" step="0.1" class="form-control" id="protein" name="protein" value="0">
+                        <span class="input-group-text"><i class="fas fa-fire"></i></span>
+                        <input type="number" step="0.1" class="form-control" id="kcal" name="kcal" value="0">
                     </div>
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="fat" class="form-label">Gordura (g)</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-cheese"></i></span>
-                        <input type="number" step="0.1" class="form-control" id="fat" name="fat" value="0">
-                    </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="sodio" class="form-label">Sódio (mg)</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-salt"></i></span>
-                        <input type="number" step="0.1" class="form-control" id="sodio" name="sodio" value="0">
-                    </div>
-                </div>
-            </div>
+                        <div class="mb-3">
+                                <label for="medida_caseira" class="form-label">Medida Caseira (Opcional)</label>
+                                <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-ruler-combined"></i></span>
+                                        <input type="text" class="form-control" id="medida_caseira"
+                        name="medida_caseira">
+                                    </div>
+                            </div>
 
-            <div class="mb-3">
-                <label for="medida_caseira" class="form-label">Medida Caseira (Opcional)</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-ruler-combined"></i></span>
-                    <input type="text" class="form-control" id="medida_caseira" name="medida_caseira">
-                </div>
-            </div>
+                        <div class="mb-3">
+                                <label for="peso_g" class="form-label">Peso (g)</label>
+                                <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-weight-hanging"></i></span>
+                                        <input type="number" step="0.1" class="form-control" id="peso_g" name="peso_g"
+                        value="0">
+                                    </div>
+                            </div>
 
-            <div class="mb-3">
-                <label for="peso_g" class="form-label">Peso (g)</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-weight-hanging"></i></span>
-                    <input type="number" step="0.1" class="form-control" id="peso_g" name="peso_g" value="0">
-                </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary w-100">
-                <i class="fas fa-save me-2"></i>Registrar Alimento
-            </button>
+                        <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-save me-2"></i>Registrar Alimento
+                            </button>
+                   
         </form>
-    </div>
+            </div>
 </div>
 {% endblock %}

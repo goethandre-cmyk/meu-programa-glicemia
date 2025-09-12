@@ -1,5 +1,3 @@
-# app.py
-
 # --- Importações e Configuração Inicial ---
 import os
 import json
@@ -12,22 +10,21 @@ from flask import (
     url_for,
     session,
     jsonify,
-    flash,
-    get_flashed_messages
+    flash
 )
-# Alteração aqui: importa a classe 'datetime' diretamente
-from datetime import datetime, timedelta, date # NOVO: Importando 'date' para lidar com datas
+from datetime import datetime, timedelta, date
 import bcrypt
 
 # Importa as classes e funções utilitárias do seu módulo logica.py
 from logica import (
-    DataManager,
+    DatabaseManager,
     AuthManager,
     AppCore,
     get_cor_glicemia,
     get_cor_classificacao,
     calcular_fator_sensibilidade,
-    calcular_bolus_detalhado
+    calcular_bolus_detalhado,
+    _processar_dados_registro  # Importação da nova função
 )
 
 app = Flask(__name__)
@@ -35,7 +32,7 @@ app = Flask(__name__)
 app.secret_key = '0edd34d5d0228451a8b702f7902892c5'
 
 # Instâncias globais das classes de lógica.
-data_manager = DataManager()
+data_manager = DatabaseManager()
 auth_manager = AuthManager(data_manager)
 app_core = AppCore(data_manager)
 
@@ -54,11 +51,11 @@ def login_required(f):
 
 # --- Rotas da Aplicação ---
 @app.route('/')
-def home():
-    """Redireciona para o dashboard se o usuário estiver logado, ou para o login caso contrário."""
+def index():
+    """Rota para a página inicial. Redireciona para o dashboard se o usuário já estiver logado."""
     if 'username' in session:
         return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -87,8 +84,8 @@ def cadastro():
         username = request.form['username']
         password = request.form['password']
         email = request.form.get('email')
-        razao_ic = request.form.get('razao_ic')
-        fator_sensibilidade = request.form.get('fator_sensibilidade')
+        razao_ic = float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None
+        fator_sensibilidade = float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None
 
         sucesso, mensagem = auth_manager.salvar_usuario(
             username,
@@ -113,77 +110,18 @@ def logout():
     session.pop('username', None)
     session.pop('role', None)
     flash("Sessão encerrada.", "info")
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     username = session['username']
+    resumo_dados = app_core.get_resumo_dashboard(username)
     
-    # Busca todos os registros do usuário
-    registros = app_core.mostrar_registros(usuario_filtro=username)
-    
-    # Inicializa as variáveis de resumo
-    resumo_dados = {
-        'media_ultima_semana': None,
-        'hipoglicemia_count': 0,
-        'hiperglicemia_count': 0,
-        'ultimo_registro': None,
-        'tempo_desde_ultimo': None
-    }
-    
-    # NOVO: Inicializa o total de calorias
-    total_calorias_diarias = 0.0
-
-    if registros:
-        # Encontra o último registro
-        ultimo_registro = registros[0]
-        resumo_dados['ultimo_registro'] = ultimo_registro
-        
-        # Calcula o tempo desde o último registro
-        agora = datetime.now()
-        delta = agora - ultimo_registro['data_hora']
-        
-        # Converte o delta em texto amigável
-        if delta.days > 0:
-            resumo_dados['tempo_desde_ultimo'] = f"{delta.days} dias atrás"
-        elif delta.seconds >= 3600:
-            horas = delta.seconds // 3600
-            resumo_dados['tempo_desde_ultimo'] = f"{horas} horas atrás"
-        else:
-            minutos = delta.seconds // 60
-            resumo_dados['tempo_desde_ultimo'] = f"{minutos} minutos atrás"
-
-        # Filtra registros da última semana e calcula média, hipo e hiper
-        sete_dias_atras = agora - timedelta(days=7)
-        glicemias_ultima_semana = [
-            reg['valor'] 
-            for reg in registros 
-            if reg['data_hora'] > sete_dias_atras
-        ]
-        
-        if glicemias_ultima_semana:
-            media = sum(glicemias_ultima_semana) / len(glicemias_ultima_semana)
-            resumo_dados['media_ultima_semana'] = round(media, 2)
-        
-        # Conta episódios de hipoglicemia e hiperglicemia
-        for reg in registros:
-            if reg['valor'] < 70:
-                resumo_dados['hipoglicemia_count'] += 1
-            if reg['valor'] > 180:
-                resumo_dados['hiperglicemia_count'] += 1
-
-        # NOVO: Calcula o total de calorias do dia
-        hoje = date.today()
-        for reg in registros:
-            if 'total_calorias' in reg and reg['data_hora'].date() == hoje:
-                total_calorias_diarias += reg['total_calorias']
-    
-    # NOVO: Passa o valor de calorias para o template
     return render_template('dashboard.html', 
-                            username=username, 
-                            resumo_dados=resumo_dados,
-                            total_calorias_diarias=round(total_calorias_diarias, 2)
+                           username=username, 
+                           resumo_dados=resumo_dados,
+                           total_calorias_diarias=resumo_dados.get('total_calorias_diarias', 0.0)
                           )
 
 @app.route('/guia_insulina')
@@ -197,19 +135,21 @@ def guia_insulina():
 def perfil():
     """Permite ao usuário visualizar e editar suas informações de perfil."""
     username = session['username']
+    usuario_atual = data_manager.carregar_usuario(username)
+    
+    if not usuario_atual:
+        flash("Usuário não encontrado.", "error")
+        return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
         try:
-            usuarios = data_manager.carregar_usuarios()
-            usuario_atual = usuarios.get(username, {})
-
             usuario_atual['email'] = request.form.get('email')
             usuario_atual['data_nascimento'] = request.form.get('data_nascimento')
             usuario_atual['sexo'] = request.form.get('sexo')
             usuario_atual['razao_ic'] = float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None
             usuario_atual['fator_sensibilidade'] = float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None
 
-            data_manager.salvar_usuarios(usuarios)
+            data_manager.salvar_usuario(usuario_atual)
 
             flash("Perfil atualizado com sucesso!", "success")
             app_core.salvar_log_acao("Perfil de usuário atualizado.", username)
@@ -217,10 +157,7 @@ def perfil():
         except (ValueError, KeyError):
             flash("Por favor, insira valores válidos para todos os campos.", "error")
             return redirect(url_for('perfil'))
-
     else:
-        usuarios = data_manager.carregar_usuarios()
-        usuario_atual = usuarios.get(username, {})
         return render_template('perfil.html', usuario=usuario_atual)
 
 @app.route('/registrar_glicemia', methods=['GET', 'POST'])
@@ -229,62 +166,26 @@ def registrar_glicemia():
     """Permite ao usuário registrar uma medição de glicemia e uma refeição."""
     if request.method == 'POST':
         try:
-            valor = float(request.form.get('valor', 0))
-            refeicao = request.form.get('refeicao', '')
-            observacoes = request.form.get('observacoes', '')
-            data_hora_str = request.form.get('data_hora')
+            dados_processados = _processar_dados_registro(request.form)
 
-            data_hora = datetime.strptime(data_hora_str, '%Y-%m-%dT%H:%M')
-
-            alimentos_selecionados = request.form.getlist('alimento_selecionado[]')
-            carbs_list = request.form.getlist('carbs[]')
-
-            alimentos_refeicao = []
-            total_carbs = 0
-
-            for i in range(len(alimentos_selecionados)):
-                alimento_nome = alimentos_selecionados[i]
-                carbs_valor = float(carbs_list[i]) if carbs_list[i] else 0
-                if alimento_nome:
-                    alimentos_refeicao.append({'nome': alimento_nome, 'carbs': carbs_valor})
-                    total_carbs += carbs_valor
-            
-            # NOVO: Calcular total de calorias (1g de carboidrato = 4 kcal)
-            total_calorias = total_carbs * 4
-
-            descricao_completa = f"{refeicao}: "
-            if alimentos_refeicao:
-                alimentos_descricao = [f"{a['nome']} - Carbs: {a['carbs']}g" for a in alimentos_refeicao]
-                descricao_completa += f"{', '.join(alimentos_descricao)}. "
-
-            descricao_completa += f"Total Carbs: {total_carbs}g. {observacoes}"
-
-            # NOVO: Passar total_calorias para o método de adicionar registro
             app_core.adicionar_registro(
-                tipo="Refeição",
-                valor=valor,
-                descricao=descricao_completa,
                 usuario=session['username'],
-                data_hora=data_hora,
-                refeicao=refeicao,
-                alimentos_refeicao=alimentos_refeicao,
-                total_carbs=total_carbs,
-                total_calorias=total_calorias, # NOVO: Campo de calorias
-                observacoes=observacoes
+                tipo="Refeição",
+                **dados_processados
             )
 
-            if valor > 300:
+            if dados_processados['valor'] > 300:
                 flash("Atenção: Glicemia elevada. A redução da glicose deve ser gradual (idealmente 50-70 mg/dL por hora). Consulte um profissional de saúde.", "warning")
-            elif valor < 70:
+            elif dados_processados['valor'] < 70:
                 flash("Atenção: Hipoglicemia detetada. Considere consumir 15g de carboidratos de ação rápida (por exemplo, 3-4 pastilhas de glicose ou 1/2 copo de sumo de fruta).", "warning")
             else:
                 flash("Registo adicionado com sucesso!", "success")
 
-            app_core.salvar_log_acao(f'Registro de glicemia e refeição: {valor}', session['username'])
+            app_core.salvar_log_acao(f'Registro de glicemia e refeição: {dados_processados["valor"]}', session['username'])
             return redirect(url_for('registros'))
 
-        except ValueError:
-            flash("Por favor, insira valores numéricos válidos.", "error")
+        except (ValueError, KeyError):
+            flash("Por favor, insira valores numéricos válidos. Campos como 'valor', 'carboidratos' ou 'data e hora' podem estar incorretos.", "error")
             return redirect(url_for('registrar_glicemia'))
 
     return render_template('registrar_glicemia.html')
@@ -314,8 +215,8 @@ def cadastrar_usuario():
         password = request.form['password']
         email = request.form.get('email')
         role = request.form.get('role')
-        razao_ic = request.form.get('razao_ic')
-        fator_sensibilidade = request.form.get('fator_sensibilidade')
+        razao_ic = float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None
+        fator_sensibilidade = float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None
 
         sucesso, mensagem = auth_manager.salvar_usuario(
             username, password, email=email, role=role,
@@ -340,8 +241,7 @@ def editar_usuario(username):
         flash("Acesso não autorizado.", "error")
         return redirect(url_for('dashboard'))
 
-    usuarios = data_manager.carregar_usuarios()
-    usuario_a_editar = usuarios.get(username)
+    usuario_a_editar = data_manager.carregar_usuario(username)
     if not usuario_a_editar:
         flash("Usuário não encontrado.", "error")
         return redirect(url_for('gerenciar_usuarios'))
@@ -352,17 +252,21 @@ def editar_usuario(username):
 
             usuario_a_editar['email'] = request.form.get('email')
             usuario_a_editar['role'] = request.form.get('role')
+            usuario_a_editar['data_nascimento'] = request.form.get('data_nascimento')
+            usuario_a_editar['sexo'] = request.form.get('sexo')
             razao_ic_str = request.form.get('razao_ic')
             fator_sensibilidade_str = request.form.get('fator_sensibilidade')
+            meta_glicemia_str = request.form.get('meta_glicemia')
 
             if nova_senha:
                 hashed_password = bcrypt.hashpw(nova_senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                usuario_a_editar['password'] = hashed_password
-
+                usuario_a_editar['password_hash'] = hashed_password
+            
             usuario_a_editar['razao_ic'] = float(razao_ic_str) if razao_ic_str else None
             usuario_a_editar['fator_sensibilidade'] = float(fator_sensibilidade_str) if fator_sensibilidade_str else None
+            usuario_a_editar['meta_glicemia'] = float(meta_glicemia_str) if meta_glicemia_str else None
 
-            data_manager.salvar_usuarios(usuarios)
+            data_manager.salvar_usuario(usuario_a_editar)
 
             flash(f"Perfil do usuário {username} atualizado com sucesso!", "success")
             app_core.salvar_log_acao(f'Perfil do usuário {username} editado', session['username'])
@@ -380,23 +284,17 @@ def excluir_usuario(username):
     if not session.get('role') == 'admin':
         flash("Acesso não autorizado.", "error")
         return redirect(url_for('dashboard'))
-
+    
     if username == session.get('username'):
         flash("Não é possível excluir a si mesmo.", "warning")
         return redirect(url_for('gerenciar_usuarios'))
 
-    usuarios = data_manager.carregar_usuarios()
-    if username in usuarios:
-        del usuarios[username]
-        data_manager.salvar_usuarios(usuarios)
-        flash(f"Usuário {username} excluído com sucesso.", "success")
-        app_core.salvar_log_acao(f'Usuário {username} excluído', session['username'])
-    else:
-        flash("Usuário não encontrado.", "error")
-
+    data_manager.excluir_usuario(username)
+    flash(f"Usuário {username} excluído com sucesso.", "success")
+    app_core.salvar_log_acao(f'Usuário {username} excluído', session['username'])
+    
     return redirect(url_for('gerenciar_usuarios'))
 
-# --- FIM DAS ROTAS DE ADMIN ---
 
 @app.route('/registrar_alimento', methods=['GET', 'POST'])
 @login_required
@@ -405,25 +303,33 @@ def registrar_alimento():
     if request.method == 'POST':
         try:
             nome = request.form['nome_alimento']
-            tipo = request.form.get('tipo_alimento', 'Usuário')
-            carbs = float(request.form.get('carbs', 0))
-            protein = float(request.form.get('protein', 0))
-            fat = float(request.form.get('fat', 0))
-            acucares = float(request.form.get('acucares', 0))
-            gord_sat = float(request.form.get('gord_sat', 0))
-            sodio = float(request.form.get('sodio', 0))
             medida_caseira = request.form.get('medida_caseira', '')
             peso_g = float(request.form.get('peso_g', 0))
-        except (ValueError, KeyError):
-            flash("Por favor, insira valores numéricos válidos.", "error")
+            carbs = float(request.form.get('cho', 0))
+            kcal = float(request.form.get('kcal', 0))
+            
+            novo_alimento_data = {
+                "ALIMENTO": nome,
+                "MEDIDA CASEIRA": medida_caseira,
+                "PESO (g/ml)": peso_g,
+                "Kcal": kcal,
+                "CHO (g)": carbs
+            }
+
+        except (ValueError, KeyError) as e:
+            flash(f"Erro ao processar os dados: {e}", "error")
             return redirect(url_for('registrar_alimento'))
 
-        app_core.salvar_alimento_csv(nome, tipo, carbs, protein, fat, acucares, gord_sat, sodio, medida_caseira, peso_g)
-        flash(f"Alimento '{nome}' salvo com sucesso!", "success")
-        app_core.salvar_log_acao(f'Novo alimento registrado: {nome}', session['username'])
+        if app_core.salvar_alimento_json(novo_alimento_data):
+            flash(f"Alimento '{nome}' salvo com sucesso!", "success")
+            app_core.salvar_log_acao(f'Novo alimento registrado: {nome}', session['username'])
+        else:
+            flash(f"O alimento '{nome}' já existe na base de dados. Por favor, use outro nome.", "error")
+
         return redirect(url_for('registrar_alimento'))
 
     return render_template('registrar_alimento.html')
+
 
 @app.route('/buscar_alimento', methods=['POST'])
 @login_required
@@ -447,19 +353,20 @@ def buscar_alimento():
 def registros():
     """Exibe a lista de registros de glicemia e refeições do usuário."""
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
-
+    
     return render_template('registros.html',
-                            registros=registros,
-                            get_cor_glicemia=get_cor_glicemia,
-                            get_cor_classificacao=get_cor_classificacao)
+                           registros=registros,
+                           get_cor_glicemia=get_cor_glicemia,
+                           get_cor_classificacao=get_cor_classificacao)
 
-@app.route('/excluir_registo/<id>', methods=['POST'])
+@app.route('/excluir_registo/<int:id>', methods=['POST'])
 @login_required
 def excluir_registo(id):
     """Exclui um registro específico pelo seu ID."""
     sucesso = app_core.excluir_registro(id)
     if sucesso:
         flash('Registro excluído com sucesso!', 'success')
+        app_core.salvar_log_acao(f'Registro de ID {id} excluído', session['username'])
     else:
         flash('Erro ao excluir o registro.', 'danger')
 
@@ -471,7 +378,6 @@ def grafico_glicemia():
     """Exibe a página com os gráficos de glicemia."""
     return render_template('grafico_glicemia.html')
 
-# NOVO: Rota para fornecer dados de calorias para o gráfico
 @app.route('/dados_calorias_diarias')
 @login_required
 def dados_calorias_diarias():
@@ -480,14 +386,11 @@ def dados_calorias_diarias():
     
     calorias_por_dia = {}
     
-    # Processa apenas os registros que têm total de calorias
     for reg in registros:
         if 'total_calorias' in reg and isinstance(reg['data_hora'], datetime):
             dia = reg['data_hora'].strftime('%d/%m')
-            # Soma as calorias para o dia correspondente
             calorias_por_dia[dia] = calorias_por_dia.get(dia, 0) + reg['total_calorias']
             
-    # Prepara os dados para o JSON
     rotulos = sorted(calorias_por_dia.keys())
     valores = [calorias_por_dia[dia] for dia in rotulos]
     
@@ -497,43 +400,35 @@ def dados_calorias_diarias():
 @login_required
 def calcular_bolus():
     """Permite ao usuário calcular a dose de insulina (bolus) com base em seus dados de perfil."""
+    resultado_bolus = None
+    glicemia_momento = None
+    carboidratos_refeicao = None
+    
     if request.method == 'POST':
         try:
             glicemia_momento = float(request.form['glicemia_momento'])
             carboidratos_refeicao = float(request.form['carboidratos_refeicao'])
 
-            usuario = data_manager.carregar_usuarios().get(session['username'])
-
+            usuario = data_manager.carregar_usuario(session['username'])
             razao_ic = usuario.get('razao_ic')
             fator_sensibilidade = usuario.get('fator_sensibilidade')
             meta_glicemia = usuario.get('meta_glicemia', 100)
 
             if razao_ic is None or fator_sensibilidade is None:
                 flash("Por favor, preencha a Razão IC e o Fator de Sensibilidade no seu perfil para usar esta calculadora.", "warning")
-                return redirect(url_for('perfil'))
-
-            resultado_bolus = calcular_bolus_detalhado(
-                carboidratos_refeicao,
-                glicemia_momento,
-                meta_glicemia,
-                razao_ic,
-                fator_sensibilidade
-            )
-
-            session['resultado_bolus'] = resultado_bolus
-            session['glicemia_momento'] = glicemia_momento
-            session['carboidratos_refeicao'] = carboidratos_refeicao
-
-            app_core.salvar_log_acao(f'Cálculo de bolus: {resultado_bolus["bolus_total"]} UI', session['username'])
-            return redirect(url_for('calcular_bolus'))
+            else:
+                resultado_bolus = calcular_bolus_detalhado(
+                    carboidratos_refeicao,
+                    glicemia_momento,
+                    meta_glicemia,
+                    razao_ic,
+                    fator_sensibilidade
+                )
+                flash("Cálculo realizado com sucesso!", "success")
+                app_core.salvar_log_acao(f'Cálculo de bolus: {resultado_bolus["bolus_total"]} UI', session['username'])
 
         except (ValueError, KeyError) as e:
             flash(f"Valores inválidos. Por favor, insira números válidos. Erro: {e}", "error")
-            return redirect(url_for('calcular_bolus'))
-
-    resultado_bolus = session.pop('resultado_bolus', None)
-    glicemia_momento = session.pop('glicemia_momento', None)
-    carboidratos_refeicao = session.pop('carboidratos_refeicao', None)
 
     return render_template(
         'calculadora_bolus.html',
@@ -546,22 +441,24 @@ def calcular_bolus():
 @login_required
 def calcular_fs():
     """Permite ao usuário calcular o Fator de Sensibilidade à Insulina (FS)."""
-    resultado_fs = None
+    resultado_fs = None 
+
     if request.method == 'POST':
         try:
             dtdi = float(request.form['dtdi'])
             tipo_insulina = request.form['tipo_insulina']
 
             resultado_fs = calcular_fator_sensibilidade(dtdi, tipo_insulina)
+            
             app_core.salvar_log_acao(f'Cálculo de Fator de Sensibilidade: {resultado_fs} mg/dL', session['username'])
             flash("Cálculo realizado com sucesso!", "success")
 
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as e:
             flash("Valores inválidos. Por favor, insira números válidos.", "error")
 
     return render_template('calcular_fs.html', resultado_fs=resultado_fs)
 
-@app.route('/editar_registo/<id>', methods=['GET', 'POST'])
+@app.route('/editar_registo/<int:id>', methods=['GET', 'POST'])
 @login_required
 def editar_registo(id):
     """Permite ao usuário editar um registro de glicemia existente."""
@@ -576,44 +473,12 @@ def editar_registo(id):
 
     if request.method == 'POST':
         try:
-            valor = float(request.form.get('valor', 0))
-            data_hora_str = request.form.get('data_hora')
-            refeicao_tipo = request.form.get('refeicao')
-            observacoes = request.form.get('observacoes', '')
+            dados_processados = _processar_dados_registro(request.form)
 
-            alimentos_refeicao = []
-            total_carbs = 0.0
-            alimentos_selecionados = request.form.getlist('alimento_selecionado[]')
-            carbs_list = request.form.getlist('carbs[]')
-
-            for i in range(len(alimentos_selecionados)):
-                alimento = alimentos_selecionados[i]
-                carbs = float(carbs_list[i]) if carbs_list[i] else 0.0
-                if alimento:
-                    alimentos_refeicao.append({'nome': alimento, 'carbs': carbs})
-                    total_carbs += carbs
-            
-            # NOVO: Calcular total de calorias
-            total_calorias = total_carbs * 4
-
-            descricao = f"{refeicao_tipo}: "
-            if alimentos_refeicao:
-                alimentos_descricao = [f"{a['nome']} - Carbs: {a['carbs']}g" for a in alimentos_refeicao]
-                descricao += " - ".join(alimentos_descricao)
-            descricao += f" Total Carbs: {total_carbs}g. {observacoes}"
-
-            # NOVO: Passar total_calorias para o método de atualizar
             app_core.atualizar_registro(
                 id,
                 tipo="Refeição",
-                valor=valor,
-                descricao=descricao,
-                data_hora=datetime.fromisoformat(data_hora_str),
-                refeicao=refeicao_tipo,
-                alimentos_refeicao=alimentos_refeicao,
-                total_carbs=total_carbs,
-                total_calorias=total_calorias, # NOVO: Campo de calorias
-                observacoes=observacoes
+                **dados_processados
             )
 
             flash('Registro atualizado com sucesso!', 'success')
@@ -626,21 +491,69 @@ def editar_registo(id):
 
     else:
         return render_template('editar_registo.html',
-                                registo=registo_para_editar,
-                                alimentos_refeicao=registo_para_editar.get('alimentos_refeicao', []),
-                                total_carbs=registo_para_editar.get('total_carbs', 0.0))
+                               registo=registo_para_editar,
+                               alimentos_refeicao=registo_para_editar.get('alimentos_refeicao', []),
+                               total_carbs=registo_para_editar.get('total_carbs', 0.0))
 
+# Rota de Relatórios
 @app.route('/relatorios')
 @login_required
 def relatorios():
-    """Gera a página de relatórios com os dados de glicemia para o gráfico."""
+    """Renderiza a página com todos os gráficos de relatórios."""
+    return render_template('relatorios.html')
+
+# Novas Rotas para dados JSON
+@app.route('/dados_glicemia_json')
+@login_required
+def dados_glicemia_json():
+    """Fornece dados de glicemia para o gráfico em formato JSON."""
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
+    
+    dados_filtrados = sorted([
+        {'data_hora': reg['data_hora'].isoformat(), 'valor': reg['valor']}
+        for reg in registros if 'valor' in reg
+    ], key=lambda x: x['data_hora'])
 
-    datas = [reg['data_hora'] for reg in registros if 'valor' in reg]
-    valores = [reg['valor'] for reg in registros if 'valor' in reg]
-    datas_formatadas = [d.strftime('%d/%m %H:%M') for d in datas]
+    labels = [datetime.fromisoformat(d['data_hora']).strftime('%d/%m %H:%M') for d in dados_filtrados]
+    data = [d['valor'] for d in dados_filtrados]
 
-    return render_template('relatorios.html', labels=datas_formatadas, data=valores)
+    return jsonify({'labels': labels, 'data': data})
+
+@app.route('/dados_calorias_diarias_json')
+@login_required
+def dados_calorias_diarias_json():
+    """Fornece dados de calorias diárias para um gráfico em formato JSON."""
+    registros = app_core.mostrar_registros(usuario_filtro=session['username'])
+    
+    calorias_por_dia = {}
+    
+    for reg in registros:
+        if 'total_calorias' in reg and isinstance(reg['data_hora'], datetime):
+            dia = reg['data_hora'].strftime('%d/%m')
+            calorias_por_dia[dia] = calorias_por_dia.get(dia, 0) + reg['total_calorias']
+            
+    rotulos = sorted(calorias_por_dia.keys())
+    valores = [calorias_por_dia[dia] for dia in rotulos]
+    
+    return jsonify({'labels': rotulos, 'data': valores})
+
+@app.route('/dados_carbs_diarios_json')
+@login_required
+def dados_carbs_diarios_json():
+    """Fornece dados de carboidratos diários para um gráfico em formato JSON."""
+    registros = app_core.mostrar_registros(usuario_filtro=session['username'])
+    
+    carbs_por_dia = {}
+    
+    for reg in registros:
+        if 'total_carbs' in reg and isinstance(reg['data_hora'], datetime):
+            dia = reg['data_hora'].strftime('%d/%m')
+            carbs_por_dia[dia] = carbs_por_dia.get(dia, 0) + reg['total_carbs']
+            
+    rotulos = sorted(carbs_por_dia.keys())
+    valores = [carbs_por_dia[dia] for dia in rotulos]
+    
+    return jsonify({'labels': rotulos, 'data': valores})
 
 # --- Inicialização da Aplicação ---
 if __name__ == '__main__':

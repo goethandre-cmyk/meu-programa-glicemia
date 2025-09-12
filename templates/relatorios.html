@@ -3,86 +3,119 @@
 {% block title %}Relatórios{% endblock %}
 
 {% block content %}
+<style>
+    /* Estilo para garantir que os gráficos tenham um tamanho limitado e consistente */
+    .chart-container {
+        position: relative;
+        height: 400px; /* Defina a altura desejada */
+        margin-bottom: 2rem;
+    }
+</style>
+
 <div class="container mt-4">
     <h1 class="mb-4">
-        <i class="fas fa-chart-line me-2"></i>Relatórios de Glicemia
+        <i class="fas fa-chart-line me-2"></i>Relatórios Detalhados
     </h1>
 
-    <div class="card p-4 shadow-sm">
+    <div class="card p-4 shadow-sm mb-4">
         <h5 class="card-title">Histórico de Glicemia</h5>
-        <canvas id="graficoGlicemia"></canvas>
+        <div class="chart-container">
+            <canvas id="graficoGlicemia"></canvas>
+        </div>
+    </div>
+
+    <div class="card p-4 shadow-sm mb-4">
+        <h5 class="card-title">Consumo Diário de Carboidratos</h5>
+        <div class="chart-container">
+            <canvas id="graficoCarboidratos"></canvas>
+        </div>
+    </div>
+
+    <div class="card p-4 shadow-sm mb-4">
+        <h5 class="card-title">Consumo Diário de Calorias</h5>
+        <div class="chart-container">
+            <canvas id="graficoCalorias"></canvas>
+        </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const labels = {{ labels| safe
-    }};
-    const data = {{ data| safe }};
-
-    const ctx = document.getElementById('graficoGlicemia').getContext('2d');
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Valor da Glicemia (mg/dL)',
-                data: data,
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: function (context) {
-                    const valor = context.dataset.data[context.dataIndex];
-                    if (valor < 70) {
-                        return 'red'; // Hipoglicemia
-                    } else if (valor >= 70 && valor <= 120) {
-                        return 'green'; // Normal
-                    } else if (valor > 120 && valor <= 180) {
-                        return 'orange'; // Elevada
-                    } else {
-                        return 'red'; // Hiperglicemia
-                    }
-                },
-                pointBorderColor: function (context) {
-                    const valor = context.dataset.data[context.dataIndex];
-                    if (valor < 70) {
-                        return 'red';
-                    } else if (valor >= 70 && valor <= 120) {
-                        return 'green';
-                    } else if (valor > 120 && valor <= 180) {
-                        return 'orange';
-                    } else {
-                        return 'red';
-                    }
-                },
-                pointRadius: 5,
-                fill: false,
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Data e Hora'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Glicemia (mg/dL)'
-                    },
-                    min: 0,
-                    suggestedMax: 200
-                }
+    // Função para buscar dados e criar um gráfico
+    async function fetchAndCreateChart(url, chartId, labelText, chartType, pointColorFunction = null) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Falha ao buscar os dados do gráfico.');
             }
+            const data = await response.json();
+
+            const ctx = document.getElementById(chartId).getContext('2d');
+            new Chart(ctx, {
+                type: chartType,
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: labelText,
+                        data: data.data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1,
+                        pointBackgroundColor: pointColorFunction,
+                        pointBorderColor: pointColorFunction,
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Data'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: labelText
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Erro ao carregar o gráfico:", error);
         }
-    });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Função para definir a cor do ponto no gráfico de glicemia
+        const glicemiaPointColors = function (context) {
+            const valor = context.dataset.data[context.dataIndex];
+            if (valor < 70) {
+                return 'red'; // Hipoglicemia
+            } else if (valor >= 70 && valor <= 120) {
+                return 'green'; // Normal
+            } else if (valor > 120 && valor <= 180) {
+                return 'orange'; // Elevada
+            } else {
+                return 'red'; // Hiperglicemia
+            }
+        };
+
+        // Carregar Gráfico de Glicemia
+        fetchAndCreateChart('/dados_glicemia_json', 'graficoGlicemia', 'Valor da Glicemia (mg/dL)', 'line', glicemiaPointColors);
+
+        // Carregar Gráfico de Carboidratos
+        fetchAndCreateChart('/dados_carbs_diarios_json', 'graficoCarboidratos', 'Carboidratos (g)', 'bar');
+
+        // Carregar Gráfico de Calorias
+        fetchAndCreateChart('/dados_calorias_diarias_json', 'graficoCalorias', 'Calorias (kcal)', 'bar');
     });
 </script>
 {% endblock %}
