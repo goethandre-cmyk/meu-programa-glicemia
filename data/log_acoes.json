@@ -1,0 +1,32 @@
+[
+    {
+        "data_hora": "2025-09-12T17:24:10.451962",
+        "usuario": "goeth",
+        "acao": "Tentativa de login falhada"
+    },
+    {
+        "data_hora": "2025-09-12T17:24:18.960407",
+        "usuario": "goeth",
+        "acao": "Tentativa de login falhada"
+    },
+    {
+        "data_hora": "2025-09-12T17:30:06.814064",
+        "usuario": "goeth",
+        "acao": "Tentativa de login falhada"
+    },
+    {
+        "data_hora": "2025-09-12T17:30:22.868621",
+        "usuario": "goeth",
+        "acao": "Tentativa de login falhada"
+    },
+    {
+        "data_hora": "2025-09-12T17:30:38.825359",
+        "usuario": "goeth",
+        "acao": "Cadastro de novo usu\u00e1rio"
+    },
+    {
+        "data_hora": "2025-09-12T17:30:48.731105",
+        "usuario": "goeth",
+        "acao": "Login bem-sucedido"
+    }
+]

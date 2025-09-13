@@ -1,0 +1,49 @@
+{% extends 'base_minimal.html' %}
+
+{% block title %}Editar Alimento{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-md-10">
+        <h2 class="text-center fw-bold mb-4">Editar Alimento</h2>
+        
+        <div class="card shadow p-4 mb-5 bg-white rounded">
+            <div class="card-body">
+                <form action="{{ url_for('editar_alimento', id=alimento['id']) }}" method="post" novalidate>
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        <label for="alimento_input" class="form-label">Nome do Alimento</label>
+                        <input type="text" class="form-control" id="alimento_input" name="alimento" value="{{ alimento['ALIMENTO'] }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="medida_caseira_input" class="form-label">Medida Caseira</label>
+                        <input type="text" class="form-control" id="medida_caseira_input" name="medida_caseira" value="{{ alimento['MEDIDA CASEIRA'] }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="peso_input" class="form-label">Peso (g/ml)</label>
+                        <input type="number" step="0.01" class="form-control" id="peso_input" name="peso" value="{{ alimento['PESO (g/ml)'] }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="kcal_input" class="form-label">Kcal</label>
+                        <input type="number" step="0.01" class="form-control" id="kcal_input" name="kcal" value="{{ alimento['Kcal'] }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="carbs_input" class="form-label">Carboidratos (g)</label>
+                        <input type="number" step="0.01" class="form-control" id="carbs_input" name="carbs" value="{{ alimento['CHO (g)'] }}" required>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                        <a href="{{ url_for('alimentos') }}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

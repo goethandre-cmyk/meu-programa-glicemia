@@ -1,0 +1,51 @@
+{% extends 'base_minimal.html' %}
+
+{% block title %}Alimentos{% endblock %}
+
+{% block content %}
+<h2 class="text-center fw-bold mb-4">Lista de Alimentos</h2>
+
+<div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('registrar_alimento') }}" class="btn btn-success">
+        <i class="fas fa-plus"></i> Novo Alimento
+    </a>
+</div>
+
+{% if alimentos %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Carboidratos (g)</th>
+                <th>Kcal</th>
+                <th>Medida Caseira</th>
+                <th class="text-center">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alimento in alimentos %}
+            <tr>
+                <td>{{ alimento['ALIMENTO'] }}</td>
+                <td>{{ alimento['CHO (g)'] }}</td>
+                <td>{{ alimento['Kcal'] }}</td>
+                <td>{{ alimento['MEDIDA CASEIRA'] }}</td>
+                <td class="text-center">
+                    <a href="{{ url_for('editar_alimento', id=alimento['id']) }}" class="btn btn-sm btn-primary" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <form action="{{ url_for('excluir_alimento', id=alimento['id']) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Tem certeza que deseja excluir este alimento? Esta ação é irreversível.');">
+                        <button type="submit" class="btn btn-sm btn-danger" title="Excluir">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+    <p class="text-center text-muted">Ainda não há alimentos cadastrados. Clique em "Novo Alimento" para começar.</p>
+{% endif %}
+{% endblock %}

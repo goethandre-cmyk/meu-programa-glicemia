@@ -389,3 +389,36 @@ button, .btn {
 .tool-card .btn {
     width: 80%;
 }
+/* Estilo para reduzir a altura do carrossel */
+.hero-carousel-short {
+    max-height: 50vh; /* 50% da altura da tela */
+    overflow: hidden;
+}
+
+.hero-carousel-short .carousel-item {
+    height: 50vh;
+}
+
+/* Estilo para as imagens do carrossel */
+.carousel-item img {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+}
+
+/* Estilo para os cards de conteúdo */
+.feature-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilo para imagens dentro dos cards */
+.feature-card img {
+    max-height: 200px; /* Altura fixa para as imagens dentro dos cartões */
+    object-fit: cover;
+    width: 100%;
+}
