@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Ficha Médica{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Ficha Médica: {{ paciente.username }}</h2>
+        <a href="{{ url_for('perfil_paciente', username=paciente.username) }}" class="btn btn-secondary">
+            Voltar
+        </a>
+    </div>
+
+    <div class="card p-4 shadow-sm">
+        <form action="{{ url_for('ficha_medica', username=paciente.username) }}" method="POST">
+            <div class="mb-3">
+                <label for="condicao_atual" class="form-label">Condição Atual:</label>
+                <textarea id="condicao_atual" name="condicao_atual" class="form-control" rows="3" placeholder="Descreva a condição de saúde atual do paciente...">{{ paciente.condicao_atual if paciente.condicao_atual is not none else '' }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label for="alergias" class="form-label">Alergias Conhecidas:</label>
+                <textarea id="alergias" name="alergias" class="form-control" rows="3" placeholder="Liste as alergias do paciente...">{{ paciente.alergias if paciente.alergias is not none else '' }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label for="historico_familiar" class="form-label">Histórico Familiar:</label>
+                <textarea id="historico_familiar" name="historico_familiar" class="form-control" rows="3" placeholder="Detalhe o histórico de doenças familiares relevantes...">{{ paciente.historico_familiar if paciente.historico_familiar is not none else '' }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label for="medicamentos_uso" class="form-label">Medicamentos em Uso:</label>
+                <textarea id="medicamentos_uso" name="medicamentos_uso" class="form-control" rows="3" placeholder="Liste os medicamentos que o paciente está a tomar...">{{ paciente.medicamentos_uso if paciente.medicamentos_uso is not none else '' }}</textarea>
+            </div>
+            
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{{ url_for('perfil_paciente', username=paciente.username) }}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Salvar Ficha</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

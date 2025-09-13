@@ -1,3 +1,5 @@
+# app.py
+
 # --- Importações e Configuração Inicial ---
 import os
 import json
@@ -12,7 +14,8 @@ from flask import (
     jsonify,
     flash
 )
-from datetime import datetime, timedelta, date
+import sqlite3
+from datetime import datetime
 import bcrypt
 
 # Importa as classes e funções utilitárias do seu módulo logica.py
@@ -25,23 +28,25 @@ from logica import (
     calcular_fator_sensibilidade,
     calcular_bolus_detalhado,
     _processar_dados_registro,
-    get_status_class # <-- Adicione esta importação aqui
+    get_status_class
 )
 
 app = Flask(__name__)
-# Chave secreta para a segurança das sessões.
 app.secret_key = '0edd34d5d0228451a8b702f7902892c5'
 
 # Instâncias globais das classes de lógica.
-data_manager = DatabaseManager()
-auth_manager = AuthManager(data_manager)
-app_core = AppCore(data_manager)
+# Corrigido: Agora criamos duas instâncias, uma para cada banco de dados
+db_manager_glicemia = DatabaseManager(db_path='glicemia.db')
+db_manager_usuarios = DatabaseManager(db_path='banco_de_dados.db')
+
+# Corrigido: As classes de lógica são inicializadas com a instância do banco de dados correta
+auth_manager = AuthManager(db_manager_usuarios)
+app_core = AppCore(db_manager_glicemia)
+
 
 # --- Funções Decoradoras (Middleware) ---
 def login_required(f):
-    """
-    Decorador para proteger rotas que exigem autenticação.
-    """
+    """Decorador para rotas que exigem autenticação."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
@@ -50,12 +55,27 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def roles_required(roles_list):
+    """Decorador para rotas que exigem uma role específica."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if session.get('role') not in roles_list:
+                flash("Acesso não autorizado.", "error")
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 # --- Rotas da Aplicação ---
 @app.route('/')
 def index():
     """Rota para a página inicial. Redireciona para o dashboard se o usuário já estiver logado."""
     if 'username' in session:
-        return redirect(url_for('dashboard'))
+        if session.get('role') == 'medico':
+            return redirect(url_for('dashboard_medico'))
+        else:
+            return redirect(url_for('dashboard'))
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -64,15 +84,16 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
         usuario_logado, mensagem = auth_manager.verificar_login(username, password)
-
         if usuario_logado:
             session['username'] = username
-            session['role'] = usuario_logado.get('role', 'user')
+            session['role'] = usuario_logado.get('role', 'paciente')
             flash("Login bem-sucedido!", "success")
             app_core.salvar_log_acao('Login bem-sucedido', username)
-            return redirect(url_for('dashboard'))
+            if session['role'] == 'medico':
+                return redirect(url_for('dashboard_medico'))
+            else:
+                return redirect(url_for('dashboard'))
         else:
             flash(mensagem, "error")
             app_core.salvar_log_acao('Tentativa de login falhada', username)
@@ -89,11 +110,7 @@ def cadastro():
         fator_sensibilidade = float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None
 
         sucesso, mensagem = auth_manager.salvar_usuario(
-            username,
-            password,
-            email=email,
-            razao_ic=razao_ic,
-            fator_sensibilidade=fator_sensibilidade
+            username, password, email=email, razao_ic=razao_ic, fator_sensibilidade=fator_sensibilidade
         )
 
         if sucesso:
@@ -107,7 +124,7 @@ def cadastro():
 
 @app.route('/logout')
 def logout():
-    """Encerra a sessão do usuário, removendo o username e a role da sessão."""
+    """Encerra a sessão do usuário."""
     session.pop('username', None)
     session.pop('role', None)
     flash("Sessão encerrada.", "info")
@@ -116,14 +133,23 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    """Dashboard para usuários pacientes."""
+    if session.get('role') == 'medico':
+        return redirect(url_for('dashboard_medico'))
     username = session['username']
     resumo_dados = app_core.get_resumo_dashboard(username)
-    
-    return render_template('dashboard.html', 
-                           username=username, 
+    return render_template('dashboard.html',
+                           username=username,
                            resumo_dados=resumo_dados,
-                           total_calorias_diarias=resumo_dados.get('total_calorias_diarias', 0.0)
-                         )
+                           total_calorias_diarias=resumo_dados.get('total_calorias_diarias', 0.0))
+
+@app.route('/dashboard_medico')
+@roles_required(['medico'])
+def dashboard_medico():
+    """Dashboard para o médico, mostrando uma lista de todos os pacientes."""
+    # Corrigido: usa o db_manager de usuários
+    pacientes = db_manager_usuarios.carregar_pacientes()
+    return render_template('dashboard_medico.html', usuarios=pacientes)
 
 @app.route('/guia_insulina')
 @login_required
@@ -136,22 +162,24 @@ def guia_insulina():
 def perfil():
     """Permite ao usuário visualizar e editar suas informações de perfil."""
     username = session['username']
-    usuario_atual = data_manager.carregar_usuario(username)
-    
+    # Corrigido: usa o db_manager de usuários
+    usuario_atual = db_manager_usuarios.carregar_usuario(username)
+
     if not usuario_atual:
         flash("Usuário não encontrado.", "error")
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
         try:
-            usuario_atual['email'] = request.form.get('email')
-            usuario_atual['data_nascimento'] = request.form.get('data_nascimento')
-            usuario_atual['sexo'] = request.form.get('sexo')
-            usuario_atual['razao_ic'] = float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None
-            usuario_atual['fator_sensibilidade'] = float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None
-
-            data_manager.salvar_usuario(usuario_atual)
-
+            dados_perfil = {
+                'email': request.form.get('email'),
+                'data_nascimento': request.form.get('data_nascimento'),
+                'sexo': request.form.get('sexo'),
+                'razao_ic': float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None,
+                'fator_sensibilidade': float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None,
+            }
+            # Corrigido: usa o db_manager de usuários
+            db_manager_usuarios.atualizar_perfil_usuario(username, dados_perfil)
             flash("Perfil atualizado com sucesso!", "success")
             app_core.salvar_log_acao("Perfil de usuário atualizado.", username)
             return redirect(url_for('perfil'))
@@ -161,6 +189,37 @@ def perfil():
     else:
         return render_template('perfil.html', usuario=usuario_atual)
 
+# --- INÍCIO: Novas Rotas para a Ficha Médica ---
+@app.route('/ficha_medica/<username>', methods=['GET', 'POST'])
+@roles_required(['medico'])
+def ficha_medica(username):
+    """
+    Permite ao médico visualizar e editar a ficha médica de um paciente.
+    A busca e a atualização são feitas na nova tabela 'fichas_medicas'.
+    """
+    # Corrigido: usa o db_manager de usuários
+    paciente = db_manager_usuarios.carregar_ficha_medica(username)
+    if not paciente:
+        flash('Paciente não encontrado ou não é paciente.', 'danger')
+        return redirect(url_for('dashboard_medico'))
+
+    if request.method == 'POST':
+        dados_ficha = {
+            'paciente_id': paciente['id'],
+            'condicao_atual': request.form.get('condicao_atual'),
+            'alergias': request.form.get('alergias'),
+            'historico_familiar': request.form.get('historico_familiar'),
+            'medicamentos_uso': request.form.get('medicamentos_uso')
+        }
+        # Corrigido: usa o db_manager de usuários
+        db_manager_usuarios.salvar_ficha_medica(dados_ficha)
+        flash('Ficha médica atualizada com sucesso!', 'success')
+        return redirect(url_for('perfil_paciente', username=username))
+
+    return render_template('ficha_medica.html', paciente=paciente)
+# --- FIM: Novas Rotas para a Ficha Médica ---
+
+
 @app.route('/registrar_glicemia', methods=['GET', 'POST'])
 @login_required
 def registrar_glicemia():
@@ -169,6 +228,7 @@ def registrar_glicemia():
         try:
             dados_processados = _processar_dados_registro(request.form)
 
+            # Corrigido: usa o app_core, que já tem a instância de glicemia
             app_core.adicionar_registro(
                 usuario=session['username'],
                 tipo="Refeição",
@@ -185,49 +245,30 @@ def registrar_glicemia():
             app_core.salvar_log_acao(f'Registro de glicemia e refeição: {dados_processados["valor"]}', session['username'])
             return redirect(url_for('registros'))
 
-        except (ValueError, KeyError):
-            flash("Por favor, insira valores numéricos válidos. Campos como 'valor', 'carboidratos' ou 'data e hora' podem estar incorretos.", "error")
+        except (ValueError, KeyError) as e:
+            flash(f"Por favor, insira valores numéricos válidos. Campos como 'valor', 'carboidratos' ou 'data e hora' podem estar incorretos. Erro: {e}", "error")
             return redirect(url_for('registrar_glicemia'))
 
     return render_template('registrar_glicemia.html')
 
-@app.route('/gerenciar_usuarios')
-@login_required
-def gerenciar_usuarios():
-    """Rota para administradores gerenciarem usuários."""
-    if session.get('role') == 'admin':
-        usuarios = data_manager.carregar_usuarios()
-        return render_template('gerenciar_usuarios.html', usuarios=usuarios)
-    else:
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for('dashboard'))
-
-# --- ROTAS PARA GERENCIAR USUÁRIOS COMO ADMIN ---
 @app.route('/cadastrar_usuario', methods=['GET', 'POST'])
-@login_required
+@roles_required(['medico'])
 def cadastrar_usuario():
-    """Permite ao admin cadastrar um novo usuário com role e dados específicos."""
-    if not session.get('role') == 'admin':
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for('dashboard'))
-
+    """Permite ao médico cadastrar um novo usuário com role e dados específicos."""
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         email = request.form.get('email')
         role = request.form.get('role')
-        razao_ic = float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None
-        fator_sensibilidade = float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None
 
         sucesso, mensagem = auth_manager.salvar_usuario(
-            username, password, email=email, role=role,
-            razao_ic=razao_ic, fator_sensibilidade=fator_sensibilidade
+            username, password, email=email, role=role
         )
 
         if sucesso:
             flash("Novo usuário cadastrado com sucesso!", "success")
-            app_core.salvar_log_acao(f'Novo usuário {username} cadastrado pelo admin', session['username'])
-            return redirect(url_for('gerenciar_usuarios'))
+            app_core.salvar_log_acao(f'Novo usuário {username} cadastrado pelo médico', session['username'])
+            return redirect(url_for('dashboard_medico'))
         else:
             flash(mensagem, "warning")
             return redirect(url_for('cadastrar_usuario'))
@@ -235,43 +276,34 @@ def cadastrar_usuario():
     return render_template('cadastrar_usuario.html')
 
 @app.route('/editar_usuario/<username>', methods=['GET', 'POST'])
-@login_required
+@roles_required(['medico'])
 def editar_usuario(username):
-    """Permite ao admin editar as informações de um usuário existente."""
-    if not session.get('role') == 'admin':
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for('dashboard'))
-
-    usuario_a_editar = data_manager.carregar_usuario(username)
+    """Permite ao médico editar as informações de um usuário existente."""
+    # Corrigido: usa o db_manager de usuários
+    usuario_a_editar = db_manager_usuarios.carregar_usuario(username)
+    
     if not usuario_a_editar:
         flash("Usuário não encontrado.", "error")
-        return redirect(url_for('gerenciar_usuarios'))
+        return redirect(url_for('dashboard_medico'))
 
     if request.method == 'POST':
         try:
+            dados_atualizacao = {
+                'email': request.form.get('email'),
+                'role': request.form.get('role'),
+                'data_nascimento': request.form.get('data_nascimento'),
+                'sexo': request.form.get('sexo'),
+                'razao_ic': float(request.form.get('razao_ic')) if request.form.get('razao_ic') else None,
+                'fator_sensibilidade': float(request.form.get('fator_sensibilidade')) if request.form.get('fator_sensibilidade') else None,
+                'meta_glicemia': float(request.form.get('meta_glicemia')) if request.form.get('meta_glicemia') else None
+            }
             nova_senha = request.form.get('password')
 
-            usuario_a_editar['email'] = request.form.get('email')
-            usuario_a_editar['role'] = request.form.get('role')
-            usuario_a_editar['data_nascimento'] = request.form.get('data_nascimento')
-            usuario_a_editar['sexo'] = request.form.get('sexo')
-            razao_ic_str = request.form.get('razao_ic')
-            fator_sensibilidade_str = request.form.get('fator_sensibilidade')
-            meta_glicemia_str = request.form.get('meta_glicemia')
-
-            if nova_senha:
-                hashed_password = bcrypt.hashpw(nova_senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                usuario_a_editar['password_hash'] = hashed_password
-            
-            usuario_a_editar['razao_ic'] = float(razao_ic_str) if razao_ic_str else None
-            usuario_a_editar['fator_sensibilidade'] = float(fator_sensibilidade_str) if fator_sensibilidade_str else None
-            usuario_a_editar['meta_glicemia'] = float(meta_glicemia_str) if meta_glicemia_str else None
-
-            data_manager.salvar_usuario(usuario_a_editar)
-
+            # Corrigido: usa o db_manager de usuários
+            db_manager_usuarios.atualizar_perfil_usuario(username, dados_atualizacao, nova_senha)
             flash(f"Perfil do usuário {username} atualizado com sucesso!", "success")
             app_core.salvar_log_acao(f'Perfil do usuário {username} editado', session['username'])
-            return redirect(url_for('gerenciar_usuarios'))
+            return redirect(url_for('dashboard_medico'))
         except (ValueError, KeyError) as e:
             flash(f"Erro ao processar o formulário: {e}", "error")
             return redirect(url_for('editar_usuario', username=username))
@@ -279,23 +311,22 @@ def editar_usuario(username):
     return render_template('editar_usuario.html', usuario=usuario_a_editar, username=username)
 
 @app.route('/excluir_usuario/<username>', methods=['GET'])
-@login_required
+@roles_required(['medico'])
 def excluir_usuario(username):
-    """Permite ao admin excluir um usuário."""
-    if not session.get('role') == 'admin':
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for('dashboard'))
-    
+    """Permite ao médico excluir um usuário."""
     if username == session.get('username'):
         flash("Não é possível excluir a si mesmo.", "warning")
-        return redirect(url_for('gerenciar_usuarios'))
+        return redirect(url_for('dashboard_medico'))
 
-    data_manager.excluir_usuario(username)
-    flash(f"Usuário {username} excluído com sucesso.", "success")
-    app_core.salvar_log_acao(f'Usuário {username} excluído', session['username'])
+    # Corrigido: usa o db_manager de usuários
+    sucesso = db_manager_usuarios.excluir_usuario(username)
+    if sucesso:
+        flash(f"Usuário {username} e todos os seus dados foram excluídos com sucesso.", "success")
+        app_core.salvar_log_acao(f'Usuário {username} e dados relacionados excluídos', session['username'])
+    else:
+        flash(f"Usuário {username} não encontrado.", "error")
     
-    return redirect(url_for('gerenciar_usuarios'))
-
+    return redirect(url_for('dashboard_medico'))
 
 @app.route('/registrar_alimento', methods=['GET', 'POST'])
 @login_required
@@ -321,6 +352,7 @@ def registrar_alimento():
             flash(f"Erro ao processar os dados: {e}", "error")
             return redirect(url_for('registrar_alimento'))
 
+        # Corrigido: usa o app_core, que já tem a instância de glicemia
         if app_core.salvar_alimento_json(novo_alimento_data):
             flash(f"Alimento '{nome}' salvo com sucesso!", "success")
             app_core.salvar_log_acao(f'Novo alimento registrado: {nome}', session['username'])
@@ -330,7 +362,6 @@ def registrar_alimento():
         return redirect(url_for('registrar_alimento'))
 
     return render_template('registrar_alimento.html')
-
 
 @app.route('/buscar_alimento', methods=['POST'])
 @login_required
@@ -342,6 +373,7 @@ def buscar_alimento():
         return jsonify({'resultados': []})
 
     try:
+        # Corrigido: usa o app_core, que já tem a instância de glicemia
         resultados = app_core.pesquisar_alimentos(termo)
         return jsonify({'resultados': resultados})
 
@@ -353,20 +385,20 @@ def buscar_alimento():
 @login_required
 def registros():
     """Exibe a lista de registros de glicemia e refeições do usuário."""
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
     
-    # Adicione get_status_class aqui para que o template possa usá-lo
     return render_template('registros.html',
                            registros=registros,
                            get_status_class=get_status_class,
-                           get_cor_glicemia=get_cor_glicemia, # Mantenha as funções antigas se ainda estiverem em uso
+                           get_cor_glicemia=get_cor_glicemia,
                            get_cor_classificacao=get_cor_classificacao)
-
 
 @app.route('/excluir_registo/<int:id>', methods=['POST'])
 @login_required
 def excluir_registo(id):
     """Exclui um registro específico pelo seu ID."""
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
     sucesso = app_core.excluir_registro(id)
     if sucesso:
         flash('Registro excluído com sucesso!', 'success')
@@ -386,6 +418,7 @@ def grafico_glicemia():
 @login_required
 def dados_calorias_diarias():
     """Fornece dados de calorias diárias para um gráfico em formato JSON."""
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
     
     calorias_por_dia = {}
@@ -413,7 +446,8 @@ def calcular_bolus():
             glicemia_momento = float(request.form['glicemia_momento'])
             carboidratos_refeicao = float(request.form['carboidratos_refeicao'])
 
-            usuario = data_manager.carregar_usuario(session['username'])
+            # Corrigido: usa o db_manager de usuários
+            usuario = db_manager_usuarios.carregar_usuario(session['username'])
             razao_ic = usuario.get('razao_ic')
             fator_sensibilidade = usuario.get('fator_sensibilidade')
             meta_glicemia = usuario.get('meta_glicemia', 100)
@@ -445,7 +479,7 @@ def calcular_bolus():
 @login_required
 def calcular_fs():
     """Permite ao usuário calcular o Fator de Sensibilidade à Insulina (FS)."""
-    resultado_fs = None 
+    resultado_fs = None
 
     if request.method == 'POST':
         try:
@@ -466,6 +500,7 @@ def calcular_fs():
 @login_required
 def editar_registo(id):
     """Permite ao usuário editar um registro de glicemia existente."""
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
     registo_para_editar = app_core.encontrar_registro(id)
 
     if not registo_para_editar:
@@ -479,6 +514,7 @@ def editar_registo(id):
         try:
             dados_processados = _processar_dados_registro(request.form)
 
+            # Corrigido: usa o app_core, que já tem a instância de glicemia
             app_core.atualizar_registro(
                 id,
                 tipo="Refeição",
@@ -499,7 +535,6 @@ def editar_registo(id):
                                alimentos_refeicao=registo_para_editar.get('alimentos_refeicao', []),
                                total_carbs=registo_para_editar.get('total_carbs', 0.0))
 
-# Rota de Relatórios
 @app.route('/relatorios')
 @login_required
 def relatorios():
@@ -511,6 +546,7 @@ def relatorios():
 @login_required
 def dados_glicemia_json():
     """Fornece dados de glicemia para o gráfico em formato JSON."""
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
     
     dados_filtrados = sorted([
@@ -527,6 +563,7 @@ def dados_glicemia_json():
 @login_required
 def dados_calorias_diarias_json():
     """Fornece dados de calorias diárias para um gráfico em formato JSON."""
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
     
     calorias_por_dia = {}
@@ -545,6 +582,7 @@ def dados_calorias_diarias_json():
 @login_required
 def dados_carbs_diarios_json():
     """Fornece dados de carboidratos diários para um gráfico em formato JSON."""
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
     registros = app_core.mostrar_registros(usuario_filtro=session['username'])
     
     carbs_por_dia = {}
@@ -559,6 +597,55 @@ def dados_carbs_diarios_json():
     
     return jsonify({'labels': rotulos, 'data': valores})
 
+@app.route('/perfil_paciente/<username>')
+@roles_required(['medico'])
+def perfil_paciente(username):
+    """
+    Permite ao médico visualizar o perfil e os registros de um paciente específico.
+    Agora busca também os dados da ficha médica.
+    """
+    # Corrigido: usa o db_manager de usuários
+    paciente = db_manager_usuarios.carregar_ficha_medica(username)
+    if not paciente:
+        flash("Paciente não encontrado.", "error")
+        return redirect(url_for('dashboard_medico'))
+    
+    # Corrigido: usa o app_core, que já tem a instância de glicemia
+    registros = app_core.mostrar_registros(usuario_filtro=username)
+
+    return render_template(
+        'perfil_paciente.html',
+        paciente=paciente,
+        registros=registros,
+        get_status_class=get_status_class
+    )
+
+def criar_usuarios_iniciais():
+    """Cria um usuário médico e um usuário de teste se eles não existirem."""
+    conn = sqlite3.connect('banco_de_dados.db')
+    cursor = conn.cursor()
+    
+    # Verifica se o médico já existe
+    cursor.execute('SELECT id FROM usuarios WHERE username = ?', ('medico',))
+    if cursor.fetchone() is None:
+        print("Criando usuário médico...")
+        hashed_password = bcrypt.hashpw('medico'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        cursor.execute('INSERT INTO usuarios (username, password, role) VALUES (?, ?, ?)',
+                       ('medico', hashed_password, 'medico'))
+    
+    # Verifica se o paciente de teste já existe
+    cursor.execute('SELECT id FROM usuarios WHERE username = ?', ('davi',))
+    if cursor.fetchone() is None:
+        print("Criando usuário paciente de teste...")
+        hashed_password = bcrypt.hashpw('davi'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        cursor.execute('INSERT INTO usuarios (username, password, role) VALUES (?, ?, ?)',
+                       ('davi', hashed_password, 'paciente'))
+
+    conn.commit()
+    conn.close()
+
 # --- Inicialização da Aplicação ---
 if __name__ == '__main__':
+    
+    criar_usuarios_iniciais()
     app.run(debug=True)

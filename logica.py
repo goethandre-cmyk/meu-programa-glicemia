@@ -1,10 +1,14 @@
+# logica.py
+
 import sqlite3
-from datetime import datetime, date, timedelta
 import bcrypt
 import json
+from datetime import datetime, date, timedelta
 from flask import request
 
 # --- Funções Utilitárias (Independentes de classes) ---
+# Essas funções não precisam de estado e podem ser chamadas de qualquer lugar.
+
 def get_cor_glicemia(valor):
     """Retorna uma classe CSS baseada no valor da glicemia."""
     if valor < 70:
@@ -82,7 +86,9 @@ def _processar_dados_registro(form_data):
 
     alimentos_refeicao = []
     total_carbs = 0.0
+    total_calorias = 0.0
 
+    # Processa os alimentos selecionados no formulário
     for i in range(len(alimentos_selecionados)):
         alimento_nome = alimentos_selecionados[i]
         try:
@@ -93,14 +99,15 @@ def _processar_dados_registro(form_data):
         if alimento_nome:
             alimentos_refeicao.append({'nome': alimento_nome, 'carbs': carbs_valor})
             total_carbs += carbs_valor
+            total_calorias += carbs_valor * 4  # Assumindo 4 kcal por grama de carboidrato
     
-    total_calorias = total_carbs * 4
-
     descricao_completa = f"{refeicao}: "
     if alimentos_refeicao:
-        alimentos_descricao = [f"{a['nome']} - Carbs: {a['carbs']}g" for a in alimentos_refeicao]
+        alimentos_descricao = [f"{a['nome']} ({a['carbs']}g de CHO)" for a in alimentos_refeicao]
         descricao_completa += f"{', '.join(alimentos_descricao)}. "
-    descricao_completa += f"Total Carbs: {round(total_carbs, 2)}g. {observacoes}"
+    descricao_completa += f"Total Carbs: {round(total_carbs, 2)}g."
+    if observacoes:
+        descricao_completa += f" Obs: {observacoes}"
 
     return {
         'valor': valor,
@@ -116,32 +123,29 @@ def _processar_dados_registro(form_data):
 # --- Classes de Lógica de Negócio ---
 
 class DatabaseManager:
-    """
-    Gerencia a conexão e as operações do banco de dados SQLite.
-    """
-    def __init__(self, db_path='glicemia.db'):
+    """Gerencia a conexão e as operações do banco de dados SQLite."""
+    def __init__(self, db_path='banco_de_dados.db'):
         self.db_path = db_path
         self._setup_db()
 
     def _get_connection(self):
-        """Retorna uma conexão com o banco de dados."""
-        return sqlite3.connect(self.db_path)
+        """Retorna uma conexão com o banco de dados com row_factory ativado."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def _setup_db(self):
-        """
-        Cria as tabelas `usuarios` e `registros` se não existirem.
-        """
+        """Cria todas as tabelas se elas ainda não existirem."""
         conn = self._get_connection()
         cursor = conn.cursor()
         
-        # Tabela de usuários
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS usuarios (
-                id INTEGER PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
                 email TEXT,
-                role TEXT DEFAULT 'user',
                 data_nascimento TEXT,
                 sexo TEXT,
                 razao_ic REAL,
@@ -149,134 +153,191 @@ class DatabaseManager:
                 meta_glicemia REAL
             )
         ''')
-
-        # Tabela de registros
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS fichas_medicas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                paciente_id INTEGER UNIQUE NOT NULL,
+                condicao_atual TEXT,
+                alergias TEXT,
+                historico_familiar TEXT,
+                medicamentos_uso TEXT,
+                FOREIGN KEY (paciente_id) REFERENCES usuarios(id)
+            )
+        ''')
+        
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS registros (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                data_hora TEXT,
-                tipo TEXT,
+                tipo TEXT NOT NULL,
                 valor REAL,
-                descricao TEXT,
+                data_hora TEXT,
                 refeicao TEXT,
                 alimentos_refeicao TEXT,
+                observacoes TEXT,
                 total_carbs REAL,
                 total_calorias REAL,
-                observacoes TEXT,
                 FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE
             )
         ''')
-        
-        # Tabela de logs
+
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS logs (
-                id INTEGER PRIMARY KEY,
-                timestamp TEXT,
-                acao TEXT,
-                usuario TEXT
+            CREATE TABLE IF NOT EXISTS alimentos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome_alimento TEXT NOT NULL UNIQUE,
+                medida_caseira TEXT,
+                peso_g REAL,
+                kcal REAL,
+                carbs REAL
             )
         ''')
         
-        # Tabela de alimentos
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS alimentos (
-                id INTEGER PRIMARY KEY,
-                alimento TEXT UNIQUE NOT NULL,
-                medida_caseira TEXT,
-                peso REAL,
-                kcal REAL,
-                carbs REAL
+            CREATE TABLE IF NOT EXISTS logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                usuario TEXT,
+                acao TEXT NOT NULL
             )
         ''')
 
         conn.commit()
         conn.close()
 
+    # --- Métodos para Usuários e Fichas Médicas ---
     def salvar_usuario(self, usuario):
         """Salva um novo usuário ou atualiza um existente."""
         conn = self._get_connection()
         cursor = conn.cursor()
         
+        # Verifica se o usuário já existe
         cursor.execute("SELECT id FROM usuarios WHERE username = ?", (usuario['username'],))
         user_id = cursor.fetchone()
 
         if user_id:
-            # Atualiza o usuário existente
             cursor.execute('''
                 UPDATE usuarios SET password_hash=?, email=?, role=?, data_nascimento=?,
                 sexo=?, razao_ic=?, fator_sensibilidade=?, meta_glicemia=?
                 WHERE username=?
             ''', (
-                usuario['password_hash'], usuario.get('email'), usuario.get('role'),
+                usuario.get('password_hash'), usuario.get('email'), usuario.get('role'),
                 usuario.get('data_nascimento'), usuario.get('sexo'), usuario.get('razao_ic'),
                 usuario.get('fator_sensibilidade'), usuario.get('meta_glicemia'), usuario['username']
             ))
         else:
-            # Insere um novo usuário
             cursor.execute('''
                 INSERT INTO usuarios (username, password_hash, email, role, data_nascimento, sexo, razao_ic, fator_sensibilidade, meta_glicemia)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 usuario['username'], usuario['password_hash'], usuario.get('email'),
-                usuario.get('role', 'user'), usuario.get('data_nascimento'), usuario.get('sexo'),
+                usuario.get('role', 'paciente'), usuario.get('data_nascimento'), usuario.get('sexo'),
                 usuario.get('razao_ic'), usuario.get('fator_sensibilidade'), usuario.get('meta_glicemia')
             ))
         
         conn.commit()
         conn.close()
+        return True
 
     def carregar_usuario(self, username):
         """Carrega um único usuário pelo nome de usuário."""
         conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM usuarios WHERE username=?", (username,))
         usuario = cursor.fetchone()
         conn.close()
-        
-        if usuario:
-            return dict(usuario)
-        return None
+        return dict(usuario) if usuario else None
 
-    def carregar_usuarios(self):
-        """Carrega todos os usuários."""
+    def carregar_pacientes(self):
+        """Carrega todos os usuários com a role 'paciente'."""
         conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM usuarios")
-        usuarios = cursor.fetchall()
+        cursor.execute("SELECT * FROM usuarios WHERE role = 'paciente'")
+        pacientes = cursor.fetchall()
         conn.close()
-        
-        return [dict(row) for row in usuarios]
-
+        return [dict(row) for row in pacientes]
+    
     def excluir_usuario(self, username):
-        """Exclui um usuário do banco de dados."""
+        """Exclui um usuário e seus registros e ficha médica associados."""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM usuarios WHERE username=?", (username,))
         conn.commit()
         conn.close()
-    
+        return True
+
+    def salvar_ficha_medica(self, dados_ficha):
+        """Salva ou atualiza a ficha médica de um paciente."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Verifica se a ficha já existe para o paciente
+        cursor.execute("SELECT id FROM fichas_medicas WHERE paciente_id = ?", (dados_ficha['paciente_id'],))
+        ficha_id = cursor.fetchone()
+
+        if ficha_id:
+            cursor.execute('''
+                UPDATE fichas_medicas SET condicao_atual=?, alergias=?, historico_familiar=?, medicamentos_uso=?
+                WHERE paciente_id=?
+            ''', (
+                dados_ficha['condicao_atual'], dados_ficha['alergias'],
+                dados_ficha['historico_familiar'], dados_ficha['medicamentos_uso'],
+                dados_ficha['paciente_id']
+            ))
+        else:
+            cursor.execute('''
+                INSERT INTO fichas_medicas (paciente_id, condicao_atual, alergias, historico_familiar, medicamentos_uso)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                dados_ficha['paciente_id'], dados_ficha['condicao_atual'],
+                dados_ficha['alergias'], dados_ficha['historico_familiar'],
+                dados_ficha['medicamentos_uso']
+            ))
+        
+        conn.commit()
+        conn.close()
+        return True
+
+    def carregar_ficha_medica(self, username):
+        """Carrega os dados de usuário e a ficha médica de um paciente."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT
+                u.*,
+                fm.condicao_atual,
+                fm.alergias,
+                fm.historico_familiar,
+                fm.medicamentos_uso
+            FROM usuarios u
+            LEFT JOIN fichas_medicas fm ON u.id = fm.paciente_id
+            WHERE u.username = ?
+        ''', (username,))
+        
+        paciente = cursor.fetchone()
+        conn.close()
+        return dict(paciente) if paciente else None
+        
+    # --- Métodos para Registros e Logs ---
     def salvar_registro(self, registro):
         """Salva um novo registro no banco de dados."""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO registros (user_id, data_hora, tipo, valor, descricao, refeicao, alimentos_refeicao, total_carbs, total_calorias, observacoes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO registros (user_id, tipo, valor, data_hora, refeicao, alimentos_refeicao, observacoes, total_carbs, total_calorias)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            registro['user_id'], registro['data_hora'], registro['tipo'], registro['valor'],
-            registro['descricao'], registro.get('refeicao'), json.dumps(registro.get('alimentos_refeicao')),
-            registro.get('total_carbs'), registro.get('total_calorias'), registro.get('observacoes')
+            registro['user_id'], registro['tipo'], registro['valor'], registro['data_hora'],
+            registro.get('refeicao'), json.dumps(registro.get('alimentos_refeicao')),
+            registro.get('observacoes'), registro.get('total_carbs'), registro.get('total_calorias')
         ))
         conn.commit()
         conn.close()
+        return True
 
     def carregar_registros(self, user_id=None):
         """Carrega registros de um usuário específico ou todos os registros."""
         conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
         query = "SELECT * FROM registros"
@@ -298,13 +359,10 @@ class DatabaseManager:
             try:
                 if reg.get('alimentos_refeicao'):
                     reg['alimentos_refeicao'] = json.loads(reg['alimentos_refeicao'])
-                
                 if reg.get('data_hora'):
                     reg['data_hora'] = datetime.fromisoformat(reg['data_hora'])
             except (json.JSONDecodeError, ValueError):
-                # Lida com dados corrompidos
                 continue
-            
             lista_registros.append(reg)
             
         return lista_registros
@@ -312,7 +370,6 @@ class DatabaseManager:
     def encontrar_registro(self, registro_id):
         """Encontra um registro pelo seu ID."""
         conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM registros WHERE id=?", (registro_id,))
         registro = cursor.fetchone()
@@ -326,27 +383,26 @@ class DatabaseManager:
                 if reg.get('data_hora'):
                     reg['data_hora'] = datetime.fromisoformat(reg['data_hora'])
             except (json.JSONDecodeError, ValueError):
-                return None # Retorna None se o registro estiver corrompido
+                return None
             return reg
         return None
     
-    def atualizar_registro(self, registro):
+    def atualizar_registro(self, registro_id, dados):
         """Atualiza um registro existente."""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            UPDATE registros SET valor=?, tipo=?, descricao=?, refeicao=?,
-            alimentos_refeicao=?, total_carbs=?, total_calorias=?, observacoes=?
+            UPDATE registros SET valor=?, tipo=?, refeicao=?, alimentos_refeicao=?, total_carbs=?, total_calorias=?, observacoes=?
             WHERE id=?
         ''', (
-            registro['valor'], registro['tipo'], registro['descricao'],
-            registro.get('refeicao'), json.dumps(registro.get('alimentos_refeicao')),
-            registro.get('total_carbs'), registro.get('total_calorias'),
-            registro.get('observacoes'), registro['id']
+            dados['valor'], dados['tipo'], dados.get('refeicao'),
+            json.dumps(dados.get('alimentos_refeicao')), dados.get('total_carbs'),
+            dados.get('total_calorias'), dados.get('observacoes'), registro_id
         ))
         conn.commit()
         conn.close()
-    
+        return True
+
     def excluir_registro(self, registro_id):
         """Exclui um registro pelo seu ID."""
         conn = self._get_connection()
@@ -354,7 +410,8 @@ class DatabaseManager:
         cursor.execute("DELETE FROM registros WHERE id=?", (registro_id,))
         conn.commit()
         conn.close()
-    
+        return True
+
     def salvar_log_acao(self, acao, usuario):
         """Salva um log de ação no banco de dados."""
         conn = self._get_connection()
@@ -366,20 +423,19 @@ class DatabaseManager:
         ''', (timestamp, acao, usuario))
         conn.commit()
         conn.close()
-    
-    def salvar_alimento_db(self, alimento_data):
+        return True
+
+    # --- Métodos para Alimentos ---
+    def salvar_alimento(self, alimento_data):
         """Salva um novo alimento no banco de dados."""
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            
-            nome_normalizado = _limpar_string_para_busca(alimento_data.get('ALIMENTO'))
-            
             cursor.execute('''
-                INSERT INTO alimentos (alimento, medida_caseira, peso, kcal, carbs)
+                INSERT INTO alimentos (nome_alimento, medida_caseira, peso_g, kcal, carbs)
                 VALUES (?, ?, ?, ?, ?)
             ''', (
-                nome_normalizado,
+                _limpar_string_para_busca(alimento_data.get('ALIMENTO')),
                 alimento_data.get('MEDIDA CASEIRA'),
                 alimento_data.get('PESO (g/ml)'),
                 alimento_data.get('Kcal'),
@@ -392,23 +448,12 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def carregar_alimentos_db(self):
-        """Carrega todos os alimentos do banco de dados."""
-        conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM alimentos ORDER BY alimento ASC")
-        alimentos = cursor.fetchall()
-        conn.close()
-        return [dict(row) for row in alimentos]
-
-    def buscar_alimentos_db(self, termo):
+    def buscar_alimentos(self, termo):
         """Busca alimentos no banco de dados por termo no nome."""
         conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        termo = f'%{termo}%'
-        cursor.execute("SELECT * FROM alimentos WHERE alimento LIKE ? ORDER BY alimento ASC", (termo,))
+        termo = f'%{_limpar_string_para_busca(termo)}%'
+        cursor.execute("SELECT * FROM alimentos WHERE nome_alimento LIKE ? ORDER BY nome_alimento ASC", (termo,))
         resultados = cursor.fetchall()
         conn.close()
         return [dict(row) for row in resultados]
@@ -419,10 +464,9 @@ class AuthManager:
     def __init__(self, db_manager):
         self.db_manager = db_manager
 
-    def salvar_usuario(self, username, password, **kwargs):
-        """Cadastra ou atualiza um usuário com senha hasheada."""
-        usuario_existente = self.db_manager.carregar_usuario(username)
-        if usuario_existente:
+    def salvar_usuario(self, username, password, role='paciente', **kwargs):
+        """Cadastra um novo usuário com senha hasheada."""
+        if self.db_manager.carregar_usuario(username):
             return False, "Nome de usuário já existe."
 
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -430,12 +474,28 @@ class AuthManager:
         novo_usuario = {
             "username": username,
             "password_hash": hashed_password,
-            "role": "user",
+            "role": role,
             **kwargs
         }
         
         self.db_manager.salvar_usuario(novo_usuario)
         return True, "Cadastro bem-sucedido."
+    
+    def atualizar_perfil_usuario(self, username, dados_perfil, nova_senha=None):
+        """Atualiza o perfil de um usuário."""
+        usuario_existente = self.db_manager.carregar_usuario(username)
+        if not usuario_existente:
+            return False
+
+        # Converte o objeto Row para um dicionário mutável
+        usuario_atualizado = dict(usuario_existente)
+        usuario_atualizado.update(dados_perfil)
+        
+        if nova_senha:
+            usuario_atualizado['password_hash'] = bcrypt.hashpw(nova_senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+        self.db_manager.salvar_usuario(usuario_atualizado)
+        return True
 
     def verificar_login(self, username, password):
         """Verifica as credenciais do usuário com a senha hasheada."""
@@ -447,6 +507,7 @@ class AuthManager:
             except (KeyError, ValueError, TypeError):
                 pass
         return None, "Credenciais inválidas. Tente novamente."
+
 
 class AppCore:
     """A camada de aplicação que coordena a lógica de negócio."""
@@ -469,7 +530,6 @@ class AppCore:
             'data_hora': kwargs.get('data_hora', datetime.now()).isoformat(),
             'tipo': kwargs.get('tipo'),
             'valor': kwargs.get('valor'),
-            'descricao': kwargs.get('descricao'),
             'refeicao': kwargs.get('refeicao'),
             'alimentos_refeicao': kwargs.get('alimentos_refeicao', []),
             'total_carbs': kwargs.get('total_carbs'),
@@ -492,31 +552,21 @@ class AppCore:
         """Encontra um registro pelo ID."""
         return self.db_manager.encontrar_registro(registro_id)
         
-    def atualizar_registro(self, registro_id, **kwargs):
+    def atualizar_registro(self, registro_id, dados):
         """Atualiza um registro existente no banco de dados."""
-        registro = self.db_manager.encontrar_registro(registro_id)
-        if not registro:
-            return False
-
-        registro.update(kwargs)
-        if isinstance(registro.get('data_hora'), datetime):
-            registro['data_hora'] = registro['data_hora'].isoformat()
-        
-        self.db_manager.atualizar_registro(registro)
-        return True
+        return self.db_manager.atualizar_registro(registro_id, dados)
         
     def excluir_registro(self, registro_id):
         """Exclui um registro pelo ID."""
-        self.db_manager.excluir_registro(registro_id)
-        return True
+        return self.db_manager.excluir_registro(registro_id)
 
     def salvar_alimento_json(self, alimento_data):
         """Salva um novo alimento na base de dados (agora no banco de dados)."""
-        return self.db_manager.salvar_alimento_db(alimento_data)
+        return self.db_manager.salvar_alimento(alimento_data)
         
     def pesquisar_alimentos(self, termo_pesquisa):
         """Busca alimentos na base de dados por nome."""
-        return self.db_manager.buscar_alimentos_db(termo_pesquisa)
+        return self.db_manager.buscar_alimentos(termo_pesquisa)
         
     def get_resumo_dashboard(self, username):
         """
