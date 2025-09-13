@@ -281,7 +281,7 @@ button, .btn {
     transform: translateY(-5px);
 }
 .carousel-item {
-    height: 100vh;
+    height: 50vh;
     background-size: cover;
     background-position: center;
     position: relative;

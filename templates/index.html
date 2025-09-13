@@ -21,7 +21,7 @@
                 </div>
             </div>
         </div>
-
+        
         <div class="carousel-item" style="background-image: url('{{ url_for('static', filename='imagens/slide2.jpg') }}');">
             <div class="carousel-caption d-flex flex-column justify-content-center align-items-center">
                 <h1 class="display-4 fw-bold text-white mb-4">Relatórios Detalhados para o Seu Bem-Estar</h1>
@@ -48,86 +48,130 @@
         <span class="visually-hidden">Next</span>
     </button>
 </div>
+<hr>
 
 <section class="features-section py-5">
     <div class="container">
-        <div class="row mb-5">
-            <div class="col-md-6">
-                <div class="card p-4 feature-card h-100">
-                    <h2 class="card-title text-center text-primary mb-4">O que é Glicemia?</h2>
-                    <p>Entender o conceito de glicemia e a importância de mantê-la dentro de valores normais é essencial para a saúde geral. Glicemia normal significa que a quantidade de glicose, ou açúcar, no sangue está dentro de um intervalo que o corpo pode gerenciar de forma eficaz, sem causar estresse ou dano aos órgãos e sistemas do corpo. Este equilíbrio é crucial para o bom funcionamento do organismo, uma vez que a glicose serve como a principal fonte de energia para as células.</p>
-                    <p>Para adultos, <strong>um nível de glicemia de jejum considerado normal fica geralmente entre 70 e 99 mg/dL</strong> (miligramas por decilitro de sangue). Valores acima ou abaixo deste intervalo podem indicar a necessidade de uma avaliação médica mais aprofundada para determinar a presença de condições de saúde subjacentes, como diabetes ou hipoglicemia.</p>
+        <h2 class="text-center fw-bold mb-5">Conheça Nossos Recursos</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm info-card">
+                    <img src="{{ url_for('static', filename='imagens/slide1.jpg') }}" class="card-img-top" alt="Gerenciar Glicemia">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold text-primary">Gerencie sua Glicemia com Facilidade</h5>
+                        <p class="card-text">Simplifique o controle da sua diabetes com nosso aplicativo intuitivo e eficiente. Registre suas medições e refeições em segundos.</p>
+                        <a href="{{ url_for('registrar_glicemia') }}" class="btn btn-primary mt-3">Saiba Mais</a>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-6 d-flex align-items-center justify-content-center">
-                <img src="{{ url_for('static', filename='imagens/glicemia.jpg') }}" class="img-fluid rounded shadow-lg" alt="Pessoa medindo a glicemia">
-            </div>
-        </div>
 
-        <div class="row mb-5">
-            <div class="col-md-6 d-flex align-items-center justify-content-center order-md-2">
-                <img src="{{ url_for('static', filename='imagens/medir.jpg') }}" class="img-fluid rounded shadow-lg" alt="Relatório de glicemia">
-            </div>
-            <div class="col-md-6 order-md-1">
-                <div class="card p-4 feature-card h-100">
-                    <h2 class="card-title text-center text-primary mb-4">Como medir a Glicemia?</h2>
-                    <p>Medir a glicemia é um processo importante para a gestão da saúde. Existem várias formas de monitoramento, desde métodos caseiros até exames laboratoriais.</p>
-                    <ul class="list-unstyled">
-                        <li><strong>1. Monitoramento da Glicemia Capilar:</strong> O método mais comum, utiliza um glicosímetro para medir a glicose numa gota de sangue do dedo.</li>
-                        <li><strong>2. Glicemia de Jejum:</strong> Mede a glicose após um jejum de 8 a 12 horas. Valores normais variam de 70 a 99 mg/dL.</li>
-                        <li><strong>3. Glicemia Pós-Prandial:</strong> Mede os níveis de glicose após as refeições. Valores normais duas horas após comer são geralmente menores que 140 mg/dL.</li>
-                        <li><strong>4. Teste de Hemoglobina Glicada (A1C):</strong> Fornece uma média dos níveis de glicose nos últimos dois a três meses.</li>
-                        <li><strong>5. Monitoramento Contínuo da Glicose (MCG):</strong> Tecnologia avançada que mede a glicose 24 horas por dia através de um sensor.</li>
-                    </ul>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm info-card">
+                    <img src="{{ url_for('static', filename='imagens/slide2.jpg') }}" class="card-img-top" alt="Relatórios Detalhados">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold text-primary">Relatórios Detalhados para o Seu Bem-Estar</h5>
+                        <p class="card-text">Acompanhe seu progresso, identifique tendências e compartilhe dados com seu médico. Nossos gráficos ajudam você a visualizar seu histórico.</p>
+                        <a href="{{ url_for('relatorios') }}" class="btn btn-primary mt-3">Ver Relatórios</a>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="card p-4 mb-5 feature-card">
-            <h2 class="text-center text-primary mb-4">Valores Normais de Glicemia Por Idade</h2>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="bg-primary text-white">
-                        <tr>
-                            <th>Faixa Etária</th>
-                            <th>Glicemia de Jejum (mg/dL)</th>
-                            <th>Glicemia Pós-Prandial (mg/dL)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>Crianças</td><td>70 – 100 mg/dL</td><td>&lt; 140</td></tr>
-                        <tr><td>Adultos</td><td>70 – 99 mg/dL</td><td>&lt; 140</td></tr>
-                        <tr><td>Idosos</td><td>70 – 110 mg/dL</td><td>&lt; 140</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="row g-4 mb-5">
-            <div class="col-md-6">
-                <div class="card p-4 feature-card h-100">
-                    <h3 class="card-title text-danger mb-3">Sintomas e Causas da Glicemia Alta</h3>
-                    <p>A <strong>hiperglicemia</strong> ocorre quando há excesso de glicose no sangue. Sintomas comuns incluem sede excessiva, aumento da frequência urinária, fadiga e visão embaçada. As principais causas são diabetes, dieta inadequada e falta de exercício físico.</p>
-                    <img src="{{ url_for('static', filename='imagens/gordura.jpg') }}" class="img-fluid rounded mt-3 shadow" alt="Sintomas de glicemia alta">
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card p-4 feature-card h-100">
-                    <h3 class="card-title text-info mb-3">Sintomas e Causas da Glicemia Baixa</h3>
-                    <p>A <strong>hipoglicemia</strong> ocorre quando os níveis de glicose caem abaixo do normal. Sintomas comuns são tremores, suor frio, tontura e fome súbita. As principais causas incluem doses excessivas de medicação para diabetes, pular refeições ou exercício excessivo.</p>
-                    <img src="{{ url_for('static', filename='imagens/baixa.jpg') }}" class="img-fluid rounded mt-3 shadow" alt="Sintomas de glicemia baixa">
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-5">
-            <div class="col-12">
-                <div class="card p-4 feature-card">
-                    <h2 class="card-title text-center text-primary mb-4">Tecnologias e Ferramentas de Monitoramento</h2>
-                    <p>A tecnologia tem proporcionado avanços significativos nas ferramentas de monitoramento, oferecendo alternativas mais convenientes e menos invasivas. Os dispositivos de <strong>Monitoramento Contínuo da Glicose (MCG)</strong>, por exemplo, oferecem leituras 24/7 e alertas em tempo real, melhorando a qualidade de vida e o controle da diabetes.</p>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm info-card">
+                    <img src="{{ url_for('static', filename='imagens/slide3.jpg') }}" class="card-img-top" alt="Cálculos de Bolus">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold text-primary">Cálculos de Bolus Precisos e Rápidos</h5>
+                        <p class="card-text">Nossa calculadora inteligente sugere a dose ideal de insulina para você, com base em suas configurações. Evite erros e tenha mais segurança.</p>
+                        <a href="{{ url_for('calcular_bolus') }}" class="btn btn-primary mt-3">Calcular Bolus</a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </section>
+<hr>
+
+<section class="knowledge-section py-5 bg-light" id="conhecimento">
+    <div class="container">
+        <h2 class="text-center fw-bold mb-5">O que é Glicemia?</h2>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 p-3 shadow-sm info-card">
+                    <h5 class="card-title fw-bold text-primary">O que é Glicemia?</h5>
+                    <p class="card-text">Glicemia normal significa que a quantidade de glicose, ou açúcar, no sangue está dentro de um intervalo que o corpo pode gerenciar de forma eficaz, sem causar estresse ou dano aos órgãos e sistemas do corpo.</p>
+                    <p class="card-text">Para adultos, um nível de glicemia de jejum considerado normal fica geralmente entre 70 e 99 mg/dL.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card h-100 p-3 shadow-sm info-card">
+                    <h5 class="card-title fw-bold text-primary">Como medir a Glicemia?</h5>
+                    <p class="card-text">A medição da glicemia é um processo importante para a gestão da saúde. Existem várias formas de monitoramento, desde métodos caseiros até exames laboratoriais.</p>
+                    <ul class="list-group list-group-flush mt-3">
+                        <li class="list-group-item">1. Monitoramento da Glicemia Capilar</li>
+                        <li class="list-group-item">2. Glicemia de Jejum</li>
+                        <li class="list-group-item">3. Glicemia Pós-Prandial</li>
+                        <li class="list-group-item">4. Teste de Hemoglobina Glicada (A1C)</li>
+                        <li class="list-group-item">5. Monitoramento Contínuo da Glicose (MCG)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 p-3 shadow-sm info-card">
+                    <h5 class="card-title fw-bold text-primary">Valores Normais de Glicemia por Idade</h5>
+                    <table class="table table-bordered mt-3">
+                        <thead>
+                            <tr>
+                                <th>Faixa Etária</th>
+                                <th>Glicemia de Jejum (mg/dL)</th>
+                                <th>Glicemia Pós-Prandial (mg/dL)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Crianças</td>
+                                <td>70 – 100</td>
+                                <td>&lt; 140</td>
+                            </tr>
+                            <tr>
+                                <td>Adultos</td>
+                                <td>70 – 99</td>
+                                <td>&lt; 140</td>
+                            </tr>
+                            <tr>
+                                <td>Idosos</td>
+                                <td>70 – 110</td>
+                                <td>&lt; 140</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card h-100 p-3 shadow-sm info-card">
+                    <h5 class="card-title fw-bold text-primary">Sintomas e Causas da Glicemia Alta</h5>
+                    <p class="card-text">Hiperglicemia é o excesso de glicose no sangue. Sintomas podem incluir sede excessiva, aumento da frequência urinária, fadiga e visão embaçada. Pode ser causada por diabetes, dieta inadequada, falta de exercício e estresse.</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 p-3 shadow-sm info-card">
+                    <h5 class="card-title fw-bold text-primary">Sintomas e Causas da Glicemia Baixa</h5>
+                    <p class="card-text">Hipoglicemia é quando a glicose cai abaixo de 70 mg/dL. Os sintomas são tremores, suor frio, tontura, fome súbita e confusão mental. As causas mais comuns são doses excessivas de medicação, pular refeições ou jejum prolongado, e exercício excessivo.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<hr>
+
+<section class="final-cta py-5 bg-dark text-white text-center">
+    <div class="container">
+        <h2 class="display-4 fw-bold mb-4">Pronto para assumir o controle?</h2>
+        <p class="lead mb-4">Junte-se a milhares de usuários que estão gerenciando sua diabetes de forma mais eficaz.</p>
+        <a href="{{ url_for('cadastro') }}" class="btn btn-primary btn-lg custom-btn">Começar Agora</a>
+    </div>
+</section>
+
 {% endblock %}
