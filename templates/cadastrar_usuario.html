@@ -3,62 +3,76 @@
 {% block title %}Cadastrar Usuário{% endblock %}
 
 {% block content %}
-<div class="card p-4 shadow-sm">
+<div class="container mt-4">
     <h1 class="mb-4">
         <i class="fas fa-user-plus me-2"></i>Cadastrar Novo Usuário
     </h1>
-    <form action="{{ url_for('cadastrar_usuario') }}" method="post">
-        <div class="mb-3 input-group">
-            <span class="input-group-text"><i class="fas fa-user"></i></span>
-            <div class="form-floating">
-                <input type="text" class="form-control" id="username" name="username" placeholder="Nome de Usuário" required>
-                <label for="username">Nome de Usuário</label>
+    
+    <div class="card p-4 shadow-sm">
+        <form action="{{ url_for('cadastrar_usuario') }}" method="post">
+            <div class="mb-3">
+                <label for="username" class="form-label">Nome de Usuário</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                    <input type="text" class="form-control" id="username" name="username" placeholder="Nome de Usuário" required>
+                </div>
             </div>
-        </div>
-        <div class="mb-3 input-group">
-            <span class="input-group-text"><i class="fas fa-key"></i></span>
-            <div class="form-floating">
-                <input type="password" class="form-control" id="password" name="password" placeholder="Senha" required>
-                <label for="password">Senha</label>
+            <div class="mb-3">
+                <label for="password" class="form-label">Senha</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-key"></i></span>
+                    <input type="password" class="form-control" id="password" name="password" placeholder="Senha" required>
+                </div>
             </div>
-        </div>
-        <div class="mb-3 input-group">
-            <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-            <div class="form-floating">
-                <input type="email" class="form-control" id="email" name="email" placeholder="Email">
-                <label for="email">Email (Opcional)</label>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                    <input type="email" class="form-control" id="email" name="email" placeholder="Email">
+                </div>
             </div>
-        </div>
-        <div class="mb-3 input-group">
-            <span class="input-group-text"><i class="fas fa-user-tag"></i></span>
-            <div class="form-floating">
-                <select class="form-select" id="role" name="role" required>
-                    <option value="user" selected>Usuário Padrão</option>
-                    <option value="admin">Administrador</option>
-                </select>
-                <label for="role">Função</label>
+            <div class="mb-3">
+                <label for="role" class="form-label">Função</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-user-tag"></i></span>
+                    <select class="form-select" id="role" name="role" required>
+                        <option value="paciente" selected>Paciente</option>
+                        <option value="medico">Médico</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
             </div>
-        </div>
-        <div class="mb-3 input-group">
-            <span class="input-group-text"><i class="fas fa-syringe"></i></span>
-            <div class="form-floating">
-                <input type="number" step="0.1" class="form-control" id="razao_ic" name="razao_ic" placeholder="Razão IC (g/UI)">
-                <label for="razao_ic">Razão IC (g/UI) (Opcional)</label>
+            <div class="mb-3">
+                <label for="razao_ic" class="form-label">Razão Insulina/Carboidratos (Razão IC)</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-syringe"></i></span>
+                    <input type="number" step="0.1" class="form-control" id="razao_ic" name="razao_ic" placeholder="Razão IC">
+                </div>
             </div>
-        </div>
-        <div class="mb-3 input-group">
-            <span class="input-group-text"><i class="fas fa-sliders-h"></i></span>
-            <div class="form-floating">
-                <input type="number" step="0.1" class="form-control" id="fator_sensibilidade" name="fator_sensibilidade" placeholder="Fator de Sensibilidade (mg/dL/UI)">
-                <label for="fator_sensibilidade">Fator de Sensibilidade (mg/dL/UI) (Opcional)</label>
+            <div class="mb-3">
+                <label for="fator_sensibilidade" class="form-label">Fator de Sensibilidade</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-sliders-h"></i></span>
+                    <input type="number" step="0.1" class="form-control" id="fator_sensibilidade" name="fator_sensibilidade" placeholder="Fator de Sensibilidade">
+                </div>
             </div>
-        </div>
-        <button type="submit" class="btn btn-success w-100">
-            <i class="fas fa-user-plus me-2"></i>Cadastrar
-        </button>
-    </form>
-    <a href="{{ url_for('gerenciar_usuarios') }}" class="btn btn-secondary mt-3">
-        <i class="fas fa-arrow-left me-2"></i>Voltar
-    </a>
+            <div class="mb-3">
+                <label for="meta_glicemia" class="form-label">Meta de Glicemia</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
+                    <input type="number" step="1" class="form-control" id="meta_glicemia" name="meta_glicemia" placeholder="Meta de Glicemia (mg/dL)">
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end mt-4">
+                <button type="submit" class="btn btn-success me-2">
+                    <i class="fas fa-user-plus me-1"></i>Cadastrar
+                </button>
+                <a href="{{ url_for('gerenciar_usuarios') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Voltar
+                </a>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}

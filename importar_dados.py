@@ -2,7 +2,7 @@ import sqlite3
 import csv
 import os
 
-DB_PATH = 'glicemia.db'
+DB_PATH = 'app.db'
 CSV_PATH = os.path.join('data', 'alimentos.csv')
 
 def importar_alimentos():

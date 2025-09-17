@@ -4,63 +4,62 @@
 
 {% block content %}
 <div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-user-edit me-2"></i>Editar Perfil de {{ usuario['username'] }}
+    </h1>
+    
     <div class="card p-4 shadow-sm">
-        <h1 class="mb-4">
-            <i class="fas fa-user-edit me-2"></i>Editar Usuário: {{ username }}
-        </h1>
-
-        <form action="{{ url_for('editar_usuario', username=username) }}" method="post" id="form-edicao">
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                <div class="form-floating">
-                    <input type="email" class="form-control" id="email" name="email" value="{{ usuario.get('email', '') }}" placeholder="Email">
-                    <label for="email">Email:</label>
-                </div>
+        <form method="POST">
+            <div class="mb-3">
+                <label for="username" class="form-label">Nome de Utilizador</label>
+                <input type="text" class="form-control" id="username" name="username" value="{{ usuario['username'] }}" readonly>
             </div>
-
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-key"></i></span>
-                <div class="form-floating">
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Nova Senha">
-                    <label for="password">Nova Senha (deixar em branco para não alterar):</label>
-                </div>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" name="email" value="{{ usuario['email'] }}" placeholder="Email">
             </div>
-
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-user-tag"></i></span>
-                <div class="form-floating">
-                    <select class="form-select" id="role" name="role">
-                        <option value="user" {% if usuario.get('role') == 'user' %}selected{% endif %}>Usuário Padrão</option>
-                        <option value="admin" {% if usuario.get('role') == 'admin' %}selected{% endif %}>Administrador</option>
-                    </select>
-                    <label for="role">Função:</label>
-                </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Nova Senha (opcional)</label>
+                <input type="password" class="form-control" id="password" name="password" placeholder="Deixe em branco para não alterar">
             </div>
-
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-syringe"></i></span>
-                <div class="form-floating">
-                    <input type="number" class="form-control" id="razao_ic" name="razao_ic" step="0.1" value="{{ usuario.get('razao_ic', '') }}" placeholder="Razão IC">
-                    <label for="razao_ic">Razão IC (g/UI):</label>
-                </div>
+            <div class="mb-3">
+                <label for="role" class="form-label">Função (Role)</label>
+                <select class="form-control" id="role" name="role">
+                    <option value="paciente" {% if usuario['role'] == 'paciente' %}selected{% endif %}>Paciente</option>
+                    <option value="medico" {% if usuario['role'] == 'medico' %}selected{% endif %}>Médico</option>
+                    <option value="admin" {% if usuario['role'] == 'admin' %}selected{% endif %}>Admin</option>
+                </select>
             </div>
-
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-sliders-h"></i></span>
-                <div class="form-floating">
-                    <input type="number" class="form-control" id="fator_sensibilidade" name="fator_sensibilidade" step="0.1" value="{{ usuario.get('fator_sensibilidade', '') }}" placeholder="Fator de Sensibilidade">
-                    <label for="fator_sensibilidade">Fator de Sensibilidade (mg/dL/UI):</label>
-                </div>
+            <div class="mb-3">
+                <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                <input type="date" class="form-control" id="data_nascimento" name="data_nascimento" value="{{ usuario['data_nascimento'] }}">
+            </div>
+            <div class="mb-3">
+                <label for="sexo" class="form-label">Sexo</label>
+                <input type="text" class="form-control" id="sexo" name="sexo" value="{{ usuario['sexo'] }}">
+            </div>
+            <div class="mb-3">
+                <label for="razao_ic" class="form-label">Razão Insulina/Carboidratos (Razão IC)</label>
+                <input type="number" step="0.1" class="form-control" id="razao_ic" name="razao_ic" value="{{ usuario['razao_ic'] }}">
+            </div>
+            <div class="mb-3">
+                <label for="fator_sensibilidade" class="form-label">Fator de Sensibilidade à Insulina</label>
+                <input type="number" step="0.1" class="form-control" id="fator_sensibilidade" name="fator_sensibilidade" value="{{ usuario['fator_sensibilidade'] }}">
+            </div>
+            <div class="mb-3">
+                <label for="meta_glicemia" class="form-label">Meta de Glicemia (mg/dL)</label>
+                <input type="number" step="1" class="form-control" id="meta_glicemia" name="meta_glicemia" value="{{ usuario['meta_glicemia'] }}">
             </div>
             
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save me-2"></i>Salvar Alterações
-            </button>
+            <div class="d-flex justify-content-end mt-4">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-save me-1"></i>Salvar Alterações
+                </button>
+                <a href="{{ url_for('gerenciar_usuarios') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Voltar
+                </a>
+            </div>
         </form>
-
-        <a href="{{ url_for('gerenciar_usuarios') }}" class="btn btn-secondary mt-3">
-            <i class="fas fa-arrow-left me-2"></i>Voltar
-        </a>
     </div>
 </div>
 {% endblock %}
