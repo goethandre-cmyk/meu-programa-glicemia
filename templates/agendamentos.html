@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Agendamentos - HealthLink{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Gerenciamento de Agendamentos</h2>
+        <a href="{{ url_for('agendar_consulta') }}" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> Novo Agendamento
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Paciente</th>
+                            <th>Médico</th>
+                            <th>Data e Hora</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if agendamentos %}
+                            {% for agendamento in agendamentos %}
+                            <tr>
+                                <td>{{ agendamento.id }}</td>
+                                <td>{{ agendamento.paciente_username }}</td>
+                                <td>{{ agendamento.medico_username }}</td>
+                                <td>{{ agendamento.data_hora_formatada }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if agendamento.status == 'agendado' %}bg-info
+                                        {% elif agendamento.status == 'confirmado' %}bg-success
+                                        {% elif agendamento.status == 'cancelado' %}bg-danger
+                                        {% elif agendamento.status == 'realizado' %}bg-secondary
+                                        {% endif %}">
+                                        {{ agendamento.status.capitalize() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('atualizar_status_agendamento', id=agendamento.id) }}" method="post" class="d-inline">
+                                        <select name="novo_status" class="form-select form-select-sm d-inline-block w-auto me-2">
+                                            <option value="confirmado" {% if agendamento.status == 'confirmado' %}selected{% endif %}>Confirmar</option>
+                                            <option value="cancelado" {% if agendamento.status == 'cancelado' %}selected{% endif %}>Cancelar</option>
+                                            <option value="realizado" {% if agendamento.status == 'realizado' %}selected{% endif %}>Realizado</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Atualizar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">Nenhum agendamento encontrado.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -14,27 +14,27 @@
                     
                     <div class="mb-3">
                         <label for="alimento_input" class="form-label">Nome do Alimento</label>
-                        <input type="text" class="form-control" id="alimento_input" name="alimento" value="{{ alimento['ALIMENTO'] }}" required>
+                        <input type="text" class="form-control" id="alimento_input" name="nome" value="{{ alimento.nome }}" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="medida_caseira_input" class="form-label">Medida Caseira</label>
-                        <input type="text" class="form-control" id="medida_caseira_input" name="medida_caseira" value="{{ alimento['MEDIDA CASEIRA'] }}" required>
+                        <input type="text" class="form-control" id="medida_caseira_input" name="medida_caseira" value="{{ alimento.medida_caseira }}" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="peso_input" class="form-label">Peso (g/ml)</label>
-                        <input type="number" step="0.01" class="form-control" id="peso_input" name="peso" value="{{ alimento['PESO (g/ml)'] }}" required>
+                        <input type="number" step="0.01" class="form-control" id="peso_input" name="peso_g" value="{{ alimento.peso_g }}" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="kcal_input" class="form-label">Kcal</label>
-                        <input type="number" step="0.01" class="form-control" id="kcal_input" name="kcal" value="{{ alimento['Kcal'] }}" required>
+                        <input type="number" step="0.01" class="form-control" id="kcal_input" name="kcal" value="{{ alimento.kcal }}" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="carbs_input" class="form-label">Carboidratos (g)</label>
-                        <input type="number" step="0.01" class="form-control" id="carbs_input" name="carbs" value="{{ alimento['CHO (g)'] }}" required>
+                        <input type="number" step="0.01" class="form-control" id="carbs_input" name="carbs_100g" value="{{ alimento.carbs_100g }}" required>
                     </div>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">

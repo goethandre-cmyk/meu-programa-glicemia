@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 
-{% block title %}Registrar Glicemia e Refeição{% endblock %}
+{% block title %}Registrar Glicemia{% endblock %}
 
 {% block content %}
 <div class="container-page">
     <div class="card p-4 shadow-sm">
         <h1 class="mb-4">
-            <i class="fas fa-plus-circle me-2"></i>Registrar Glicemia e Refeição
+            <i class="fas fa-plus-circle me-2"></i>Registrar Glicemia
         </h1>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -20,11 +20,11 @@
             {% endif %}
         {% endwith %}
 
-        <form id="form-registro" action="{{ url_for('registrar_glicemia') }}" method="post">
+        <form id="form-registro-glicemia" action="{{ url_for('registrar_glicemia') }}" method="post">
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
                 <div class="form-floating">
-                    <input type="number" step="0.1" class="form-control" id="valor_glicemia" name="valor_glicemia" placeholder="Valor da Glicemia (mg/dL)" required>
+                    <input type="number" step="0.1" class="form-control" id="valor_glicemia" name="valor" placeholder="Valor da Glicemia (mg/dL)" required>
                     <label for="valor_glicemia">Valor da Glicemia (mg/dL)</label>
                 </div>
             </div>
@@ -38,45 +38,6 @@
             </div>
 
             <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-utensils"></i></span>
-                <div class="form-floating">
-                    <select class="form-select" id="refeicao" name="refeicao" required>
-                        <option value="" disabled selected>Selecione a Refeição...</option>
-                        <option value="Jejum">Jejum</option>
-                        <option value="Café da Manhã">Café da Manhã</option>
-                        <option value="Almoço">Almoço</option>
-                        <option value="Janta">Janta</option>
-                        <option value="Lanche">Lanche</option>
-                        <option value="Colação">Colação</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="mb-3">
-                <label for="alimento_busca" class="form-label text-muted">
-                    <i class="fas fa-search me-2"></i>Procurar Alimento:
-                </label>
-                <div class="input-group">
-                    <input type="text" id="alimento_busca" class="form-control" placeholder="Digite 3 ou mais letras para pesquisar...">
-                </div>
-            </div>
-            
-            <div id="resultados_busca_alimentos" class="list-group mb-3">
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label text-muted"><i class="fas fa-list-ul me-2"></i>Alimentos Selecionados:</label>
-                <ul id="lista_alimentos_selecionados" class="list-group">
-                </ul>
-                <input type="hidden" name="alimentos_refeicao" id="alimentos_refeicao_input" value="[]">
-            </div>
-            
-            <div class="mb-3 text-end fs-5">
-                <strong>Total de Carboidratos:</strong>
-                <span id="total_carbs_refeicao" class="fw-bold text-success">0.0</span>g
-            </div>
-
-            <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-comment-dots"></i></span>
                 <div class="form-floating">
                     <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Observações (opcional)"></textarea>
@@ -85,208 +46,9 @@
             </div>
 
             <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">
-                <i class="fas fa-save me-2"></i>Registrar
+                <i class="fas fa-save me-2"></i>Registrar Glicemia
             </button>
         </form>
     </div>
 </div>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const refeicaoSelect = document.getElementById('refeicao');
-        const searchInput = document.getElementById('alimento_busca');
-        const resultsContainer = document.getElementById('resultados_busca_alimentos');
-        const listaAlimentos = document.getElementById('lista_alimentos_selecionados');
-        const totalCarbsElement = document.getElementById('total_carbs_refeicao');
-        const alimentosRefeicaoInput = document.getElementById('alimentos_refeicao_input');
-
-        let timeoutId;
-
-        refeicaoSelect.addEventListener('change', function() {
-            if (this.value === 'Jejum') {
-                searchInput.value = '';
-                resultsContainer.innerHTML = '';
-                listaAlimentos.innerHTML = '';
-                atualizarTotalCarbs();
-                searchInput.disabled = true;
-            } else {
-                searchInput.disabled = false;
-            }
-        });
-
-        searchInput.addEventListener('input', function() {
-            clearTimeout(timeoutId);
-            const termo = searchInput.value;
-            
-            if (termo.length < 3) {
-                resultsContainer.innerHTML = '';
-                return;
-            }
-
-            timeoutId = setTimeout(() => {
-                fetch('/buscar_alimentos', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `termo_pesquisa=${encodeURIComponent(termo)}`
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Erro na resposta do servidor.');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    exibirResultados(data.resultados);
-                })
-                .catch(error => {
-                    console.error('Erro na requisição:', error);
-                    resultsContainer.innerHTML = '<p class="list-group-item text-danger">Erro ao conectar com o servidor.</p>';
-                });
-            }, 500);
-        });
-
-        function exibirResultados(alimentos) {
-            let html = '';
-            if (alimentos.length === 0) {
-                html = '<div class="list-group-item text-muted">Nenhum alimento encontrado.</div>';
-            } else {
-                alimentos.forEach(alimento => {
-                    const nome = alimento.alimento;
-                    const carbs = alimento.carbs;
-                    const medida = alimento.medida_caseira;
-                    const peso = alimento.peso_g;
-                    const kcal = alimento.kcal;
-                    
-                    html += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>${nome}</strong>
-                                <br>
-                                <small>Carboidratos: ${carbs}g | Medida: ${medida}</small>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-outline-primary adicionar-alimento-btn" 
-                                data-nome="${nome}" data-carbs="${carbs}" data-medida="${medida}" data-peso="${peso}" data-kcal="${kcal}">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    `;
-                });
-            }
-            resultsContainer.innerHTML = html;
-            
-            document.querySelectorAll('.adicionar-alimento-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const { nome, carbs, medida, peso, kcal } = this.dataset;
-                    adicionarAlimentoNaLista(nome, parseFloat(carbs), medida, parseFloat(peso), parseFloat(kcal));
-                    searchInput.value = '';
-                    resultsContainer.innerHTML = '';
-                });
-            });
-        }
-
-        function adicionarAlimentoNaLista(nome, carbsPorMedida, medidaCaseira, pesoGrama, kcalPorMedida) {
-            const novoItem = document.createElement('li');
-            novoItem.classList.add('list-group-item', 'd-flex', 'flex-column', 'bg-light', 'rounded-3', 'mb-2', 'p-3');
-            novoItem.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span><strong>${nome}</strong></span>
-                    <button type="button" class="btn btn-sm btn-danger remover-alimento-btn">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="row g-2">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label d-block text-muted small">Carboidratos por medida:</label>
-                        <span class="text-primary fw-bold carbs-base">${carbsPorMedida}</span>g / 
-                        <span class="text-muted small">${medidaCaseira} (${pesoGrama}g)</span>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label d-block text-muted small">Quantidade consumida:</label>
-                        <div class="input-group">
-                            <input type="number" step="0.1" class="form-control form-control-sm input-quantidade" value="1" min="0.1">
-                            <span class="input-group-text">${medidaCaseira}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-2 text-end">
-                    <span class="fw-bold">Total:</span> <span class="carbs-calculados fw-bold text-success">0.0</span>g
-                </div>
-                <input type="hidden" name="alimentos_refeicao_nome" value="${nome}">
-                <input type="hidden" name="alimentos_refeicao_carbs" value="${carbsPorMedida}">
-                <input type="hidden" name="alimentos_refeicao_peso" value="${pesoGrama}">
-                <input type="hidden" name="alimentos_refeicao_kcal" value="${kcalPorMedida}">
-                <input type="hidden" name="alimentos_refeicao_medida" value="${medidaCaseira}">
-            `;
-            
-            listaAlimentos.appendChild(novoItem);
-            
-            const inputQuantidade = novoItem.querySelector('.input-quantidade');
-            
-            inputQuantidade.addEventListener('input', function() {
-                recalcularItem(novoItem, carbsPorMedida, pesoGrama);
-                atualizarTotalCarbs();
-                atualizarCampoOculto();
-            });
-            
-            novoItem.querySelector('.remover-alimento-btn').addEventListener('click', function() {
-                novoItem.remove();
-                atualizarTotalCarbs();
-                atualizarCampoOculto();
-            });
-
-            recalcularItem(novoItem, carbsPorMedida, pesoGrama);
-            atualizarTotalCarbs();
-            atualizarCampoOculto();
-        }
-        
-        function recalcularItem(item, carbsPorMedida, pesoGrama) {
-            const quantidade = parseFloat(item.querySelector('.input-quantidade').value) || 0;
-            let totalItemCarbs = 0;
-            
-            if (!isNaN(pesoGrama) && pesoGrama > 0) {
-                totalItemCarbs = (carbsPorMedida / pesoGrama) * (quantidade * pesoGrama);
-            } else {
-                totalItemCarbs = quantidade * carbsPorMedida;
-            }
-            
-            item.querySelector('.carbs-calculados').textContent = totalItemCarbs.toFixed(2);
-        }
-        
-        function atualizarTotalCarbs() {
-            let total = 0;
-            document.querySelectorAll('.carbs-calculados').forEach(span => {
-                total += parseFloat(span.textContent) || 0;
-            });
-            totalCarbsElement.textContent = total.toFixed(2);
-        }
-
-        function atualizarCampoOculto() {
-            const alimentos = [];
-            document.querySelectorAll('#lista_alimentos_selecionados > li').forEach(li => {
-                const nome = li.querySelector('input[name="alimentos_refeicao_nome"]').value;
-                const carbs = parseFloat(li.querySelector('.carbs-calculados').textContent);
-                const kcalBase = parseFloat(li.querySelector('input[name="alimentos_refeicao_kcal"]').value);
-                const quantidade = parseFloat(li.querySelector('.input-quantidade').value);
-                const kcalTotal = (kcalBase * quantidade).toFixed(2);
-
-                alimentos.push({
-                    "ALIMENTO": nome,
-                    "CHO (g)": carbs,
-                    "Kcal": parseFloat(kcalTotal),
-                    "quantidade": quantidade
-                });
-            });
-            alimentosRefeicaoInput.value = JSON.stringify(alimentos);
-        }
-
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-            }
-        });
-    });
-</script>
 {% endblock %}

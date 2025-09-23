@@ -1,3 +1,8 @@
+/* Reseta as margens e preenchimentos padrão */
+html, body {
+    margin: 0;
+    padding: 0;
+}
 /* -------------------------------------------------------------------------- */
 /* VARIÁVEIS GLOBAIS DE COR E ESTILO                                         */
 /* -------------------------------------------------------------------------- */

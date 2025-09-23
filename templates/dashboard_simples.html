@@ -15,12 +15,12 @@
     <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido</h2>
     <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
         <div class="col">
-            <div class="dashboard-card bg-light text-center shadow-sm">
+            <div class="dashboard-card text-center shadow-sm card-glicemia-{{ resumo_dados['ultimo_registro']['status'] }}">
                 <div class="card-body">
-                    <i class="fas fa-arrow-circle-right fa-3x mb-3 text-info"></i>
-                    <h5 class="card-title text-secondary">Último Registro</h5>
-                    <h2 class="card-text display-6 fw-bold text-success">{{ resumo_dados['ultimo_registro']['valor'] }} mg/dL</h2>
-                    <p class="card-text"><small>{{ resumo_dados['tempo_desde_ultimo'] }}</small></p>
+                    <i class="fas fa-arrow-circle-right fa-3x mb-3 text-white"></i>
+                    <h5 class="card-title text-white">Último Registro</h5>
+                    <h2 class="card-text display-6 fw-bold text-white">{{ resumo_dados['ultimo_registro']['valor'] }} mg/dL</h2>
+                    <p class="card-text text-white"><small>{{ resumo_dados['tempo_desde_ultimo'] }}</small></p>
                 </div>
             </div>
         </div>
@@ -63,7 +63,7 @@
                     <i class="fas fa-notes-medical fa-3x mb-3 text-success"></i>
                     <h5 class="card-title">Registrar Glicemia e Refeição</h5>
                     <p class="card-text text-muted">Adicione seus novos registros e acompanhe seu progresso diário.</p>
-                    <a href="{{ url_for('registrar_glicemia') }}" class="btn btn-outline-success mt-auto">
+                    <a href="{{ url_for('registrar_refeicao') }}" class="btn btn-outline-success mt-auto">
                         <i class="fas fa-plus-circle me-2"></i>Registrar
                     </a>
                 </div>

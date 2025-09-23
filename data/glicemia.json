@@ -1,0 +1,22 @@
+{
+    "users": [
+        {
+            "id": 1,
+            "username": "testeuser",
+            "password_hash": "scrypt:32768:8:1$vJ8GZkxwvvtwh8Dr$ebebee99d5844861add11ff20d8ccd533a5a6e42abcacb2fdfc924de39af8eaf20148bb5b9696bfd0de99710cf672d621f4381f1e933204100bf3d14c8fec515",
+            "role": "user"
+        }
+    ],
+    "registros_glicemia_refeicao": [],
+    "alimentos": [],
+    "medicos": [],
+    "agendamentos": [],
+    "logs_acao": [
+        {
+            "data_hora": "2025-09-23 02:16:31.413263",
+            "acao": "Login",
+            "usuario": "testeuser"
+        }
+    ],
+    "fichas_medicas": []
+}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block titulo %}Minhas Consultas{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <h6 class="text-white text-capitalize ps-3">Minhas Consultas Agendadas</h6>
+                    </div>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    <div class="table-responsive p-0">
+                        {% if agendamentos %}
+                        <table class="table align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Médico</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Data e Hora</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</th>
+                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Observações</th>
+                                    <th class="text-secondary opacity-7"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for agendamento in agendamentos %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex px-2 py-1">
+                                            <div class="d-flex flex-column justify-content-center">
+                                                <h6 class="mb-0 text-sm">{{ agendamento.medico_username }}</h6>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="align-middle text-center text-sm">
+                                        <span class="text-secondary text-xs font-weight-bold">{{ agendamento.data_hora.strftime('%d/%m/%Y às %H:%M') }}</span>
+                                    </td>
+                                    <td class="align-middle text-center text-sm">
+                                        <span class="badge badge-sm bg-gradient-{{ get_status_class(agendamento.status) }}">{{ agendamento.status | capitalize }}</span>
+                                    </td>
+                                    <td>
+                                        <p class="text-xs font-weight-bold mb-0">{{ agendamento.observacoes or 'N/A' }}</p>
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <div class="d-flex justify-content-center">
+                                            {% if agendamento.status == 'agendado' %}
+                                            <form action="{{ url_for('atualizar_status_paciente', id=agendamento.id) }}" method="post" class="d-inline-block me-2">
+                                                <input type="hidden" name="novo_status" value="confirmado">
+                                                <button type="submit" class="btn btn-sm btn-success mb-0" title="Confirmar">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </form>
+                                            <form action="{{ url_for('atualizar_status_paciente', id=agendamento.id) }}" method="post" class="d-inline-block">
+                                                <input type="hidden" name="novo_status" value="cancelado">
+                                                <button type="submit" class="btn btn-sm btn-danger mb-0" title="Cancelar">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </form>
+                                            {% else %}
+                                            <span class="text-secondary text-xs font-weight-bold">Ação não disponível</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-center text-secondary mt-3">Nenhuma consulta agendada encontrada.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

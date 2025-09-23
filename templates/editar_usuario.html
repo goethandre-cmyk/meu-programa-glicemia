@@ -1,6 +1,4 @@
-{% extends 'base.html' %}
-
-{% block title %}Editar Usuário{% endblock %}
+{% extends "base.html" %}
 
 {% block content %}
 <div class="container mt-4">
@@ -28,6 +26,7 @@
                     <option value="paciente" {% if usuario['role'] == 'paciente' %}selected{% endif %}>Paciente</option>
                     <option value="medico" {% if usuario['role'] == 'medico' %}selected{% endif %}>Médico</option>
                     <option value="admin" {% if usuario['role'] == 'admin' %}selected{% endif %}>Admin</option>
+                    <option value="secretario" {% if usuario['role'] == 'secretario' %}selected{% endif %}>Secretário</option>
                 </select>
             </div>
             <div class="mb-3">

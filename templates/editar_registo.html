@@ -9,94 +9,91 @@
     </h1>
 
     <div class="card p-4 shadow-sm">
-        <form id="form-registro-edicao" action="{{ url_for('editar_registo', id=registo.id) }}" method="post">
+        <form id="form-registo-edicao" action="{{ url_for('editar_registo', id=registo.id) }}" method="post">
             
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
-                <input type="number" step="0.1" class="form-control" id="valor" name="valor" 
-                       placeholder="Valor da Glicemia (mg/dL)" value="{{ registo.valor }}" required>
-            </div>
+            <input type="hidden" name="tipo" value="{{ tipo_registo }}">
             
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
                 <input type="datetime-local" class="form-control" id="data_hora" name="data_hora" 
-                       value="{{ registo.data_hora.strftime('%Y-%m-%dT%H:%M') }}" required>
-            </div>
-
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-utensils"></i></span>
-                <select class="form-select" id="refeicao" name="refeicao" required>
-                    <option value="" disabled selected>Selecione a Refeição...</option>
-                    <option value="Jejum" {% if registo.tipo == 'Jejum' %}selected{% endif %}>Jejum</option>
-                    <option value="Café da Manhã" {% if registo.tipo == 'Café da Manhã' %}selected{% endif %}>Café da Manhã</option>
-                    <option value="Almoço" {% if registo.tipo == 'Almoço' %}selected{% endif %}>Almoço</option>
-                    <option value="Janta" {% if registo.tipo == 'Janta' %}selected{% endif %}>Janta</option>
-                    <option value="Lanche" {% if registo.tipo == 'Lanche' %}selected{% endif %}>Lanche</option>
-                    <option value="Colação" {% if registo.tipo == 'Colação' %}selected{% endif %}>Colação</option>
-                </select>
+                       value="{{ data_hora }}" required>
             </div>
             
-            <div id="alimentos-container-edicao">
-                {% if alimentos_refeicao %}
-                    {% for alimento in alimentos_refeicao %}
-                        <div class="alimento-form-template">
-                            <hr>
-                            <h5 class="mb-3">Alimento {{ loop.index }}</h5>
-                            <div class="mb-3 input-group form-alimento">
-                                <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                <input type="text" class="form-control alimento-busca" placeholder="Buscar Alimento...">
-                            </div>
-                            <div class="alimento-sugestoes list-group"></div>
+            {% if tipo_registo == 'Glicemia' %}
+                <div class="mb-3 input-group">
+                    <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
+                    <input type="number" step="0.1" class="form-control" id="valor" name="valor" 
+                           placeholder="Valor da Glicemia (mg/dL)" value="{{ registo.valor }}" required>
+                </div>
+                
+                <div class="mb-3 input-group">
+                    <span class="input-group-text"><i class="fas fa-utensils"></i></span>
+                    <select class="form-select" id="refeicao" name="refeicao" required>
+                        <option value="" disabled selected>Selecione a Refeição...</option>
+                        <option value="Jejum" {% if registo.refeicao == 'Jejum' %}selected{% endif %}>Jejum</option>
+                        <option value="Café da Manhã" {% if registo.refeicao == 'Café da Manhã' %}selected{% endif %}>Café da Manhã</option>
+                        <option value="Almoço" {% if registo.refeicao == 'Almoço' %}selected{% endif %}>Almoço</option>
+                        <option value="Janta" {% if registo.refeicao == 'Janta' %}selected{% endif %}>Janta</option>
+                        <option value="Lanche" {% if registo.refeicao == 'Lanche' %}selected{% endif %}>Lanche</option>
+                        <option value="Colação" {% if registo.refeicao == 'Colação' %}selected{% endif %}>Colação</option>
+                    </select>
+                </div>
+            {% endif %}
 
-                            <div class="mb-3 input-group form-alimento">
-                                <span class="input-group-text"><i class="fas fa-carrot"></i></span>
-                                <input type="text" class="form-control alimento-selecionado" name="alimento_selecionado[]" 
-                                       value="{{ alimento.nome }}" readonly>
-                            </div>
-
-                            <div class="row form-alimento">
-                                <div class="col-md-4 mb-3">
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-weight-hanging"></i></span>
-                                        <input type="number" step="0.1" class="form-control carbs carbs-input" name="carbs[]" 
-                                               value="{{ alimento.carbs }}" placeholder="Carboidratos (g)">
+            {% if tipo_registo == 'Refeição' %}
+                <input type="hidden" name="alimentos_refeicao" id="alimentos-refeicao-json" value="{{ alimentos_refeicao }}">
+                
+                <div id="alimentos-container-edicao">
+                    {% if alimentos_refeicao %}
+                        {% for alimento in alimentos_refeicao %}
+                            <div class="alimento-form-template">
+                                <hr>
+                                <h5 class="mb-3">Alimento {{ loop.index }}</h5>
+                                <div class="mb-3 input-group form-alimento">
+                                    <span class="input-group-text"><i class="fas fa-carrot"></i></span>
+                                    <input type="text" class="form-control alimento-selecionado" name="alimento_selecionado[]" 
+                                           value="{{ alimento.nome }}" readonly>
+                                </div>
+                                <div class="row form-alimento">
+                                    <div class="col-md-4 mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-weight-hanging"></i></span>
+                                            <input type="number" step="0.1" class="form-control carbs carbs-input" name="carbs[]" 
+                                                   value="{{ alimento.carbs }}" placeholder="Carboidratos (g)">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-drumstick-bite"></i></span>
+                                            <input type="number" step="0.1" class="form-control protein" name="protein[]" 
+                                                   value="{{ alimento.protein }}" placeholder="Proteína (g)">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-cheese"></i></span>
+                                            <input type="number" step="0.1" class="form-control fat" name="fat[]" 
+                                                   value="{{ alimento.fat }}" placeholder="Gordura (g)">
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-drumstick-bite"></i></span>
-                                        <input type="number" step="0.1" class="form-control protein" name="protein[]" 
-                                               placeholder="Proteína (g)">
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="fas fa-cheese"></i></span>
-                                        <input type="number" step="0.1" class="form-control fat" name="fat[]" 
-                                               placeholder="Gordura (g)">
-                                    </div>
-                                </div>
                             </div>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3 input-group">
+                    <span class="input-group-text"><i class="fas fa-calculator"></i></span>
+                    <input type="text" class="form-control" id="total-carbs-display" value="Total de CHO: {{ total_carbs }}g" readonly>
+                </div>
+            {% endif %}
 
-            <button type="button" id="adicionar-alimento-btn" class="btn btn-secondary mt-2 mb-4">
-                <i class="fas fa-plus me-2"></i>Adicionar Outro Alimento
-            </button>
-            
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-comment-dots"></i></span>
                 <textarea class="form-control" id="observacoes" name="observacoes" rows="3" 
                           placeholder="Observações (opcional)">{{ registo.observacoes }}</textarea>
             </div>
             
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-calculator"></i></span>
-                <input type="text" class="form-control" id="total-carbs-display" value="{{ total_carbs }}" readonly>
-            </div>
-
             <button type="submit" class="btn btn-primary w-100">
                 <i class="fas fa-save me-2"></i>Salvar Alterações
             </button>

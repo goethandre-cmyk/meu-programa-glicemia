@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Novo Agendamento{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4 class="mb-0">Agendar Nova Consulta</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form action="{{ url_for('agendar_consulta') }}" method="post">
+                        <div class="mb-3">
+                            <label for="paciente_username" class="form-label">Paciente</label>
+                            <select id="paciente_username" name="paciente_username" class="form-select" required>
+                                <option value="">Selecione um paciente...</option>
+                                {% for paciente in pacientes %}
+                                <option value="{{ paciente.username }}">{{ paciente.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="medico_username" class="form-label">Médico</label>
+                            <select id="medico_username" name="medico_username" class="form-select" required>
+                                <option value="">Selecione um médico...</option>
+                                {% for medico in medicos %}
+                                <option value="{{ medico.username }}">{{ medico.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="data_hora" class="form-label">Data e Hora da Consulta</label>
+                            <input type="datetime-local" id="data_hora" name="data_hora" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="observacoes" class="form-label">Observações</label>
+                            <textarea id="observacoes" name="observacoes" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Agendar</button>
+                            <a href="{{ url_for('agendamentos') }}" class="btn btn-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

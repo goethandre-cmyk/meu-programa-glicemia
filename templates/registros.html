@@ -17,8 +17,8 @@
                 <thead>
                     <tr>
                         <th scope="col" class="text-white bg-primary rounded-top-start">Data e Hora</th>
-                        <th scope="col" class="text-white bg-primary">Refeição</th>
-                        <th scope="col" class="text-white bg-primary">Valor</th>
+                        <th scope="col" class="text-white bg-primary">Tipo</th>
+                        <th scope="col" class="text-white bg-primary">Detalhes</th>
                         <th scope="col" class="text-white bg-primary">Observações</th>
                         <th scope="col" class="text-white bg-primary rounded-top-end">Ações</th>
                     </tr>
@@ -26,20 +26,34 @@
                 <tbody>
                     {% if registros %}
                         {% for registro in registros %}
-                        <tr class="glicemia-status {{ get_status_class(registro.valor) }}">
+                        <tr>
                             <td>{{ registro.data_hora.strftime('%d/%m/%Y %H:%M') }}</td>
-                            <td>{{ registro.refeicao }}</td>
-                            <td>
-                                <span class="fw-bold">{{ registro.valor }} mg/dL</span>
-                            </td>
+                            
+                            <td>{{ registro.tipo_exibicao }}</td>
+                            
+                            {% if registro.tipo == 'Glicemia' %}
+                                <td class="glicemia-status {{ get_status_class(registro.valor) }}">
+                                    <span class="fw-bold">{{ "%.1f"|format(registro.valor) }} mg/dL</span>
+                                </td>
+                            {% elif registro.tipo == 'Refeição' %}
+                                <td>
+                                    <span class="fw-bold">
+                                        {{ "%.1f"|format(registro.total_calorias) }} Kcal | 
+                                        {{ "%.1f"|format(registro.total_carbs) }}g de CHO
+                                    </span>
+                                </td>
+                            {% else %}
+                                <td>N/A</td>
+                            {% endif %}
+
                             <td>{{ registro.observacoes if registro.observacoes else 'N/A' }}</td>
                             <td class="action-buttons">
                                 <a href="{{ url_for('editar_registo', id=registro.id) }}" class="btn btn-sm btn-outline-warning">
                                     <i class="fas fa-edit"></i>
                                 </a>
                                 <form action="{{ url_for('excluir_registo', id=registro.id) }}" method="post" 
-                                      onsubmit="return confirm('Tem certeza que deseja excluir este registro?');"
-                                      style="display: inline;">
+                                    onsubmit="return confirm('Tem certeza que deseja excluir este registro?');"
+                                    style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
