@@ -14,8 +14,23 @@ app = Flask(__name__)
 app.secret_key = 'sua_chave_secreta_aqui' 
 app.logger.setLevel(logging.INFO)
 
+# Adicione a função ao ambiente Jinja2
+app.jinja_env.globals['from_json'] = json.loads
+
+# Adicione o resto do seu código, como a função de filtro
+def from_json_filter(json_string):
+    if json_string:
+        try:
+            return json.loads(json_string)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
+
+# Em seguida, adicione a função como um filtro
+app.jinja_env.filters['from_json'] = from_json_filter
+
 # --- Inicialização das Classes ---
-db_path = os.path.join('data', 'glicemia.json')
+db_path = os.path.join('data', 'glicemia.db')
 db_manager = DatabaseManager()
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -444,144 +459,56 @@ def salvar_glicemia():
         
     return redirect(url_for('registros'))
     
-@app.route('/salvar_refeicao', methods=['POST'])
+@app.route('/registrar_refeicao', methods=['GET', 'POST'])
 @login_required
-def salvar_refeicao():
-    data_hora_str = request.form.get('data_hora')
-    observacoes = request.form.get('observacoes')
-    alimentos_json_str = request.form.get('alimentos')
-    tipo_refeicao_especifica = request.form.get('tipo_refeicao_especifica') 
-
-    if not data_hora_str or not alimentos_json_str or not tipo_refeicao_especifica:
-        flash('Por favor, preencha todos os campos obrigatórios.', 'danger')
-        return redirect(url_for('refeicao'))
-    
-    try:
-        data_hora = datetime.fromisoformat(data_hora_str)
-        alimentos_list = json.loads(alimentos_json_str)
-        
-        total_carbs = sum(item.get('carbs', 0) for item in alimentos_list)
-        total_calorias = sum(item.get('kcal', 0) for item in alimentos_list)
-        
-    except (ValueError, TypeError, json.JSONDecodeError):
-        flash('Dados de refeição inválidos.', 'danger')
-        return redirect(url_for('refeicao'))
-
-    dados_registro = {
-        'user_id': current_user.id,
-        'data_hora': data_hora.isoformat(), # <-- CORREÇÃO: Salva como string
-        'tipo': 'Refeição', 
-        'alimentos_refeicao': alimentos_list,
-        'total_carbs': total_carbs,
-        'total_calorias': total_calorias,
-        'observacoes': observacoes,
-        'tipo_refeicao': tipo_refeicao_especifica,
-        'valor': None,
-        'descricao': None,
-        'refeicao': None,
-    }
-    
-    if db_manager.salvar_registro(dados_registro):
-        flash(f'Registro de {tipo_refeicao_especifica} salvo com sucesso!', 'success')
-        app_core.salvar_log_acao(f'Registro de {tipo_refeicao_especifica} salvo', current_user.username)
-    else:
-        flash('Erro ao salvar registro de refeição.', 'danger')
-        
-    return redirect(url_for('registros'))
-    
-@app.route('/editar_registo/<int:id>', methods=['GET', 'POST'])
-@login_required
-def editar_registo(id):
-    registro = db_manager.encontrar_registro(id)
-    if not registro or registro.get('user_id') != current_user.id:
-        flash('Registro não encontrado ou você não tem permissão para editá-lo.', 'danger')
-        return redirect(url_for('registros'))
-
+def registrar_refeicao():
     if request.method == 'POST':
-        if registro.get('tipo') == 'Glicemia':
-            valor_glicemia = request.form.get('valor_glicemia')
-            data_hora_str = request.form.get('data_hora')
+        try:
+            # 1. Obter os dados do formulário
+            data_hora_str = request.form['data_hora']
+            tipo = request.form['tipo']
             observacoes = request.form.get('observacoes')
             
-            try:
-                data_hora = datetime.fromisoformat(data_hora_str)
-                valor_glicemia = float(valor_glicemia.replace(',', '.'))
-            except (ValueError, TypeError):
-                flash('Valores de glicemia ou data/hora inválidos.', 'danger')
-                return redirect(url_for('editar_registo', id=id))
+            # Os totais são enviados diretamente do JavaScript
+            total_carbs = float(request.form['total_carbs'])
+            total_kcal = float(request.form['total_kcal'])
+            
+            # O JavaScript enviou a lista de alimentos selecionados como uma string JSON
+            alimentos_selecionados_json = request.form['alimentos_selecionados']
+            
+            # 2. Descodificar a string JSON de volta para uma lista Python
+            alimentos_selecionados = json.loads(alimentos_selecionados_json)
+            
+            # 3. Criar um dicionário com todos os dados
+            registro_data = {
+                'user_id': current_user.id,
+                'data_hora': data_hora_str,
+                'tipo': tipo,
+                'valor': None, # `valor` pode ser None para refeições
+                'observacoes': observacoes,
+                'alimentos_json': alimentos_selecionados_json, # Salve a string JSON
+                'total_calorias': total_kcal,
+                'total_carbs': total_carbs
+            }
+            
+            # 4. Chamar a função `salvar_registro` passando APENAS o dicionário
+            db_manager.salvar_registro(registro_data)
+            
+            flash('Refeição registrada com sucesso!', 'success')
+            return redirect(url_for('dashboard'))
 
-            registro['valor'] = valor_glicemia
-            registro['data_hora'] = data_hora.isoformat() # <-- CORREÇÃO: Salva como string
-            registro['observacoes'] = observacoes
-            
-            if db_manager.atualizar_registro(registro):
-                flash('Registro de glicemia atualizado com sucesso!', 'success')
-                app_core.salvar_log_acao(f'Registro de glicemia {id} atualizado', current_user.username)
-            else:
-                flash('Erro ao atualizar registro.', 'danger')
-            return redirect(url_for('registros'))
+        except Exception as e:
+            flash(f'Erro ao registrar a refeição: {e}', 'danger')
+            return redirect(url_for('registrar_refeicao'))
 
-        elif registro.get('tipo') == 'Refeição':
-            data_hora_str = request.form.get('data_hora')
-            observacoes = request.form.get('observacoes')
-            alimentos_json_str = request.form.get('alimentos')
-            tipo_refeicao_especifica = request.form.get('tipo_refeicao_especifica')
-            
-            if not data_hora_str or not alimentos_json_str or not tipo_refeicao_especifica:
-                flash('Por favor, preencha todos os campos obrigatórios.', 'danger')
-                return redirect(url_for('editar_registo', id=id))
-            
-            try:
-                data_hora = datetime.fromisoformat(data_hora_str)
-                alimentos_list = json.loads(alimentos_json_str)
-                
-                total_carbs = sum(item.get('carbs', 0) for item in alimentos_list)
-                total_calorias = sum(item.get('kcal', 0) for item in alimentos_list)
-                
-            except (ValueError, TypeError, json.JSONDecodeError) as e:
-                flash(f'Dados de refeição inválidos: {e}', 'danger')
-                return redirect(url_for('editar_registo', id=id))
-
-            registro['data_hora'] = data_hora.isoformat() # <-- CORREÇÃO: Salva como string
-            registro['observacoes'] = observacoes
-            registro['alimentos_refeicao'] = alimentos_list
-            registro['total_carbs'] = total_carbs
-            registro['total_calorias'] = total_calorias
-            registro['tipo_refeicao'] = tipo_refeicao_especifica
-            
-            if db_manager.atualizar_registro(registro):
-                flash('Registro de refeição atualizado com sucesso!', 'success')
-                app_core.salvar_log_acao(f'Registro de refeição {id} atualizado', current_user.username)
-            else:
-                flash('Erro ao atualizar registro de refeição.', 'danger')
-            return redirect(url_for('registros'))
-
-    else: # Lógica para carregar o formulário (GET)
-        if registro.get('tipo') == 'Glicemia':
-            # --- CORREÇÃO: Converte a string de data para um objeto datetime para exibir no formulário ---
-            if 'data_hora' in registro and isinstance(registro['data_hora'], str):
-                try:
-                    registro['data_hora'] = datetime.fromisoformat(registro['data_hora'])
-                except ValueError:
-                    pass
-            # --- Fim da correção ---
-            return render_template('editar_glicemia.html', registro=registro)
-        elif registro.get('tipo') == 'Refeição':
-            # --- CORREÇÃO: Converte a string de data para um objeto datetime para exibir no formulário ---
-            if 'data_hora' in registro and isinstance(registro['data_hora'], str):
-                try:
-                    registro['data_hora'] = datetime.fromisoformat(registro['data_hora'])
-                except ValueError:
-                    pass
-            # --- Fim da correção ---
-            alimentos = db_manager.carregar_alimentos()
-            return render_template(
-                'editar_refeicao.html',
-                registro=registro,
-                alimentos_disponiveis=alimentos,
-                tipos_refeicao=app_core.obter_tipos_refeicao(),
-            )
-            
+    # Se a requisição for GET, carrega a lista de alimentos para o template
+    alimentos = db_manager.carregar_alimentos()
+    
+    # Define a data e hora atuais para o campo do formulário
+    now = datetime.now().strftime('%Y-%m-%dT%H:%M')
+    
+    return render_template('registrar_refeicao.html', alimentos=alimentos, now=now)
+    
 @app.route('/excluir_registo/<int:id>', methods=['POST'])
 @login_required
 def excluir_registo(id):
@@ -607,46 +534,121 @@ def alimentos():
     lista_alimentos = db_manager.carregar_alimentos()
     return render_template('alimentos.html', alimentos=lista_alimentos)
 
-@app.route('/editar_alimento/<int:id>', methods=['GET', 'POST'])
+@app.route('/buscar_alimentos', methods=['GET'])
+def buscar_alimentos():
+    query = request.args.get('query', '')
+    if query:
+        resultados = app_core.buscar_alimentos_por_nome(query)
+        return jsonify(resultados)
+    return jsonify([])
+
+@app.route('/editar_registo/<int:id>', methods=['GET', 'POST'])
 @login_required
-def editar_alimento(id):
-    alimento = db_manager.encontrar_alimento(id)
-    if not alimento:
-        flash('Alimento não encontrado.', 'danger')
-        return redirect(url_for('alimentos'))
+def editar_registo(id):
+    registro = db_manager.encontrar_registro(id)
+    if not registro or registro.get('user_id') != current_user.id:
+        flash('Registro não encontrado ou você não tem permissão para editá-lo.', 'danger')
+        return redirect(url_for('registros'))
 
     if request.method == 'POST':
-        nome = request.form.get('nome')
-        medida_caseira = request.form.get('medida_caseira')
-        peso_g = request.form.get('peso_g')
-        kcal = request.form.get('kcal')
-        carbs_100g = request.form.get('carbs_100g')
-        
-        try:
-            peso_g = float(peso_g.replace(',', '.')) if peso_g else None
-            kcal = float(kcal.replace(',', '.')) if kcal else None
-            carbs_100g = float(carbs_100g.replace(',', '.')) if carbs_100g else None
-        except (ValueError, TypeError):
-            flash('Valores inválidos para peso, Kcal ou Carboidratos.', 'danger')
-            return redirect(url_for('editar_alimento', id=id))
+        if registro.get('tipo') == 'Glicemia':
+            valor_glicemia = request.form.get('valor_glicemia')
+            data_hora_str = request.form.get('data_hora')
+            observacoes = request.form.get('observacoes')
             
-        alimento_atualizado = {
-            'id': id,
-            'nome': nome,
-            'medida_caseira': medida_caseira,
-            'peso_g': peso_g,
-            'kcal': kcal,
-            'carbs_100g': carbs_100g
-        }
-        
-        if db_manager.atualizar_alimento(alimento_atualizado):
-            flash('Alimento atualizado com sucesso!', 'success')
-            return redirect(url_for('alimentos'))
-        else:
-            flash('Erro ao atualizar o alimento.', 'danger')
-            return redirect(url_for('editar_alimento', id=id))
+            try:
+                data_hora = datetime.fromisoformat(data_hora_str)
+                valor_glicemia = float(valor_glicemia.replace(',', '.'))
+            except (ValueError, TypeError):
+                flash('Valores de glicemia ou data/hora inválidos.', 'danger')
+                return redirect(url_for('editar_registo', id=id))
 
-    return render_template('editar_alimento.html', alimento=alimento)
+            registro['valor'] = valor_glicemia
+            registro['data_hora'] = data_hora.isoformat()
+            registro['observacoes'] = observacoes
+            
+            if db_manager.atualizar_registro(registro):
+                flash('Registro de glicemia atualizado com sucesso!', 'success')
+                app_core.salvar_log_acao(f'Registro de glicemia {id} atualizado', current_user.username)
+            else:
+                flash('Erro ao atualizar registro.', 'danger')
+            return redirect(url_for('registros'))
+
+        elif registro.get('tipo') in ['Jejum', 'Café da Manhã', 'Almoço', 'Janta', 'Lanche', 'Colação']:
+            data_hora_str = request.form.get('data_hora')
+            observacoes = request.form.get('observacoes')
+            
+            # CORREÇÃO: Pega o JSON e o tipo de refeição do formulário
+            alimentos_json_str = request.form.get('alimentos_selecionados') 
+            tipo_refeicao_especifica = request.form.get('tipo')
+            
+            if not data_hora_str or not alimentos_json_str:
+                flash('Por favor, preencha todos os campos obrigatórios.', 'danger')
+                return redirect(url_for('editar_registo', id=id))
+            
+            try:
+                data_hora = datetime.fromisoformat(data_hora_str)
+                alimentos_list = json.loads(alimentos_json_str)
+                
+                # CORREÇÃO: Use as chaves corretas do JSON enviado pelo frontend
+                total_carbs = sum(item.get('CHO (g)', 0) for item in alimentos_list)
+                total_calorias = sum(item.get('KCAL', 0) for item in alimentos_list)
+                
+            except (ValueError, TypeError, json.JSONDecodeError) as e:
+                flash(f'Dados de refeição inválidos: {e}', 'danger')
+                return redirect(url_for('editar_registo', id=id))
+
+            registro['data_hora'] = data_hora.isoformat()
+            registro['observacoes'] = observacoes
+            registro['alimentos_json'] = alimentos_json_str
+            registro['total_carbs'] = total_carbs
+            registro['total_calorias'] = total_calorias
+            registro['tipo'] = tipo_refeicao_especifica
+            
+            if db_manager.atualizar_registro(registro):
+                flash('Registro de refeição atualizado com sucesso!', 'success')
+                app_core.salvar_log_acao(f'Registro de refeição {id} atualizado', current_user.username)
+            else:
+                flash('Erro ao atualizar registro de refeição.', 'danger')
+            return redirect(url_for('registros'))
+        
+        else:
+            flash('Tipo de registro inválido.', 'danger')
+            return redirect(url_for('registros'))
+
+    # Lógica para carregar o formulário (GET)
+    else: 
+        if registro.get('tipo') == 'Glicemia':
+            if 'data_hora' in registro and isinstance(registro['data_hora'], str):
+                try:
+                    registro['data_hora'] = datetime.fromisoformat(registro['data_hora'])
+                except ValueError:
+                    pass
+            return render_template('editar_glicemia.html', registro=registro)
+        
+        elif registro.get('tipo') in ['Jejum', 'Café da Manhã', 'Almoço', 'Janta', 'Lanche', 'Colação']:
+            if 'data_hora' in registro and isinstance(registro['data_hora'], str):
+                try:
+                    registro['data_hora'] = datetime.fromisoformat(registro['data_hora'])
+                except ValueError:
+                    pass
+            
+            if 'alimentos_json' in registro and registro['alimentos_json']:
+                registro['alimentos_list'] = json.loads(registro['alimentos_json'])
+            else:
+                registro['alimentos_list'] = []
+            
+            alimentos = db_manager.carregar_alimentos()
+            return render_template(
+                'editar_refeicao.html',
+                registro=registro,
+                alimentos_disponiveis=alimentos,
+                tipos_refeicao=['Jejum', 'Café da Manhã', 'Almoço', 'Janta', 'Lanche', 'Colação'],
+            )
+        
+        else:
+            flash('Tipo de registro inválido.', 'danger')
+            return redirect(url_for('registros'))
 
 @app.route('/excluir_alimento/<int:id>', methods=['POST'])
 @login_required
@@ -667,20 +669,23 @@ def registrar_alimento():
 
     if request.method == 'POST':
         try:
-            nome = request.form['nome']
+            # Captura os dados do formulário HTML
+            nome_alimento = request.form['nome_alimento']
             medida_caseira = request.form['medida_caseira']
             peso_g = float(request.form['peso_g'].replace(',', '.'))
             kcal = float(request.form['kcal'].replace(',', '.'))
-            carbs_100g = float(request.form['carbs_100g'].replace(',', '.'))
+            cho = float(request.form['cho'].replace(',', '.'))
             
+            # Mapeia os dados do formulário para o formato da sua tabela 'alimentos'
             novo_alimento = {
-                'nome': nome,
+                'alimento': nome_alimento, # 'alimento' é o nome da coluna no BD
                 'medida_caseira': medida_caseira,
-                'peso_g': peso_g,
+                'peso': peso_g, # 'peso' é o nome da coluna no BD
                 'kcal': kcal,
-                'carbs_100g': carbs_100g
+                'carbs': cho # 'carbs' é o nome da coluna no BD
             }
             
+            # Chama o método de salvar_alimento (que vamos criar)
             if db_manager.salvar_alimento(novo_alimento):
                 flash('Alimento adicionado com sucesso!', 'success')
             else:
@@ -688,9 +693,12 @@ def registrar_alimento():
         except (ValueError, TypeError):
             flash('Dados do alimento inválidos. Por favor, verifique os valores numéricos.', 'danger')
         
+        # Redireciona para a página de listagem de alimentos
         return redirect(url_for('alimentos'))
 
-    return render_template('registrar_alimento.html')
+    # Se a requisição for GET, carrega a lista de alimentos
+    alimentos = db_manager.carregar_alimentos()
+    return render_template('registrar_alimento.html', alimentos=alimentos)
 
 @app.route('/adicionar_alimento', methods=['GET', 'POST'])
 @login_required
@@ -853,74 +861,113 @@ def salvar_ficha_medica():
     except Exception as e:
         flash(f'Ocorreu um erro: {e}', 'danger')
         return redirect(url_for('dashboard'))
-
+    
 @app.route('/agendamentos')
 @login_required
-def agendamentos():
-    if current_user.is_medico or current_user.is_admin:
-        agendamentos = db_manager.carregar_agendamentos_medico(current_user.id)
-    else:
-        agendamentos = db_manager.carregar_agendamentos_paciente(current_user.id)
-    
-    return render_template('agendamentos.html', agendamentos=agendamentos)
+def agendamentos_redirect():
+    return redirect(url_for('gerenciar_agendamentos'))
 
-# No seu arquivo app.py
-
-# No seu arquivo app.py
-
-@app.route('/agendar', methods=['GET', 'POST'])
+# /////// AGENDA DO PACIENTE ///////
+@app.route('/minhas_consultas')
 @login_required
-def agendar():
+def minhas_consultas():
+    # Apenas pacientes podem acessar esta rota
+    if not current_user.is_paciente:
+        flash('Acesso não autorizado. Esta página é para pacientes.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    agendamentos = db_manager.buscar_agendamentos_paciente(current_user.id)
+    return render_template('minhas_consultas.html', agendamentos=agendamentos)
+
+@app.route('/atualizar_status_paciente/<int:id>', methods=['POST'])
+@login_required
+def atualizar_status_paciente(id):
+    # Lógica de atualização de status para um paciente
+    # Apenas pacientes podem usar esta rota para atualizar o status de suas próprias consultas
+    if not current_user.is_paciente:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    novo_status = request.form.get('novo_status')
+    if db_manager.atualizar_status_agendamento(id, novo_status):
+        flash('Status da consulta atualizado com sucesso.', 'success')
+    else:
+        flash('Erro ao atualizar o status da consulta.', 'danger')
+    return redirect(url_for('minhas_consultas'))
+
+@app.route('/gerenciar_agendamentos')
+@login_required
+def gerenciar_agendamentos():
+    # Verifica se o usuário logado tem permissão (médico, secretário ou admin)
+    if not current_user.is_medico and not current_user.is_admin:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    agendamentos = db_manager.buscar_todos_agendamentos()
+    return render_template('gerenciar_agendamentos.html', agendamentos=agendamentos)
+
+@app.route('/agendar_para_paciente', methods=['GET', 'POST'])
+@login_required
+def agendar_para_paciente():
+    # Lógica para garantir que apenas médicos e administradores podem acessar
+    if not current_user.is_medico and not current_user.is_admin:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+
     if request.method == 'POST':
-        # Esta parte é para a lógica de salvar o agendamento
         try:
-            paciente_id_str = request.form.get('paciente_id')
-            medico_id_str = request.form.get('medico_id')
-            data_hora_str = request.form.get('data_hora')
-            observacoes = request.form.get('observacoes')
+            paciente_username = request.form['paciente_username']
+            medico_username = request.form['medico_username']
+            data_hora = request.form['data_hora']
+            observacoes = request.form.get('observacoes', '')
 
-            # Validação dos dados antes da conversão
-            if not medico_id_str or not data_hora_str:
-                flash('Por favor, preencha todos os campos obrigatórios.', 'danger')
-                return redirect(url_for('agendamentos'))
+            # Busque os IDs dos usuários pelos usernames
+            paciente_id = db_manager.get_user_id_by_username(paciente_username)
+            medico_id = db_manager.get_user_id_by_username(medico_username)
 
-            # Se o campo paciente_id não for preenchido, usa o ID do usuário atual
-            if not paciente_id_str:
-                paciente_id = current_user.id
-            else:
-                paciente_id = int(paciente_id_str)
+            if not paciente_id or not medico_id:
+                flash('Paciente ou médico não encontrado.', 'danger')
+                return redirect(url_for('agendar_para_paciente'))
 
-            medico_id = int(medico_id_str)
-            data_hora = datetime.fromisoformat(data_hora_str)
-            
-            dados_agendamento = {
-                'paciente_id': paciente_id,
-                'medico_id': medico_id,
-                'data_hora': data_hora.isoformat(),
-                'observacoes': observacoes
-            }
-            
-            if db_manager.salvar_agendamento(dados_agendamento):
-                flash('Agendamento salvo com sucesso!', 'success')
+            if db_manager.salvar_agendamento(paciente_id, medico_id, data_hora, observacoes):
+                flash('Agendamento criado com sucesso!', 'success')
+                return redirect(url_for('gerenciar_agendamentos'))
             else:
                 flash('Erro ao salvar agendamento.', 'danger')
-
-        except (ValueError, TypeError) as e:
-            # Captura erros de formato de dados, mas não a ausência
-            flash('Dados do agendamento inválidos. Verifique o formato da data e hora.', 'danger')
-
-        return redirect(url_for('agendamentos'))
-
-    else: # request.method == 'GET'
-        medicos = db_manager.carregar_medicos()
+                return redirect(url_for('agendar_para_paciente'))
         
-        if current_user.is_paciente:
-            return render_template('agendar.html', medicos=medicos)
-        
+        except Exception as e:
+            flash(f'Ocorreu um erro: {e}', 'danger')
+            return redirect(url_for('agendar_para_paciente'))
+
+    # Para requisição GET, carrega a lista de pacientes e médicos para o template
+    pacientes = db_manager.carregar_todos_os_usuarios('paciente')
+    medicos = db_manager.carregar_todos_os_usuarios('medico')
+    
+    return render_template('agendar_para_paciente.html', pacientes=pacientes, medicos=medicos)
+
+@app.route('/agendar_consulta', methods=['GET', 'POST'])
+@login_required
+def agendar_consulta():
+    if request.method == 'POST':
+        # Aqui a lógica de agendamento é mais simples, pois o paciente
+        # está agendando para si mesmo.
+        medico_id = request.form.get('medico_id')
+        data_hora = request.form.get('data_agendamento')
+        observacoes = request.form.get('observacoes')
+        paciente_id = current_user.id # O ID do paciente é o ID do usuário logado
+
+        if db_manager.salvar_agendamento(paciente_id, medico_id, data_hora, observacoes):
+            flash('Consulta agendada com sucesso!', 'success')
+            return redirect(url_for('minhas_consultas'))
         else:
-            pacientes = db_manager.carregar_todos_os_usuarios()
-            return render_template('agendar_consulta_admin.html', medicos=medicos, pacientes=pacientes)
-        
+            flash('Erro ao agendar consulta. Tente novamente.', 'danger')
+            return redirect(url_for('agendar_consulta'))
+
+    # Para requisição GET, carrega a lista de médicos
+    medicos = db_manager.carregar_todos_os_usuarios(perfil='medico')
+    return render_template('agendar_consulta.html', medicos=medicos)
+
 @app.route('/calcular_fs')
 @login_required
 def calcular_fs():

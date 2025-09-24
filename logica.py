@@ -176,6 +176,9 @@ class DatabaseManager:
             print(f"Erro ao excluir o usuário: {e}")
             return False
 
+    def buscar_alimentos_por_nome(self, nome):
+        return self.db_manager.buscar_alimentos(nome)
+
     def salvar_registro(self, user_id, tipo, valor, carboidratos, observacoes, alimentos_refeicao, data_hora):
         """Salva um novo registro no banco de dados, incluindo a lista de alimentos."""
         # Converte a lista de alimentos para uma string JSON antes de salvar

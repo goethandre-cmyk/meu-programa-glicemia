@@ -67,5 +67,42 @@
             </button>
         </form>
     </div>
+
+    ---
+
+    <div class="card p-4 shadow-sm mt-4">
+        <h2 class="mb-4">
+            <i class="fas fa-list me-2"></i>Alimentos Registrados
+        </h2>
+
+        {% if alimentos %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th scope="col">Nome</th>
+                        <th scope="col">Medida</th>
+                        <th scope="col">Peso (g)</th>
+                        <th scope="col">Carboidratos (g)</th>
+                        <th scope="col">Calorias (kcal)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alimento in alimentos %}
+                    <tr>
+                        <td>{{ alimento.get('alimento', '') }}</td>
+                        <td>{{ alimento.get('medida_caseira', '') }}</td>
+                        <td>{{ "%.2f"|format(alimento.get('peso', 0)) }}</td>
+                        <td>{{ "%.2f"|format(alimento.get('carbs', 0)) }}</td>
+                        <td>{{ "%.2f"|format(alimento.get('kcal', 0)) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">Nenhum alimento registrado ainda.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

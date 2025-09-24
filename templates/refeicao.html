@@ -7,6 +7,195 @@
     <div class="card p-4 shadow-sm">
         <h1><i class="fas fa-utensils me-2"></i>Registrar Refeição</h1>
         <p>Preencha os dados da sua refeição abaixo.</p>
-        </div>
+
+        <form action="{{ url_for('registrar_refeicao') }}" method="post" id="form-refeicao">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="tipo_refeicao" class="form-label">Tipo de Refeição</label>
+                    <select id="tipo_refeicao" name="tipo" class="form-control">
+                        <option value="café da manhã">Café da Manhã</option>
+                        <option value="almoço">Almoço</option>
+                        <option value="lanche da tarde">Lanche da Tarde</option>
+                        <option value="jantar">Jantar</option>
+                        <option value="ceia">Ceia</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="data_refeicao" class="form-label">Data e Hora</label>
+                    <input type="datetime-local" id="data_refeicao" name="data_hora" class="form-control" value="{{ now }}">
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <h3>Adicionar Alimento</h3>
+            <div class="row g-3 mb-3">
+                <div class="col-md-8">
+                    <label for="alimento-select" class="form-label">Alimento</label>
+                    <select id="alimento-select" class="form-control">
+                        <option value="">Selecione um alimento...</option>
+                        {% for alimento in alimentos %}
+                            <option value="{{ alimento.id }}" 
+                                    data-carbs="{{ alimento.carbs }}" 
+                                    data-kcal="{{ alimento.kcal }}"
+                                    data-peso="{{ alimento.peso }}"
+                                    data-nome="{{ alimento.alimento }}">
+                                {{ alimento.alimento }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="quantidade-input" class="form-label">Quantidade (g)</label>
+                    <input type="number" id="quantidade-input" class="form-control" value="100" min="1">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-success w-100" id="adicionar-alimento-btn">
+                        <i class="fas fa-plus me-1"></i>Adicionar
+                    </button>
+                </div>
+            </div>
+            
+            <hr class="my-4">
+
+            <h3>Alimentos da Refeição</h3>
+            <div class="table-responsive">
+                <table class="table table-striped" id="tabela-alimentos">
+                    <thead>
+                        <tr>
+                            <th>Alimento</th>
+                            <th>Quantidade (g)</th>
+                            <th>Carboidratos (g)</th>
+                            <th>Calorias (kcal)</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-alimentos">
+                        </tbody>
+                </table>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 offset-md-6">
+                    <div class="card p-3 bg-light">
+                        <div class="d-flex justify-content-between">
+                            <strong>Total de Carboidratos:</strong>
+                            <span id="total-carbs-span">0.0 g</span>
+                        </div>
+                        <div class="d-flex justify-content-between mt-2">
+                            <strong>Total de Calorias:</strong>
+                            <span id="total-kcal-span">0.0 kcal</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="mb-3">
+                <label for="observacoes" class="form-label">Observações (Opcional)</label>
+                <textarea id="observacoes" name="observacoes" class="form-control" rows="3"></textarea>
+            </div>
+            
+            <input type="hidden" name="alimentos_selecionados" id="alimentos-selecionados">
+            <input type="hidden" name="total_carbs" id="total-carbs-input">
+            <input type="hidden" name="total_kcal" id="total-kcal-input">
+
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="fas fa-save me-2"></i>Salvar Refeição
+            </button>
+        </form>
+    </div>
 </div>
+
+<script>
+    // Código JavaScript para adicionar dinamismo à página
+    const alimentosSelect = document.getElementById('alimento-select');
+    const quantidadeInput = document.getElementById('quantidade-input');
+    const adicionarBtn = document.getElementById('adicionar-alimento-btn');
+    const listaAlimentos = document.getElementById('lista-alimentos');
+    const totalCarbsSpan = document.getElementById('total-carbs-span');
+    const totalKcalSpan = document.getElementById('total-kcal-span');
+    const alimentosInput = document.getElementById('alimentos-selecionados');
+    const form = document.getElementById('form-refeicao');
+
+    let totalCarbs = 0;
+    let totalKcal = 0;
+    let alimentosAdicionados = [];
+
+    // Função para calcular os totais
+    const calcularTotais = () => {
+        totalCarbs = alimentosAdicionados.reduce((sum, item) => sum + item.carbs, 0);
+        totalKcal = alimentosAdicionados.reduce((sum, item) => sum + item.kcal, 0);
+        totalCarbsSpan.textContent = totalCarbs.toFixed(1) + ' g';
+        totalKcalSpan.textContent = totalKcal.toFixed(1) + ' kcal';
+        // Atualiza os campos escondidos para o formulário
+        document.getElementById('total-carbs-input').value = totalCarbs;
+        document.getElementById('total-kcal-input').value = totalKcal;
+    };
+
+    // Função para adicionar um alimento à lista
+    adicionarBtn.addEventListener('click', () => {
+        const alimentoId = alimentosSelect.value;
+        const quantidade = parseFloat(quantidadeInput.value);
+
+        if (alimentoId && quantidade > 0) {
+            const selectedOption = alimentosSelect.options[alimentosSelect.selectedIndex];
+            const nomeAlimento = selectedOption.getAttribute('data-nome');
+            const carbsPorPeso = (parseFloat(selectedOption.getAttribute('data-carbs')) / parseFloat(selectedOption.getAttribute('data-peso'))) || 0;
+            const kcalPorPeso = (parseFloat(selectedOption.getAttribute('data-kcal')) / parseFloat(selectedOption.getAttribute('data-peso'))) || 0;
+
+            const carbsCalculado = carbsPorPeso * quantidade;
+            const kcalCalculado = kcalPorPeso * quantidade;
+
+            const alimentoAdicionado = {
+                id: alimentoId,
+                nome: nomeAlimento,
+                quantidade: quantidade,
+                carbs: carbsCalculado,
+                kcal: kcalCalculado
+            };
+
+            alimentosAdicionados.push(alimentoAdicionado);
+            
+            // Adicionar à tabela HTML
+            const novaLinha = document.createElement('tr');
+            novaLinha.innerHTML = `
+                <td>${nomeAlimento}</td>
+                <td>${quantidade} g</td>
+                <td>${carbsCalculado.toFixed(1)} g</td>
+                <td>${kcalCalculado.toFixed(1)} kcal</td>
+                <td><button type="button" class="btn btn-danger btn-sm remover-alimento" data-id="${alimentoId}">
+                    <i class="fas fa-trash-alt"></i></button>
+                </td>
+            `;
+            listaAlimentos.appendChild(novaLinha);
+
+            // Atualizar os totais
+            calcularTotais();
+        }
+    });
+
+    // Função para remover um alimento da lista
+    listaAlimentos.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remover-alimento') || e.target.closest('.remover-alimento')) {
+            const button = e.target.closest('.remover-alimento');
+            const idToRemove = button.getAttribute('data-id');
+            
+            // Remove do array de alimentos adicionados
+            alimentosAdicionados = alimentosAdicionados.filter(item => item.id != idToRemove);
+            
+            // Remove da tabela HTML
+            button.closest('tr').remove();
+            
+            // Recalcula os totais
+            calcularTotais();
+        }
+    });
+    
+    // Antes de enviar o formulário, atualize o campo escondido com os dados JSON
+    form.addEventListener('submit', () => {
+        alimentosInput.value = JSON.stringify(alimentosAdicionados);
+    });
+</script>
 {% endblock %}

@@ -20,7 +20,7 @@
         {% endif %}
     {% endwith %}
 
-    <form action="{{ url_for('calcular_bolus') }}" method="post">
+    <form action="{{ url_for('calculadora_bolus') }}" method="post">
         <div class="mb-3 input-group">
             <span class="input-group-text"><i class="fas fa-tint"></i></span>
             <input type="number" step="0.1" class="form-control" id="glicemia_momento" name="glicemia_momento" placeholder="Glicemia no Momento (mg/dL)" required>
