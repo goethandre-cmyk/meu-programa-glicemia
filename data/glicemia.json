@@ -4,10 +4,23 @@
             "id": 1,
             "username": "testeuser",
             "password_hash": "scrypt:32768:8:1$vJ8GZkxwvvtwh8Dr$ebebee99d5844861add11ff20d8ccd533a5a6e42abcacb2fdfc924de39af8eaf20148bb5b9696bfd0de99710cf672d621f4381f1e933204100bf3d14c8fec515",
-            "role": "user"
+            "role": "admin"
         }
     ],
-    "registros_glicemia_refeicao": [],
+    "registros_glicemia_refeicao": [
+        {
+            "user_id": 1,
+            "data_hora": "2025-09-23T22:43:00",
+            "tipo": "Glicemia",
+            "valor": 300.0,
+            "observacoes": "davi",
+            "total_carbs": null,
+            "total_calorias": null,
+            "alimentos_refeicao": null,
+            "tipo_refeicao": null,
+            "id": 1
+        }
+    ],
     "alimentos": [],
     "medicos": [],
     "agendamentos": [],
@@ -15,6 +28,16 @@
         {
             "data_hora": "2025-09-23 02:16:31.413263",
             "acao": "Login",
+            "usuario": "testeuser"
+        },
+        {
+            "data_hora": "2025-09-23 22:43:05.385674",
+            "acao": "Login",
+            "usuario": "testeuser"
+        },
+        {
+            "data_hora": "2025-09-23 22:43:40.979829",
+            "acao": "Registro de glicemia salvo: 300.0",
             "usuario": "testeuser"
         }
     ],

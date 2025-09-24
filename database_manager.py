@@ -66,6 +66,14 @@ class DatabaseManager:
                 return user
         return None
 
+    def carregar_todos_os_usuarios(self):
+        """
+        Carrega todos os usuários registados no banco de dados.
+        Retorna uma lista de dicionários de usuários.
+        """
+        # Itera sobre a lista de usuários e retorna todos
+        return self.db['users']
+
     def salvar_usuario(self, user_data):
         if self.carregar_usuario(user_data['username']):
             return False
@@ -159,7 +167,25 @@ class DatabaseManager:
         
     def medico_tem_acesso_a_paciente(self, medico_id, paciente_id):
         return True
+
+    def salvar_ficha_medica(self, ficha_data):
+        """
+        Salva ou atualiza a ficha médica de um paciente.
+        """
+        paciente_id = ficha_data['paciente_id']
+        # Tenta encontrar uma ficha médica existente para este paciente
+        for i, ficha in enumerate(self.db['fichas_medicas']):
+            if ficha.get('paciente_id') == paciente_id:
+                # Ficha encontrada, atualiza os dados
+                self.db['fichas_medicas'][i].update(ficha_data)
+                self._save_db()
+                return True
         
+        # Se não encontrou, cria uma nova ficha
+        self.db['fichas_medicas'].append(ficha_data)
+        self._save_db()
+        return True
+
     def carregar_ficha_medica(self, paciente_id):
         for ficha in self.db['fichas_medicas']:
             if ficha.get('paciente_id') == paciente_id:
@@ -181,3 +207,43 @@ class DatabaseManager:
         self.db['agendamentos'].append(agendamento_data)
         self._save_db()
         return True
+    
+def carregar_cuidadores(self):
+        """
+        Carrega todos os usuários com a função de cuidador.
+        Retorna uma lista de dicionários.
+        """
+        cuidadores = []
+        for usuario in self.db['users']:
+            if usuario.get('role') == 'cuidador':
+                cuidadores.append(usuario)
+        return cuidadores
+
+def vincular_cuidador_paciente(self, cuidador_username, paciente_username):
+    """
+    Vincula um cuidador a um paciente.
+    """
+    # Encontra o cuidador e o paciente pelos seus usernames
+    cuidador = next((u for u in self.db['users'] if u['username'] == cuidador_username), None)
+    paciente = next((u for u in self.db['users'] if u['username'] == paciente_username), None)
+
+    # Verifica se ambos os usuários existem e se as suas roles estão corretas
+    if not cuidador or not paciente:
+        return False  # Cuidador ou paciente não encontrado
+
+    if cuidador['role'] != 'cuidador' or paciente['role'] != 'user':
+        return False  # As roles não correspondem ao esperado
+    
+    # Adiciona a entrada de vinculação.
+    # Vamos usar um campo 'pacientes_vinculados' para permitir
+    # que um cuidador cuide de mais de um paciente no futuro.
+    if 'pacientes_vinculados' not in cuidador:
+        cuidador['pacientes_vinculados'] = []
+    
+    # Adiciona o ID do paciente à lista do cuidador, se ainda não estiver lá
+    if paciente['id'] not in cuidador['pacientes_vinculados']:
+        cuidador['pacientes_vinculados'].append(paciente['id'])
+        self._save_db()  # Salva as mudanças na base de dados
+        return True
+    
+    return False # A vinculação já existe

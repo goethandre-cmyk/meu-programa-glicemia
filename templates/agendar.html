@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block titulo %}Agendar Consulta{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4 class="mb-0">Agendar uma Consulta Médica</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('salvar_agendamento') }}">
+                        <div class="mb-3">
+                            <label for="medico" class="form-label">Selecione o Médico:</label>
+                            <select class="form-select" id="medico" name="medico_id" required>
+                                {% for medico in medicos %}
+                                <option value="{{ medico.id }}">{{ medico.nome_completo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="data_agendamento" class="form-label">Data e Hora:</label>
+                            <input type="datetime-local" class="form-control" id="data_agendamento" name="data_agendamento" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="observacoes" class="form-label">Observações:</label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Detalhes sobre a consulta..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Confirmar Agendamento</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

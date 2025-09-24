@@ -45,7 +45,7 @@
                                 <a class="nav-link" href="{{ url_for('refeicao') }}"><i class="fas fa-utensils me-2"></i>Reg. Refeição</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('salvar_glicemia') }}"><i class="fas fa-syringe me-2"></i>Reg. Glicemia</a>
+                                <a class="nav-link" href="{{ url_for('registrar_glicemia') }}"><i class="fas fa-syringe me-2"></i>Reg. Glicemia</a>
                             </li>
                             {% if current_user.role in ['medico', 'secretario', 'admin'] %}
                                 <li class="nav-item">

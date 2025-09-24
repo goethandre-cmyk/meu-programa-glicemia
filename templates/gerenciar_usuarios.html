@@ -10,7 +10,7 @@
 
     <div class="card p-4 shadow-sm">
         <div class="d-flex justify-content-end mb-3">
-            <a href="{{ url_for('cadastrar_usuario') }}" class="btn btn-success">
+            <a href="{{ url_for('cadastro') }}" class="btn btn-success">
                 <i class="fas fa-user-plus me-2"></i>Novo Usuário
             </a>
         </div>
@@ -32,6 +32,11 @@
                         <td>{{ usuario.email or 'N/A' }}</td>
                         <td>{{ usuario.role or 'padrão' }}</td>
                         <td>
+                            {% if usuario.role == 'user' %}
+                                <a href="{{ url_for('vincular_cuidador', username=usuario.username) }}" class="btn btn-sm btn-info text-white">
+                                    <i class="fas fa-handshake"></i> Vincular Cuidador
+                                </a>
+                            {% endif %}
                             <a href="{{ url_for('editar_usuario', username=usuario.username) }}" class="btn btn-sm btn-warning">
                                 <i class="fas fa-edit"></i> Editar
                             </a>
