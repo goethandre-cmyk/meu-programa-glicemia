@@ -5,21 +5,11 @@ from datetime import datetime
 
 class DatabaseManager:
     def __init__(self, db_path='glicemia.json'):
-        # Pega o diretório do arquivo atual (database_manager.py)
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Cria o caminho completo para a pasta 'data' dentro do seu projeto
         db_folder = os.path.join(base_dir, 'data')
-        
-        # Cria a pasta 'data' se ela não existir
         os.makedirs(db_folder, exist_ok=True)
-        
-        # Define o caminho completo para o arquivo glicemia.json
         self.db_path = os.path.join(db_folder, db_path)
-        
-        # Linha para verificar o caminho final, que você pode apagar depois
         print(f"Salvando em: {self.db_path}")
-        
         self.db = self._load_db()
 
     def _load_db(self):
@@ -67,11 +57,6 @@ class DatabaseManager:
         return None
 
     def carregar_todos_os_usuarios(self):
-        """
-        Carrega todos os usuários registados no banco de dados.
-        Retorna uma lista de dicionários de usuários.
-        """
-        # Itera sobre a lista de usuários e retorna todos
         return self.db['users']
 
     def salvar_usuario(self, user_data):
@@ -87,6 +72,27 @@ class DatabaseManager:
         self.db['users'].append(user_data)
         self._save_db()
         return True
+
+    # -- O MÉTODO ATUALIZAR_USUARIO ESTAVA AQUI E FOI MOVIDO PARA DENTRO DA CLASSE --
+    def atualizar_usuario(self, user_data):
+        """
+        Atualiza os dados de um usuário existente na base de dados.
+        Recebe um dicionário com os dados do usuário, incluindo o 'id'.
+        """
+        user_id = user_data.get('id')
+        if not user_id:
+            return False
+
+        try:
+            for i, user in enumerate(self.db['users']):
+                if user.get('id') == user_id:
+                    self.db['users'][i].update(user_data)
+                    self._save_db()
+                    return True
+            return False
+        except Exception as e:
+            print(f"Erro ao atualizar usuário: {e}")
+            return False
 
     def salvar_registro(self, registro_data):
         last_id = max([r['id'] for r in self.db['registros_glicemia_refeicao']] + [0])
@@ -163,25 +169,31 @@ class DatabaseManager:
         return True
     
     def obter_pacientes_por_medico(self, medico_id):
-        return [user for user in self.db['users'] if user['role'] == 'user']
+        medico = self.carregar_usuario_por_id(medico_id)
+        if not medico or medico.get('role') != 'medico':
+            return []
+
+        pacientes_vinculados_ids = medico.get('pacientes_vinculados', [])
+
+        pacientes = []
+        for user_id in pacientes_vinculados_ids:
+            paciente = self.carregar_usuario_por_id(user_id)
+            if paciente:
+                pacientes.append(paciente)
+
+        return pacientes
         
     def medico_tem_acesso_a_paciente(self, medico_id, paciente_id):
         return True
 
     def salvar_ficha_medica(self, ficha_data):
-        """
-        Salva ou atualiza a ficha médica de um paciente.
-        """
         paciente_id = ficha_data['paciente_id']
-        # Tenta encontrar uma ficha médica existente para este paciente
         for i, ficha in enumerate(self.db['fichas_medicas']):
             if ficha.get('paciente_id') == paciente_id:
-                # Ficha encontrada, atualiza os dados
                 self.db['fichas_medicas'][i].update(ficha_data)
                 self._save_db()
                 return True
         
-        # Se não encontrou, cria uma nova ficha
         self.db['fichas_medicas'].append(ficha_data)
         self._save_db()
         return True
@@ -207,43 +219,58 @@ class DatabaseManager:
         self.db['agendamentos'].append(agendamento_data)
         self._save_db()
         return True
-    
-def carregar_cuidadores(self):
-        """
-        Carrega todos os usuários com a função de cuidador.
-        Retorna uma lista de dicionários.
-        """
+
+    # ---- MÉTODOS DE VINCULAÇÃO E CARREGAMENTO ESPECÍFICO ----
+
+    def carregar_cuidadores(self):
         cuidadores = []
         for usuario in self.db['users']:
             if usuario.get('role') == 'cuidador':
                 cuidadores.append(usuario)
         return cuidadores
 
-def vincular_cuidador_paciente(self, cuidador_username, paciente_username):
-    """
-    Vincula um cuidador a um paciente.
-    """
-    # Encontra o cuidador e o paciente pelos seus usernames
-    cuidador = next((u for u in self.db['users'] if u['username'] == cuidador_username), None)
-    paciente = next((u for u in self.db['users'] if u['username'] == paciente_username), None)
+    def vincular_cuidador_paciente(self, cuidador_username, paciente_username):
+        cuidador = next((u for u in self.db['users'] if u['username'] == cuidador_username), None)
+        paciente = next((u for u in self.db['users'] if u['username'] == paciente_username), None)
+        if not cuidador or not paciente:
+            return False
+        # Corrigido: 'user' para 'paciente' para manter a consistência
+        if cuidador['role'] != 'cuidador' or paciente['role'] != 'paciente':
+            return False
+        if 'pacientes_vinculados' not in cuidador:
+            cuidador['pacientes_vinculados'] = []
+        if paciente['id'] not in cuidador['pacientes_vinculados']:
+            cuidador['pacientes_vinculados'].append(paciente['id'])
+            self._save_db()
+            return True
+        return False
+        
+    # Corrigido: Este método foi movido e indentado para DENTRO da classe
+    def vincular_paciente_medico(self, paciente_id, medico_id):
+        """
+        Vincula um paciente a um médico.
+        """
+        # Encontra o paciente e o médico pelos seus IDs
+        paciente = self.carregar_usuario_por_id(paciente_id)
+        medico = self.carregar_usuario_por_id(medico_id)
 
-    # Verifica se ambos os usuários existem e se as suas roles estão corretas
-    if not cuidador or not paciente:
-        return False  # Cuidador ou paciente não encontrado
+        # Verifica se ambos os usuários existem e se as suas roles estão corretas
+        if not paciente or not medico:
+            return False  # Paciente ou médico não encontrado
 
-    if cuidador['role'] != 'cuidador' or paciente['role'] != 'user':
-        return False  # As roles não correspondem ao esperado
-    
-    # Adiciona a entrada de vinculação.
-    # Vamos usar um campo 'pacientes_vinculados' para permitir
-    # que um cuidador cuide de mais de um paciente no futuro.
-    if 'pacientes_vinculados' not in cuidador:
-        cuidador['pacientes_vinculados'] = []
-    
-    # Adiciona o ID do paciente à lista do cuidador, se ainda não estiver lá
-    if paciente['id'] not in cuidador['pacientes_vinculados']:
-        cuidador['pacientes_vinculados'].append(paciente['id'])
-        self._save_db()  # Salva as mudanças na base de dados
-        return True
-    
-    return False # A vinculação já existe
+        if paciente.get('role') != 'paciente' or medico.get('role') != 'medico':
+            return False  # As roles não correspondem ao esperado
+        
+        # Se o médico ainda não tiver a lista de pacientes, crie-a
+        if 'pacientes_vinculados' not in medico:
+            medico['pacientes_vinculados'] = []
+        
+        # Adiciona o ID do paciente à lista do médico, se ainda não estiver lá
+        if paciente['id'] not in medico['pacientes_vinculados']:
+            medico['pacientes_vinculados'].append(paciente['id'])
+            
+            # O método 'atualizar_usuario' já salva o arquivo
+            self.atualizar_usuario(medico)
+            return True
+        
+        return False # A vinculação já existe

@@ -28,19 +28,19 @@
                 <tbody>
                     {% for usuario in usuarios %}
                     <tr>
-                        <td>{{ usuario.username }}</td>
-                        <td>{{ usuario.email or 'N/A' }}</td>
-                        <td>{{ usuario.role or 'padrão' }}</td>
+                        <td>{{ usuario['username'] }}</td>
+                        <td>{{ usuario.get('email', 'N/A') }}</td>
+                        <td>{{ usuario.get('role', 'padrão') }}</td>
                         <td>
-                            {% if usuario.role == 'user' %}
-                                <a href="{{ url_for('vincular_cuidador', username=usuario.username) }}" class="btn btn-sm btn-info text-white">
-                                    <i class="fas fa-handshake"></i> Vincular Cuidador
-                                </a>
+                            {% if usuario.get('role') == 'user' %}
+                            <a href="{{ url_for('vincular_cuidador', username=usuario['username']) }}" class="btn btn-sm btn-info text-white">
+                                <i class="fas fa-handshake"></i> Vincular Cuidador
+                            </a>
                             {% endif %}
-                            <a href="{{ url_for('editar_usuario', username=usuario.username) }}" class="btn btn-sm btn-warning">
+                            <a href="{{ url_for('editar_usuario', username=usuario['username']) }}" class="btn btn-sm btn-warning">
                                 <i class="fas fa-edit"></i> Editar
                             </a>
-                            <a href="{{ url_for('excluir_usuario', username=usuario.username) }}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário?');">
+                            <a href="{{ url_for('excluir_usuario', username=usuario['username']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário?');">
                                 <i class="fas fa-trash-alt"></i> Excluir
                             </a>
                         </td>
