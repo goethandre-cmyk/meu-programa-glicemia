@@ -33,11 +33,15 @@
                         <td>{{ usuario.get('role', 'padrão') }}</td>
                         <td>
                             {% if usuario.get('role') == 'user' %}
-                            <a href="{{ url_for('vincular_cuidador', username=usuario['username']) }}" class="btn btn-sm btn-info text-white">
-                                <i class="fas fa-handshake"></i> Vincular Cuidador
+                            <a href="{{ url_for('ficha_acompanhamento', paciente_id=usuario['id']) }}" class="btn btn-sm btn-info text-white me-2" title="Acompanhar Exames Laboratoriais">
+                                <i class="fas fa-file-medical"></i> Ficha
+                            </a>
+                            <a href="{{ url_for('vincular_cuidador', username=usuario['username']) }}" class="btn btn-sm btn-secondary me-2">
+                                <i class="fas fa-handshake"></i> Cuidador
                             </a>
                             {% endif %}
-                            <a href="{{ url_for('editar_usuario', username=usuario['username']) }}" class="btn btn-sm btn-warning">
+                            
+                            <a href="{{ url_for('editar_usuario', username=usuario['username']) }}" class="btn btn-sm btn-warning me-2">
                                 <i class="fas fa-edit"></i> Editar
                             </a>
                             <a href="{{ url_for('excluir_usuario', username=usuario['username']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário?');">

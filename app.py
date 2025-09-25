@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 import plotly.graph_objects as go
@@ -56,6 +56,72 @@ class AppCore:
     def carregar_dados_analise(self, user_id):
         # Implementação da função de análise
         pass
+def carregar_dados_dashboard(user_id):
+    """
+    Carrega e processa os dados de glicemia para o dashboard.
+    """
+    # Use sua classe DatabaseManager para buscar os dados
+    registros = db_manager.carregar_registros(user_id)
+    
+    # Inicializa os dados para o dashboard
+    resumo_dados = {
+        'ultimo_registro': None,
+        'media_ultima_semana': 'N/A',
+        'hiperglicemia_count': 0,
+        'hipoglicemia_count': 0
+    }
+    
+    # Garante que a lista de registros não está vazia e que os dicionários têm as chaves esperadas
+    if not registros:
+        return resumo_dados
+
+    # Encontra o último registro de glicemia
+    registros_glicemia = [
+        r for r in registros 
+        if r.get('tipo') == 'Glicemia' and r.get('data_hora') and r.get('valor') is not None
+    ]
+    registros_glicemia.sort(key=lambda x: datetime.fromisoformat(x['data_hora']) if isinstance(x['data_hora'], str) else datetime.min, reverse=True)
+    
+    if registros_glicemia:
+        ultimo_registro = registros_glicemia[0]
+        data_hora_ultimo = datetime.fromisoformat(ultimo_registro['data_hora'])
+        tempo_passado = datetime.now() - data_hora_ultimo
+        
+        # Formata o tempo para exibição
+        if tempo_passado.total_seconds() < 60:
+            tempo_str = f"{int(tempo_passado.total_seconds())} segundos atrás"
+        elif tempo_passado.total_seconds() < 3600:
+            tempo_str = f"{int(tempo_passado.total_seconds() / 60)} minutos atrás"
+        elif tempo_passado.total_seconds() < 86400:
+            tempo_str = f"{int(tempo_passado.total_seconds() / 3600)} horas atrás"
+        else:
+            tempo_str = f"{int(tempo_passado.total_seconds() / 86400)} dias atrás"
+
+        resumo_dados['ultimo_registro'] = {
+            'valor': "%.1f" % ultimo_registro.get('valor', 0),
+            'tempo_desde_ultimo': tempo_str
+        }
+
+    # Filtra os dados da última semana e calcula a média e eventos extremos
+    data_limite = datetime.now() - timedelta(days=7)
+    glicemias_semana = []
+    
+    for r in registros_glicemia:
+        data_hora = datetime.fromisoformat(r['data_hora']) if isinstance(r.get('data_hora'), str) else datetime.min
+        if data_hora >= data_limite:
+            glicemias_semana.append(r['valor'])
+            # Conta eventos extremos
+            if r['valor'] < 70:
+                resumo_dados['hipoglicemia_count'] += 1
+            elif r['valor'] > 180:
+                resumo_dados['hiperglicemia_count'] += 1
+    
+    if glicemias_semana:
+        media = sum(glicemias_semana) / len(glicemias_semana)
+        resumo_dados['media_ultima_semana'] = "%.1f" % media
+    
+    return resumo_dados
+
 
 # --- Classes de Suporte ---
 class User(UserMixin):
@@ -225,43 +291,22 @@ def cadastro():
             
     return render_template('cadastro.html')
 
-# Rota do Dashboard
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Simplifica a lógica de redirecionamento para o dashboard correto
+    # 1. Verifica se é Médico/Admin e redireciona (ENCERRA a função aqui)
     if current_user.is_medico or current_user.is_admin:
         return redirect(url_for('dashboard_medico'))
-    else: # Por padrão, qualquer outro usuário vai para o dashboard do paciente
-        registros = db_manager.carregar_registros(current_user.id)
-        
-        ultimo_registro = None
-        if registros:
-            registros_glicemia = [r for r in registros if r.get('tipo') == 'Glicemia']
-            if registros_glicemia:
-                registros_glicemia.sort(key=lambda x: x.get('data_hora'), reverse=True)
-                ultimo_registro = registros_glicemia[0]
-                
-                # --- LÓGICA DE TRATAMENTO DE ERRO ADICIONADA AQUI ---
-                # Garante que 'data_hora' seja uma string antes de tentar a conversão.
-                data_hora_str = ultimo_registro.get('data_hora')
-                if data_hora_str and isinstance(data_hora_str, str):
-                    try:
-                        ultimo_registro['data_hora'] = datetime.fromisoformat(data_hora_str)
-                    except ValueError:
-                        # Se a string não estiver no formato ISO 8601,
-                        # defina o valor como None ou outra representação
-                        ultimo_registro['data_hora'] = None
-                else:
-                    # Se não for uma string válida, defina como None para evitar o erro
-                    ultimo_registro['data_hora'] = None
-                # --- FIM DA LÓGICA DE TRATAMENTO DE ERRO ---
-
-        resumo_dados = {
-            'ultimo_registro': ultimo_registro,
-        }
-        
-        return render_template('dashboard_paciente.html', resumo_dados=resumo_dados)
+    
+    # 2. Se for PACIENTE ou outro usuário, a execução continua aqui.
+    
+    # Chama a função que processa TODOS os dados (média, hipo, último registro)
+    # e define a variável 'resumo_dados'
+    resumo_dados = carregar_dados_dashboard(current_user.id)
+    
+    # 3. Retorna o template do paciente com os dados
+    # Mantenha o nome do seu template aqui (dashboard.html ou dashboard_paciente.html)
+    return render_template('dashboard_paciente.html', resumo_dados=resumo_dados)
 
 @app.route('/gerenciar_usuarios')
 @login_required
@@ -1026,6 +1071,59 @@ def ficha_medica(paciente_id):
         return redirect(url_for('ficha_medica', paciente_id=paciente_id))
 
     return render_template('ficha_medica.html', paciente=paciente, ficha=ficha_medica_data)
+# No seu app.py
+
+@app.route('/medico/ficha_acompanhamento/<int:paciente_id>', methods=['GET'])
+@login_required
+def ficha_acompanhamento(paciente_id):
+    # 1. Verificação de permissão
+    if not current_user.is_medico and not current_user.is_admin:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # 2. Carregar dados do paciente e exames
+    paciente = db_manager.carregar_usuario_por_id(paciente_id) # Você precisará desta função no db_manager
+    if not paciente:
+        flash('Paciente não encontrado.', 'danger')
+        return redirect(url_for('dashboard_medico')) # Redirecionar para o painel principal do médico
+        
+    exames_anteriores = db_manager.buscar_exames_paciente(paciente_id)
+    
+    # 3. Renderizar o template
+    return render_template(
+        'ficha_acompanhamento.html', 
+        paciente=paciente, 
+        exames_anteriores=exames_anteriores
+    )
+# No seu app.py
+
+@app.route('/medico/salvar_ficha_exame/<int:paciente_id>', methods=['POST'])
+@login_required
+def salvar_ficha_exame(paciente_id):
+    if not current_user.is_medico and not current_user.is_admin:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # Coletar dados do formulário
+    novo_exame = {
+        'paciente_id': paciente_id,
+        'data_exame': request.form.get('data_exame'), # String 'YYYY-MM-DD'
+        'hb_a1c': float(request.form.get('hb_a1c', 0.0)),
+        'glicose_jejum': int(request.form.get('glicose_jejum', 0)),
+        'ldl': int(request.form.get('ldl', 0)),
+        'triglicerides': int(request.form.get('triglicerides', 0)),
+        'obs_medico': request.form.get('obs_medico')
+        # ... adicionar outros campos
+    }
+    
+    if db_manager.salvar_exame_laboratorial(novo_exame):
+        flash('Ficha de exame salva com sucesso!', 'success')
+    else:
+        flash('Erro ao salvar ficha de exame.', 'danger')
+
+    return redirect(url_for('ficha_acompanhamento', paciente_id=paciente_id))
+# No seu app.py
+
 
 # ---- FIM DAS ROTAS DA ÁREA MÉDICA ----
 

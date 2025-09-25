@@ -18,107 +18,139 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
+    def _load_json_data(self) -> dict:
+        """Carrega os dados de um arquivo JSON (modelo antigo) para migração."""
+        json_path = os.path.join(os.path.dirname(self.db_path), 'data.json')
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                print("Aviso: Arquivo data.json está corrompido ou vazio.")
+                return {}
+        return {} # Retorna um dicionário vazio se o arquivo não existir
+
+    # No seu database_manager.py
 
     def create_tables(self):
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'paciente',
-                    email TEXT,
-                    nome TEXT,
-                    razao_ic REAL,
-                    fator_sensibilidade REAL,
-                    data_nascimento TEXT,
-                    sexo TEXT
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS registros (
-                    id INTEGER PRIMARY KEY,
-                    user_id INTEGER NOT NULL,
-                    data_hora TEXT NOT NULL,
-                    tipo TEXT NOT NULL,
-                    valor REAL,
-                    observacoes TEXT,
-                    alimentos_json TEXT,
-                    total_calorias REAL,
-                    total_carbs REAL,
-                    FOREIGN KEY (user_id) REFERENCES users (id)
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS logs_acao (
-                    id INTEGER PRIMARY KEY,
-                    data_hora TEXT,
-                    acao TEXT,
-                    usuario TEXT
-                );
-            """)
-            
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS fichas_medicas (
-                    paciente_id INTEGER PRIMARY KEY,
-                    historico_clinico TEXT,
-                    medicacoes_atuais TEXT,
-                    alergias TEXT,
-                    observacoes_medicas TEXT,
-                    FOREIGN KEY (paciente_id) REFERENCES users (id)
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS agendamentos (
-                    id INTEGER PRIMARY KEY,
-                    paciente_id INTEGER NOT NULL,
-                    medico_id INTEGER NOT NULL,
-                    data_hora TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    FOREIGN KEY (paciente_id) REFERENCES users (id),
-                    FOREIGN KEY (medico_id) REFERENCES users (id)
-                );
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS vinculos_medico_paciente (
-                    medico_id INTEGER NOT NULL,
-                    paciente_id INTEGER NOT NULL,
-                    PRIMARY KEY (medico_id, paciente_id),
-                    FOREIGN KEY (medico_id) REFERENCES users (id),
-                    FOREIGN KEY (paciente_id) REFERENCES users (id)
-                );
-            """)
-            
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS vinculos_cuidador_paciente (
-                    cuidador_id INTEGER NOT NULL,
-                    paciente_id INTEGER NOT NULL,
-                    PRIMARY KEY (cuidador_id, paciente_id),
-                    FOREIGN KEY (cuidador_id) REFERENCES users (id),
-                    FOREIGN KEY (paciente_id) REFERENCES users (id)
-                );
-            """)
-
-            conn.commit()
-
-
-    def _load_json_data(self):
-        json_path = self.db_path.replace('.db', '.json')
-        if not os.path.exists(json_path):
-            print("Nenhum arquivo JSON de dados encontrado para migrar.")
-            return None
+        # O bloco 'with' garante que a conexão será fechada ao final,
+        # mesmo que ocorra um erro.
         try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError) as e:
-            print(f"Erro ao carregar dados JSON: {e}")
-            return None
+            # Use self.get_db_connection() para iniciar a conexão
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # --- Criação da Tabela de Usuários ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY,
+                        username TEXT UNIQUE NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        role TEXT NOT NULL DEFAULT 'paciente',
+                        email TEXT,
+                        nome TEXT,
+                        razao_ic REAL,
+                        fator_sensibilidade REAL,
+                        data_nascimento TEXT,
+                        sexo TEXT
+                    );
+                """)
+
+                # --- Criação da Tabela de Registros ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS registros (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        data_hora TEXT NOT NULL,
+                        tipo TEXT NOT NULL,
+                        valor REAL,
+                        observacoes TEXT,
+                        alimentos_json TEXT,
+                        total_calorias REAL,
+                        total_carbs REAL,
+                        FOREIGN KEY (user_id) REFERENCES users (id)
+                    );
+                """)
+
+                # --- Criação da Tabela de Logs ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS logs_acao (
+                        id INTEGER PRIMARY KEY,
+                        data_hora TEXT,
+                        acao TEXT,
+                        usuario TEXT
+                    );
+                """)
+                
+                # --- Criação da Tabela de Fichas Médicas ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS fichas_medicas (
+                        paciente_id INTEGER PRIMARY KEY,
+                        historico_clinico TEXT,
+                        medicacoes_atuais TEXT,
+                        alergias TEXT,
+                        observacoes_medicas TEXT,
+                        FOREIGN KEY (paciente_id) REFERENCES users (id)
+                    );
+                """)
+
+                # --- Criação da Tabela de Agendamentos ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS agendamentos (
+                        id INTEGER PRIMARY KEY,
+                        paciente_id INTEGER NOT NULL,
+                        medico_id INTEGER NOT NULL,
+                        data_hora TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        FOREIGN KEY (paciente_id) REFERENCES users (id),
+                        FOREIGN KEY (medico_id) REFERENCES users (id)
+                    );
+                """)
+
+                # --- Criação das Tabelas de Vínculos ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS vinculos_medico_paciente (
+                        medico_id INTEGER NOT NULL,
+                        paciente_id INTEGER NOT NULL,
+                        PRIMARY KEY (medico_id, paciente_id),
+                        FOREIGN KEY (medico_id) REFERENCES users (id),
+                        FOREIGN KEY (paciente_id) REFERENCES users (id)
+                    );
+                """)
+                
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS vinculos_cuidador_paciente (
+                        cuidador_id INTEGER NOT NULL,
+                        paciente_id INTEGER NOT NULL,
+                        PRIMARY KEY (cuidador_id, paciente_id),
+                        FOREIGN KEY (cuidador_id) REFERENCES users (id),
+                        FOREIGN KEY (paciente_id) REFERENCES users (id)
+                    );
+                """)
+                
+                # --- NOVO: Criação da tabela de Exames Laboratoriais ---
+                # ATENÇÃO: Corrigi 'REFERENCES usuarios(id)' para 'REFERENCES users(id)' para coincidir com o nome da sua tabela.
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS exames_laboratoriais (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        paciente_id INTEGER NOT NULL,
+                        data_exame TEXT NOT NULL,
+                        hb_a1c REAL,
+                        glicose_jejum REAL,
+                        colesterol_total REAL,
+                        hdl REAL,
+                        ldl REAL,
+                        triglicerides REAL,
+                        tsh REAL,
+                        obs_medico TEXT,
+                        FOREIGN KEY(paciente_id) REFERENCES users(id)
+                    );
+                """)
+                
+                conn.commit() # Confirma todas as criações de tabela
+        
+        except sqlite3.Error as e:
+            print(f"Erro ao criar tabelas no banco de dados: {e}")
 
     def _migrate_json_to_sqlite(self):
         json_data = self._load_json_data()
@@ -320,7 +352,79 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("SELECT 1 FROM vinculos_medico_paciente WHERE medico_id = ? AND paciente_id = ?", (medico_id, paciente_id))
             return cursor.fetchone() is not None
+        
+   # Dentro da classe DatabaseManager...
 
+    def salvar_exame_laboratorial(self, ficha_exame: dict) -> bool:
+        conn = self.get_db_connection()
+        try:
+            # Tenta converter para os tipos corretos ou define como None se o campo estiver vazio
+            hb_a1c = float(ficha_exame.get('hb_a1c')) if ficha_exame.get('hb_a1c') else None
+            glicose_jejum = int(ficha_exame.get('glicose_jejum')) if ficha_exame.get('glicose_jejum') else None
+            colesterol_total = int(ficha_exame.get('colesterol_total')) if ficha_exame.get('colesterol_total') else None
+            hdl = int(ficha_exame.get('hdl')) if ficha_exame.get('hdl') else None
+            ldl = int(ficha_exame.get('ldl')) if ficha_exame.get('ldl') else None
+            triglicerides = int(ficha_exame.get('triglicerides')) if ficha_exame.get('triglicerides') else None
+            tsh = float(ficha_exame.get('tsh')) if ficha_exame.get('tsh') else None
+            
+            conn.execute("""
+                INSERT INTO exames_laboratoriais (
+                    paciente_id, data_exame, hb_a1c, glicose_jejum, colesterol_total, 
+                    hdl, ldl, triglicerides, tsh, obs_medico
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                ficha_exame.get('paciente_id'),
+                ficha_exame.get('data_exame'), # Salvo como TEXT 'YYYY-MM-DD'
+                hb_a1c, glicose_jejum, colesterol_total, hdl, ldl, triglicerides, tsh,
+                ficha_exame.get('obs_medico')
+            ))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Erro SQLite ao salvar exame laboratorial: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def buscar_exames_paciente(self, paciente_id: int) -> list:
+        conn = self.get_db_connection()
+        
+        # Busca e ordena por data decrescente
+        exames = conn.execute("""
+            SELECT * FROM exames_laboratoriais
+            WHERE paciente_id = ?
+            ORDER BY data_exame DESC
+        """, (paciente_id,)).fetchall()
+        
+        # Converte rows do SQLite para dicionários padrão e formata a data para objeto datetime
+        result = [dict(row) for row in exames]
+        conn.close()
+        
+        for exame in result:
+            try:
+                # Converte a string de data (YYYY-MM-DD) para objeto datetime para uso no Jinja
+                exame['data_exame'] = datetime.strptime(exame['data_exame'], '%Y-%m-%d')
+            except (ValueError, TypeError):
+                pass
+
+        return result
+    
+    def carregar_usuario_por_id(self, user_id: int) -> dict | None:
+        conn = self.get_db_connection()
+        # Busca dados essenciais do paciente
+        user_data = conn.execute(
+            "SELECT id, username, role, email, nome, razao_ic, fator_sensibilidade, data_nascimento, sexo FROM users WHERE id = ?", 
+            (user_id,)
+        ).fetchone()
+        conn.close()
+        
+        if user_data:
+            # Retorna como um dicionário
+            return dict(user_data) 
+        return None
+
+    
+            
     def salvar_ficha_medica(self, ficha_data):
         with self.get_db_connection() as conn:
             cursor = conn.cursor()

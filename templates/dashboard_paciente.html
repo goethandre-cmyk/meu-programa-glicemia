@@ -12,20 +12,26 @@
     </div>
 
     {% if resumo_dados['ultimo_registro'] %}
-    <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido</h2>
+    <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido (Últimos 7 Dias)</h2>
     <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+        
+        {% set glicemia_valor = resumo_dados['ultimo_registro']['valor'] | float %}
+        {% set status_class = 'text-danger' if glicemia_valor > 180 else ('text-warning' if glicemia_valor < 70 else 'text-success') %}
+        {% set status_icon = 'fa-arrow-up' if glicemia_valor > 180 else ('fa-arrow-down' if glicemia_valor < 70 else 'fa-check-circle') %}
+
         <div class="col">
-            <div class="dashboard-card bg-light text-center shadow-sm">
+            <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
                 <div class="card-body">
-                    <i class="fas fa-arrow-circle-right fa-3x mb-3 text-info"></i>
-                    <h5 class="card-title text-secondary">Último Registro</h5>
-                    <h2 class="card-text display-6 fw-bold text-success">{{ resumo_dados['ultimo_registro']['valor'] }} mg/dL</h2>
-                    <p class="card-text"><small>{{ resumo_dados['tempo_desde_ultimo'] }}</small></p>
+                    <i class="fas {{ status_icon }} fa-3x mb-3 {{ status_class }}"></i>
+                    <h5 class="card-title text-secondary">Última Glicemia</h5>
+                    <h2 class="card-text display-6 fw-bold {{ status_class }}">{{ resumo_dados['ultimo_registro']['valor'] }} mg/dL</h2>
+                    <p class="card-text"><small>{{ resumo_dados['ultimo_registro']['tempo_desde_ultimo'] }}</small></p>
                 </div>
             </div>
         </div>
+        
         <div class="col">
-            <div class="dashboard-card bg-light text-center shadow-sm">
+            <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
                 <div class="card-body">
                     <i class="fas fa-chart-bar fa-3x mb-3 text-primary"></i>
                     <h5 class="card-title text-secondary">Média (Últimos 7 Dias)</h5>
@@ -36,22 +42,33 @@
                         N/A
                         {% endif %}
                     </h2>
+                    <p class="card-text"><small class="text-muted">Mostra seu controle de longo prazo.</small></p>
                 </div>
             </div>
         </div>
+
         <div class="col">
-            <div class="dashboard-card bg-light text-center shadow-sm">
+            <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
                 <div class="card-body">
-                    <i class="fas fa-exclamation-triangle fa-3x mb-3 text-danger"></i>
-                    <h5 class="card-title text-secondary">Eventos Extremos</h5>
-                    <p class="card-text fs-5 fw-bold">
-                        <span class="text-warning">Hiper: {{ resumo_dados['hiperglicemia_count'] }}</span>
-                        <span class="mx-2 text-muted">|</span>
-                        <span class="text-danger">Hipo: {{ resumo_dados['hipoglicemia_count'] }}</span>
-                    </p>
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3 text-secondary"></i>
+                    <h5 class="card-title text-secondary">Alertas de 7 Dias</h5>
+                    <div class="d-flex justify-content-center align-items-center mt-3">
+                        <div class="p-2 me-4">
+                            <h3 class="fw-bolder text-danger">{{ resumo_dados['hiperglicemia_count'] }}</h3>
+                            <p class="mb-0 text-muted">Hiper</p>
+                        </div>
+                        <div class="p-2">
+                            <h3 class="fw-bolder text-warning">{{ resumo_dados['hipoglicemia_count'] }}</h3>
+                            <p class="mb-0 text-muted">Hipo</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center mt-5" role="alert">
+        Ainda não há registros de glicemia. Use o botão **"+"** para começar a acompanhar seus dados!
     </div>
     {% endif %}
 
@@ -69,6 +86,7 @@
                 </div>
             </div>
         </div>
+        
         <div class="col">
             <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
                 <div class="card-body d-flex flex-column align-items-center text-center">
@@ -84,7 +102,6 @@
     </div>
 
     <hr class="my-5">
-
     <h2 class="text-center mb-4 text-secondary">Calculadoras</h2>
     <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
         <div class="col">
@@ -114,7 +131,6 @@
     </div>
 
     <hr class="my-5">
-
     <h2 class="text-center mb-4 text-secondary">Recursos e Informações</h2>
     <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
         <div class="col">
@@ -129,7 +145,20 @@
                 </div>
             </div>
         </div>
+        <div class="col">
+            <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
+                <div class="card-body d-flex flex-column align-items-center text-center">
+                    <i class="fas fa-calendar-check fa-3x mb-3 text-success"></i>
+                    <h5 class="card-title">Minhas Consultas</h5>
+                    <p class="card-text text-muted">Visualize e gerencie suas consultas agendadas com a equipe clínica.</p>
+                    <a href="{{ url_for('minhas_consultas') }}" class="btn btn-outline-success mt-auto">
+                        <i class="fas fa-eye me-2"></i>Ver Consultas
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
+
 
     {% if session.get('role') == 'admin' %}
     <hr class="my-5">
@@ -160,23 +189,37 @@
             </div>
         </div>
     </div>
-    <hr class="my-5">
-
-    <h2 class="text-center mb-4 text-secondary">Sua Saúde</h2>
-    <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
-        <div class="col">
-            <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
-                <div class="card-body d-flex flex-column align-items-center text-center">
-                    <i class="fas fa-calendar-check fa-3x mb-3 text-success"></i>
-                    <h5 class="card-title">Minhas Consultas</h5>
-                    <p class="card-text text-muted">Visualize e gerencie suas consultas agendadas com a equipe clínica.</p>
-                    <a href="{{ url_for('minhas_consultas') }}" class="btn btn-outline-success mt-auto">
-                        <i class="fas fa-eye me-2"></i>Ver Consultas
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
     {% endif %}
+
+    <a href="{{ url_for('registrar_glicemia') }}" class="btn btn-success btn-lg rounded-circle shadow-lg fab-button" title="Novo Registro">
+        <i class="fas fa-plus fa-2x"></i>
+    </a>
+
 </div>
+
+<style>
+.fab-button {
+    position: fixed;
+    bottom: 30px; /* Distância da parte inferior */
+    right: 30px; /* Distância da direita */
+    width: 65px; /* Tamanho */
+    height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem; /* Ajuste o tamanho do ícone */
+    z-index: 1000; /* Garante que fique acima de outros elementos */
+    border: none;
+}
+.dashboard-card {
+    transition: transform 0.2s; /* Efeito de zoom suave ao passar o mouse */
+}
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+}
+.hero-dashboard {
+    background: linear-gradient(135deg, #007bff, #0056b3); /* Fundo com gradiente suave */
+}
+</style>
 {% endblock %}
