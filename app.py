@@ -969,7 +969,7 @@ def calcular_fs():
 def guia_insulina():
     return render_template('guia_insulina.html')
 
-@app.route('/buscar_alimentos', methods=['GET'])
+@app.route('/buscar_alimentos', methods=['POST'])
 def buscar_alimentos():
     query = request.args.get('query', '')
     if query:

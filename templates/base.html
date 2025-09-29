@@ -39,6 +39,14 @@
                             <i class="bi bi-journal-text me-2"></i>Meus Registros
                         </a>
                     </li>
+                    {# NOVO LINK: Registrar Refeição #}
+                    {% if current_user.is_paciente %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('registrar_refeicao') }}">
+                            <i class="bi bi-utensils me-2"></i>Registrar Refeição
+                        </a>
+                    </li>
+                    {% endif %}
                     {% if current_user.is_paciente %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('minhas_consultas') }}">
