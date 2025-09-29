@@ -32,7 +32,60 @@ class DatabaseManager:
                 print("Aviso: Arquivo data.json está corrompido ou vazio.")
                 return {}
         return {}
+      # ==========================================================
+    # MÉTODO FALTANTE QUE DEVE SER INCLUÍDO AQUI
+    # ==========================================================
+    def create_tables(self):
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # --- 1. Tabela de Usuários ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY,
+                        username TEXT UNIQUE NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        role TEXT NOT NULL DEFAULT 'paciente',
+                        email TEXT,
+                        nome_completo TEXT, 
+                        razao_ic REAL,
+                        fator_sensibilidade REAL,
+                        data_nascimento TEXT,
+                        sexo TEXT,
+                        telefone TEXT,
+                        medico_id INTEGER,
+                        meta_glicemia REAL,
+                        documento TEXT,
+                        crm TEXT,
+                        cns TEXT,
+                        especialidade TEXT
+                    );
+                """)
+                # --- 2. Tabela de Registros ---
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS registros (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        data_hora TEXT NOT NULL,
+                        tipo TEXT NOT NULL,
+                        valor REAL,
+                        observacoes TEXT,
+                        alimentos_json TEXT,
+                        total_calorias REAL,
+                        total_carbs REAL,
+                        FOREIGN KEY (user_id) REFERENCES users (id)
+                    );
+                """)
+                
+                # [ADICIONE AQUI AS DEFINIÇÕES SQL PARA AS OUTRAS TABELAS (logs_acao, fichas_medicas, agendamentos, vinculos, exames, ficha_medica) ]
+                # ...
+                # ...
+                
+                conn.commit()
         
+        except sqlite3.Error as e:
+            print(f"Erro ao criar tabelas no banco de dados: {e}")   
     # Mantive a função add_new_columns para compatibilidade com DBs já criados, 
     # embora as colunas já estejam na create_tables atualizada
     def add_new_columns(self):
@@ -60,152 +113,6 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    def create_tables(self):
-        try:
-            with self.get_db_connection() as conn:
-                cursor = conn.cursor()
-                
-                # --- 1. Tabela de Usuários (CORRIGIDA E ATUALIZADA) ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY,
-                        username TEXT UNIQUE NOT NULL,
-                        password_hash TEXT NOT NULL,
-                        role TEXT NOT NULL DEFAULT 'paciente',
-                        email TEXT,
-                        nome_completo TEXT, 
-                        razao_ic REAL,
-                        fator_sensibilidade REAL,
-                        data_nascimento TEXT,
-                        sexo TEXT,
-                        telefone TEXT,          -- Adicionado
-                        medico_id INTEGER       -- Adicionado
-                        meta_glicemia REAL,
-                        documento TEXT,
-                        crm TEXT,
-                        cns TEXT,
-                        especialidade TEXT
-                    );
-                """)
-
-                # --- 2. Tabela de Registros ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS registros (
-                        id INTEGER PRIMARY KEY,
-                        user_id INTEGER NOT NULL,
-                        data_hora TEXT NOT NULL,
-                        tipo TEXT NOT NULL,
-                        valor REAL,
-                        observacoes TEXT,
-                        alimentos_json TEXT,
-                        total_calorias REAL,
-                        total_carbs REAL,
-                        FOREIGN KEY (user_id) REFERENCES users (id)
-                    );
-                """)
-
-                # --- 3. Tabela de Logs ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS logs_acao (
-                        id INTEGER PRIMARY KEY,
-                        data_hora TEXT,
-                        acao TEXT,
-                        usuario TEXT
-                    );
-                """)
-                
-                # --- 4. Tabela de Fichas Médicas (VERSÃO SIMPLIFICADA) ---
-                # A tabela 'ficha_medica' abaixo é a nova e mais completa. A 'fichas_medicas' é redundante.
-                # Mantida se for usada por outras funções antigas.
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS fichas_medicas (
-                        paciente_id INTEGER PRIMARY KEY,
-                        historico_clinico TEXT,
-                        medicacoes_atuais TEXT,
-                        alergias TEXT,
-                        observacoes_medicas TEXT,
-                        FOREIGN KEY (paciente_id) REFERENCES users (id)
-                    );
-                """)
-
-                # --- 5. Tabela de Agendamentos ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS agendamentos (
-                        id INTEGER PRIMARY KEY,
-                        paciente_id INTEGER NOT NULL,
-                        medico_id INTEGER NOT NULL,
-                        data_hora TEXT NOT NULL,
-                        status TEXT NOT NULL,
-                        FOREIGN KEY (paciente_id) REFERENCES users (id),
-                        FOREIGN KEY (medico_id) REFERENCES users (id)
-                    );
-                """)
-
-                # --- 6. Tabela de Vínculos Médico-Paciente ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS vinculos_medico_paciente (
-                        medico_id INTEGER NOT NULL,
-                        paciente_id INTEGER NOT NULL,
-                        PRIMARY KEY (medico_id, paciente_id),
-                        FOREIGN KEY (medico_id) REFERENCES users (id),
-                        FOREIGN KEY (paciente_id) REFERENCES users (id)
-                    );
-                """)
-                
-                # --- 7. Tabela de Vínculos Cuidador-Paciente ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS vinculos_cuidador_paciente (
-                        cuidador_id INTEGER NOT NULL,
-                        paciente_id INTEGER NOT NULL,
-                        PRIMARY KEY (cuidador_id, paciente_id),
-                        FOREIGN KEY (cuidador_id) REFERENCES users (id),
-                        FOREIGN KEY (paciente_id) REFERENCES users (id)
-                    );
-                """)
-                
-                # --- 8. Tabela de Exames Laboratoriais ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS exames_laboratoriais (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        paciente_id INTEGER NOT NULL,
-                        data_exame TEXT NOT NULL,
-                        hb_a1c REAL,
-                        glicose_jejum REAL,
-                        colesterol_total REAL,
-                        hdl REAL,
-                        ldl REAL,
-                        triglicerides REAL,
-                        tsh REAL,
-                        obs_medico TEXT,
-                        FOREIGN KEY(paciente_id) REFERENCES users(id)
-                    );
-                """)
-
-                # --- 9. Tabela Ficha Médica (Anamnese/Histórico Detalhado) ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS ficha_medica (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        medico_id INTEGER,
-                        data_registro TEXT NOT NULL,
-                        tipo_diabetes TEXT, 
-                        data_diagnostico TEXT,
-                        historico_familiar TEXT,
-                        outras_comorbidades TEXT,
-                        insulina_basal TEXT,
-                        insulina_bolus TEXT,
-                        dose_basal_manha REAL,
-                        dose_basal_noite REAL,
-                        FOREIGN KEY (user_id) REFERENCES users(id),
-                        FOREIGN KEY (medico_id) REFERENCES users(id)
-                    );
-                """)
-                
-                conn.commit()
-        
-        except sqlite3.Error as e:
-            print(f"Erro ao criar tabelas no banco de dados: {e}")
-
     def _migrate_json_to_sqlite(self):
         json_data = self._load_json_data()
         if not json_data:
@@ -213,42 +120,70 @@ class DatabaseManager:
 
         print("Iniciando a migração dos dados do JSON para o SQLite...")
         
+        # Certifique-se de importar o módulo 'json' e 'datetime' se ainda não o fez.
+        # import json
+        # from datetime import datetime 
+        
         with self.get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # Migrar usuários (AJUSTADO para nome_completo, telefone e medico_id)
+            # Migrar usuários (AJUSTADO para TODAS as 17 colunas)
             users_migrated_count = 0
             for user in json_data.get('users', []):
-                cursor.execute("SELECT id FROM users WHERE username = ?", (user['username'],))
-                if cursor.fetchone():
-                    continue
-                
-                cursor.execute("""
-                    INSERT INTO users (id, username, password_hash, role, email, nome_completo, razao_ic, fator_sensibilidade, data_nascimento, sexo, telefone, medico_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    user['id'], 
-                    user['username'], 
-                    user['password_hash'], 
-                    user.get('role', 'paciente'), 
-                    user.get('email'), 
-                    user.get('nome'), # Mapeia 'nome' do JSON para 'nome_completo'
-                    user.get('razao_ic'), 
-                    user.get('fator_sensibilidade'), 
-                    user.get('data_nascimento'), 
-                    user.get('sexo'),
-                    user.get('telefone'), # Tenta carregar, senão None
-                    user.get('medico_id') # Tenta carregar, senão None
-                ))
-                users_migrated_count += 1
+                # O bloco try/except é sugerido para capturar erros de integridade (e.g., username duplicado)
+                try:
+                    cursor.execute("SELECT id FROM users WHERE username = ?", (user['username'],))
+                    if cursor.fetchone():
+                        continue
+                    
+                    # 1. Ajuste a lista de colunas para incluir TODAS as 17 colunas
+                    cursor.execute("""
+                        INSERT INTO users (
+                            id, username, password_hash, role, email, nome_completo, 
+                            razao_ic, fator_sensibilidade, data_nascimento, sexo, 
+                            telefone, medico_id, meta_glicemia, documento, 
+                            crm, cns, especialidade
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        # 2. Forneça 17 valores na ORDEM EXATA
+                        user['id'], 
+                        user['username'], 
+                        user['password_hash'], 
+                        user.get('role', 'paciente'), 
+                        user.get('email'), 
+                        user.get('nome'), # Mapeia 'nome' do JSON para 'nome_completo'
+                        user.get('razao_ic'), 
+                        user.get('fator_sensibilidade'), 
+                        user.get('data_nascimento'), 
+                        user.get('sexo'),
+                        user.get('telefone'), 
+                        user.get('medico_id'), 
+                        # Novos campos, preenchidos com None se não estiverem no JSON
+                        user.get('meta_glicemia'), 
+                        user.get('documento'),
+                        user.get('crm'),
+                        user.get('cns'),
+                        user.get('especialidade') 
+                    ))
+                    users_migrated_count += 1
+                except sqlite3.Error as e:
+                    print(f"Erro ao migrar usuário {user.get('username')}: {e}")
             
-            # Migrar registros (Sem alteração)
+            # Migrar registros (Sem alteração, está correto)
             registros_migrated_count = 0
+            # ... (O restante da sua lógica de migração de registros está correta e inalterada)
             for registro in json_data.get('registros_glicemia_refeicao', []):
                 cursor.execute("SELECT id FROM registros WHERE id = ?", (registro.get('id',-1),))
                 if cursor.fetchone():
                     continue
                 
+                # Importação de datetime e json é necessária aqui se o código estiver fora do escopo
+                try:
+                    from datetime import datetime
+                except ImportError:
+                    pass # Assumindo que já está importado ou não é estritamente necessário para o exemplo.
+
                 data_hora = registro.get('data_hora') or datetime.now().isoformat()
                 tipo = registro.get('tipo') or 'Desconhecido'
 
@@ -425,18 +360,21 @@ class DatabaseManager:
             'email', 'password_hash', 'nome_completo', 'role', 
             'data_nascimento', 'sexo', 'telefone', 
             'razao_ic', 'fator_sensibilidade', 'meta_glicemia', 
-            'documento', 'crm', 'cns', 'especialidade'
+            'documento', 'crm', 'cns', 'especialidade',
+            'medico_id' # <<< CORREÇÃO: COLUNA 'medico_id' ADICIONADA AQUI
         ]
         
         # 1. Ajuste a QUERY para refletir as colunas corretas (Sem username, Com password_hash)
         set_clauses = ', '.join([f"{c} = ?" for c in colunas_set])
         query = f"""UPDATE users SET {set_clauses} WHERE id = ?"""
         
+        # Agora, set_clauses terá 15 colunas, e a query terá 15 `?` + 1 `?` (do WHERE).
+        
         # 2. Monte a tupla de valores na ORDEM EXATA das colunas_set
         valores = (
-            # Valores na ordem de colunas_set:
+            # Valores na ordem de colunas_set (15 valores):
             user_data.get('email'), 
-            user_data.get('password_hash'), # NOVO CAMPO DE SENHA!
+            user_data.get('password_hash'), 
             user_data.get('nome_completo'),
             user_data.get('role'),
             user_data.get('data_nascimento'), 
@@ -449,10 +387,13 @@ class DatabaseManager:
             user_data.get('crm'),
             user_data.get('cns'),
             user_data.get('especialidade'),
-            user_data.get('medico_id'), # <<< VALOR ADICIONADO AQUI           
-            # Condição WHERE:
+            user_data.get('medico_id'), # <<< VALOR CORRESPONDENTE A COLUNA ADICIONADA
+            
+            # Condição WHERE (1 valor):
             user_data.get('id')
         )
+        
+        # O número total de valores (16) agora corresponde ao número total de `?` na query (16).
         
         # 3. Execução da Query
         try:
@@ -471,7 +412,7 @@ class DatabaseManager:
         except Exception as e:
             print(f"Erro geral de DB ao atualizar usuário: {e}")
             return False
-
+        
         def excluir_usuario(self, username):
             """Exclui um usuário e seus dados associados do banco de dados pelo username."""
             

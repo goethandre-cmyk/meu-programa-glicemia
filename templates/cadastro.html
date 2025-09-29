@@ -1,43 +1,164 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block title %}Cadastro{% endblock %}
+{% block title %}Cadastro de Usuário{% endblock %}
 
 {% block content %}
-<div class="container d-flex justify-content-center align-items-center vh-100">
-    <div class="card p-4 shadow-sm" style="width: 100%; max-width: 600px;">
-        <div class="card-body">
-            <h1 class="card-title text-center mb-4">
-                <i class="fas fa-user-plus me-2"></i>Cadastre-se
-            </h1>
-            
-            <form action="{{ url_for('cadastro') }}" method="post">
-                <div class="mb-3 input-group">
-                    <span class="input-group-text"><i class="fas fa-user"></i></span>
-                    <input type="text" class="form-control" id="username" name="username"
-                        placeholder="Usuário" required>
-                    <div class="form-text text-muted">Mínimo de 3 caracteres.</div>
-                </div>
-                <div class="mb-3 input-group">
-                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                    <input type="password" class="form-control" id="password" name="password"
-                        placeholder="Senha" required>
-                    <div class="form-text text-muted">Mínimo de 6 caracteres.</div>
-                </div>
-                <div class="mb-3 input-group">
-                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                    <input type="password" class="form-control" id="password_confirm"
-                        name="password_confirm" placeholder="Confirmar Senha" required>
-                </div>
-                <button type="submit" class="btn btn-primary w-100 mb-2">
-                    <i class="fas fa-sign-in-alt me-2"></i>Cadastrar
-                </button>
-            </form>
+<div class="container mt-5 mb-5">
+    <div class="card p-4 shadow-lg mx-auto" style="max-width: 600px;">
+        <h2 class="text-center mb-4 text-primary">
+            <i class="bi bi-person-plus-fill me-2"></i>Crie sua conta HealthLink
+        </h2>
 
-            <div class="text-center mt-3">
-                <p>Já tem uma conta? <a href="{{ url_for('login') }}"><i
-                    class="fas fa-user-check me-1"></i>Faça Login</a></p>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('cadastro') }}">
+
+            <div class="mb-4">
+                <label for="role" class="form-label fw-bold">Selecione seu tipo de usuário:</label>
+                <select class="form-select" id="role" name="role" required>
+                    <option value="paciente" selected>Paciente/Usuário Comum</option>
+                    <option value="cuidador">Cuidador</option>
+                    <option value="medico">Médico (Profissional de Saúde)</option>
+                </select>
             </div>
+
+            <h4 class="text-secondary mb-3 border-bottom pb-2">Dados de Acesso</h4>
+
+            <div class="mb-3">
+                <label for="username" class="form-label">Nome de Usuário</label>
+                <input type="text" class="form-control" id="username" name="username" required minlength="3">
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="password" class="form-label">Senha</label>
+                    <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="password_confirm" class="form-label">Confirmar Senha</label>
+                    <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">E-mail</label>
+                <input type="email" class="form-control" id="email" name="email">
+            </div>
+
+            <h4 class="text-secondary mb-3 mt-4 border-bottom pb-2">Informações Pessoais</h4>
+
+            <div class="mb-3">
+                <label for="nome_completo" class="form-label">Nome Completo</label>
+                <input type="text" class="form-control" id="nome_completo" name="nome_completo" required>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                    <input type="date" class="form-control" id="data_nascimento" name="data_nascimento">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="sexo" class="form-label">Sexo</label>
+                    <input type="text" class="form-control" id="sexo" name="sexo" placeholder="Ex: Feminino, Masculino">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="telefone" class="form-label">Telefone</label>
+                <input type="text" class="form-control" id="telefone" name="telefone" placeholder="(XX) XXXXX-XXXX">
+            </div>
+
+            <div id="medico-fields" style="display:none;">
+                <h4 class="text-secondary mb-3 mt-4 border-bottom pb-2">Registro Profissional</h4>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="documento" class="form-label">Documento (CPF/RG)</label>
+                        <input type="text" class="form-control" id="documento" name="documento"
+                            placeholder="Obrigatório para Médico">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="crm" class="form-label">CRM</label>
+                        <input type="text" class="form-control" id="crm" name="crm"
+                            placeholder="Obrigatório para Médico">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="cns" class="form-label">CNS (Cartão Nacional de Saúde)</label>
+                        <input type="text" class="form-control" id="cns" name="cns">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="especialidade" class="form-label">Especialidade</label>
+                        <select class="form-select" id="especialidade" name="especialidade">
+                            <option value="" selected disabled>Selecione a Especialidade</option>
+                            {% for esp in especialidades %}
+                            <option value="{{ esp }}">{{ esp }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <h4 class="text-secondary mb-3 mt-4 border-bottom pb-2">Parâmetros de Glicemia (Opcional)</h4>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="razao_ic" class="form-label">Razão Insulina/Carboidratos</label>
+                    <input type="number" step="any" min="0" class="form-control" id="razao_ic" name="razao_ic"
+                        value="1.0">
+                    <small class="form-text text-muted">Ex: 1/10g (Padrão: 1.0)</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="fator_sensibilidade" class="form-label">Fator de Sensibilidade</label>
+                    <input type="number" step="any" min="0" class="form-control" id="fator_sensibilidade"
+                        name="fator_sensibilidade" value="1.0">
+                    <small class="form-text text-muted">Ex: 1/50mg/dL (Padrão: 1.0)</small>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-circle-fill me-2"></i>Cadastrar
+                </button>
+            </div>
+        </form>
+
+        <div class="text-center mt-3">
+            <p>Já tem uma conta? <a href="{{ url_for('login') }}">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>Faça Login</a></p>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const roleSelect = document.getElementById('role');
+        const medicoFields = document.getElementById('medico-fields');
+
+        function toggleMedicoFields() {
+            const isMedico = roleSelect.value === 'medico';
+            medicoFields.style.display = isMedico ? 'block' : 'none';
+
+            // Lógica de obrigatoriedade (reverte a validação se não for médico)
+            document.getElementById('documento').required = isMedico;
+            document.getElementById('crm').required = isMedico;
+            document.getElementById('especialidade').required = isMedico;
+        }
+
+        // Executa na carga da página
+        toggleMedicoFields();
+
+        // Executa na mudança de seleção
+        roleSelect.addEventListener('change', toggleMedicoFields);
+    });
+</script>
+
 {% endblock %}

@@ -432,6 +432,7 @@ def cadastro():
     return render_template('cadastro.html', 
                             especialidades=ESPECIALIDADES_MEDICAS)
 
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -513,6 +514,7 @@ def editar_usuario(username):
             if medico_id_selecionado:
                 db_manager.vincular_paciente_medico(usuario['id'], int(medico_id_selecionado))
         
+        # 1. CAPTURA DE DADOS BÁSICOS (Incluindo nome_completo)
         nome_completo = request.form.get('nome_completo')
         role = request.form.get('role').lower()
         email = request.form.get('email')
@@ -520,30 +522,51 @@ def editar_usuario(username):
         confirmar_senha = request.form.get('confirmar_senha')
         data_nascimento = request.form.get('data_nascimento')
         sexo = request.form.get('sexo')
-        
+
+        # 2. CAPTURA DOS NOVOS CAMPOS DO LOG (documento e crm)
+        documento = request.form.get('documento')
+        crm = request.form.get('crm') # Apenas relevante para médicos
+
         if nova_senha:
             if nova_senha != confirmar_senha:
                 flash('A senha e a confirmação de senha não coincidem.', 'danger')
                 return render_template('editar_usuario.html', usuario=usuario, medicos=medicos)
             
+            # Hash da nova senha
             usuario['password_hash'] = generate_password_hash(nova_senha)
 
+        # 3. ATRIBUIÇÃO DOS NOVOS VALORES AO OBJETO/DICIONÁRIO 'usuario'
         usuario['nome_completo'] = nome_completo
         usuario['role'] = role
         usuario['email'] = email
         usuario['data_nascimento'] = data_nascimento
         usuario['sexo'] = sexo
         
-        usuario['razao_ic'] = float(request.form.get('razao_ic', 0.0))
-        usuario['fator_sensibilidade'] = float(request.form.get('fator_sensibilidade', 0.0))
-        usuario['meta_glicemia'] = float(request.form.get('meta_glicemia', 0.0))
+        # Atribuição dos campos de log
+        usuario['documento'] = documento # <-- Adicionado
+        usuario['crm'] = crm             # <-- Adicionado
         
+        # Funções de conversão para float
+        # Usamos float(value or 0.0) para garantir que strings vazias sejam 0.0,
+        # ou, melhor, convertemos para None se estiver vazio, para melhor tratamento no DB.
+        
+        def safe_float(value):
+            return float(value) if value else None
+            
+        usuario['razao_ic'] = safe_float(request.form.get('razao_ic'))
+        usuario['fator_sensibilidade'] = safe_float(request.form.get('fator_sensibilidade'))
+        usuario['meta_glicemia'] = safe_float(request.form.get('meta_glicemia'))
+        
+        
+        # 4. Tentar Atualizar o DB
         if db_manager.atualizar_usuario(usuario):
             flash('Usuário atualizado com sucesso!', 'success')
             return redirect(url_for('gerenciar_usuarios'))
         else:
+            # Se o erro for de DB (como 'no such column'), ele será exibido aqui
             flash('Erro ao atualizar usuário.', 'danger')
 
+    # Rota GET ou POST com erro de senha
     return render_template('editar_usuario.html', usuario=usuario, medicos=medicos)
 
 @app.route('/excluir_usuario/<username>', methods=['POST'])

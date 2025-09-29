@@ -10,7 +10,10 @@ class User(UserMixin):
     """
     def __init__(self, id, username, password_hash, role='user', email=None, 
                  razao_ic=1.0, fator_sensibilidade=1.0, data_nascimento=None, 
-                 sexo=None, meta_glicemia=None): # <-- Adicionado 'meta_glicemia' aqui
+                 sexo=None, meta_glicemia=None, 
+                 # NOVOS CAMPOS ADICIONADOS AQUI:
+                 nome_completo=None, telefone=None, documento=None, 
+                 crm=None, cns=None, especialidade=None):
         
         self.id = id
         self.username = username
@@ -22,7 +25,15 @@ class User(UserMixin):
         self.fator_sensibilidade = fator_sensibilidade
         self.data_nascimento = data_nascimento
         self.sexo = sexo
-        self.meta_glicemia = meta_glicemia  # <-- Atribuição do atributo
+        self.meta_glicemia = meta_glicemia 
+        
+        # NOVAS ATRIBUIÇÕES:
+        self.nome_completo = nome_completo
+        self.telefone = telefone
+        self.documento = documento
+        self.crm = crm
+        self.cns = cns
+        self.especialidade = especialidade
         
     def get_id(self):
         # Implementação obrigatória para Flask-Login
@@ -38,7 +49,6 @@ class User(UserMixin):
 
     @property
     def is_secretario(self):
-        # Propriedade adicionada explicitamente
         return self.role == 'secretario'
 
     @property
