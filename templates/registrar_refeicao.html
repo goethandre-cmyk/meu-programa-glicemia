@@ -3,24 +3,28 @@
 {% block title %}Registrar Refeição{% endblock %}
 
 {% block content %}
-<div class="container-page">
-    <div class="card p-4 shadow-sm">
-        <h1 class="mb-4">
-            <i class="fas fa-utensils me-2"></i>Registrar Refeição
+<div class="container mt-4">
+    <div class="card p-4 shadow-lg border-0 bg-white">
+        <h1 class="mb-4 text-primary">
+            <i class="fas fa-utensils me-3"></i>Registrar Refeição
         </h1>
-        
+
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
+        {% if messages %}
+        <div class="mb-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         {% endwith %}
 
-        <form id="form-registro-refeicao" action="{{ url_for('registrar_refeicao') }}" method="post">
+        <form id="form-registro-refeicao" action="{{ url_for('salvar_refeicao') }}" method="post">
+            <h5 class="text-secondary mb-3"><i class="fas fa-calendar-check me-2"></i>Informações Básicas</h5>
+
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
                 <div class="form-floating">
@@ -29,7 +33,7 @@
                 </div>
             </div>
 
-            <div class="mb-3 input-group">
+            <div class="mb-4 input-group">
                 <span class="input-group-text"><i class="fas fa-utensils"></i></span>
                 <div class="form-floating">
                     <select class="form-select" id="refeicao" name="tipo" required>
@@ -44,234 +48,109 @@
                     <label for="refeicao">Tipo de Refeição</label>
                 </div>
             </div>
-            
+
+            <h5 class="text-secondary mb-3"><i class="fas fa-search me-2"></i>Busca e Adição de Alimentos</h5>
+
             <div class="mb-3">
-                <label for="alimento_busca" class="form-label text-muted">
-                    <i class="fas fa-search me-2"></i>Procurar Alimento:
-                </label>
                 <div class="input-group">
-                    <input type="text" id="alimento_busca" class="form-control" placeholder="Digite 3 ou mais letras para pesquisar...">
+                    <input type="text" id="alimento_busca" class="form-control"
+                        placeholder="Digite 3 ou mais letras para pesquisar...">
                 </div>
             </div>
-            
-            <div id="resultados_busca_alimentos" class="list-group mb-3">
+
+            <div id="resultados_busca_alimentos" class="list-group mb-4">
             </div>
 
-            <div class="mb-3">
-                <label class="form-label text-muted"><i class="fas fa-list-ul me-2"></i>Alimentos Selecionados:</label>
-                <ul id="lista_alimentos_selecionados" class="list-group">
-                </ul>
-                <input type="hidden" name="alimentos_selecionados" id="alimentos_selecionados_input" value="[]">
-                <input type="hidden" name="total_carbs" id="total_carbs_input" value="0">
-                <input type="hidden" name="total_kcal" id="total_kcal_input" value="0">
-            </div>
-            
-            <div class="mb-3 text-end fs-5">
-                <strong>Total de Carboidratos:</strong>
-                <span id="total_carbs_span" class="fw-bold text-success">0.0</span>g
-            </div>
-            <div class="mb-3 text-end fs-5">
-                <strong>Total de Calorias:</strong>
-                <span id="total_kcal_span" class="fw-bold text-success">0.0</span>kcal
+            <h5 class="text-secondary mb-3"><i class="fas fa-list-ul me-2"></i>Itens da Refeição</h5>
+            <ul id="lista_alimentos_selecionados" class="list-group">
+            </ul>
+
+            <input type="hidden" name="alimentos_selecionados" id="alimentos_selecionados_input" value="[]">
+            <input type="hidden" name="total_carbs" id="total_carbs_input" value="0.00">
+            <input type="hidden" name="total_kcal" id="total_kcal_input" value="0.00">
+
+            <div class="mt-4 pt-3 border-top">
+                <div class="mb-2 text-end fs-5">
+                    <strong>Total de Carboidratos:</strong>
+                    <span id="total_carbs_span" class="fw-bold text-success">0.00</span>g
+                </div>
+                <div class="mb-3 text-end fs-5">
+                    <strong>Total de Calorias:</strong>
+                    <span id="total_kcal_span" class="fw-bold text-success">0.00</span>kcal
+                </div>
             </div>
 
+            <h5 class="text-secondary mb-3"><i class="fas fa-comment-dots me-2"></i>Observações</h5>
             <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-comment-dots"></i></span>
+                <span class="input-group-text align-items-start pt-3"><i class="fas fa-comment-dots"></i></span>
                 <div class="form-floating">
-                    <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Observações (opcional)"></textarea>
-                    <label for="observacoes">Observações (opcional)</label>
+                    <textarea class="form-control" id="observacoes" name="observacoes" rows="3"
+                        placeholder="Observações (opcional)"></textarea>
+                    <label for="observacoes">Detalhes e anotações (opcional)</label>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">
+            <button type="submit" class="btn btn-primary w-100 btn-lg shadow-lg mt-3">
                 <i class="fas fa-save me-2"></i>Registrar Refeição
             </button>
         </form>
     </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // Usando url_for do Jinja para rotas robustas
+    const URL_BUSCA_ALIMENTOS = "{{ url_for('buscar_alimentos') }}";
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicialização de Elementos DOM
         const refeicaoSelect = document.getElementById('refeicao');
         const searchInput = document.getElementById('alimento_busca');
         const resultsContainer = document.getElementById('resultados_busca_alimentos');
         const listaAlimentos = document.getElementById('lista_alimentos_selecionados');
-        
         const totalCarbsSpan = document.getElementById('total_carbs_span');
         const totalKcalSpan = document.getElementById('total_kcal_span');
         const alimentosSelecionadosInput = document.getElementById('alimentos_selecionados_input');
         const totalCarbsInput = document.getElementById('total_carbs_input');
         const totalKcalInput = document.getElementById('total_kcal_input');
-
         let timeoutId;
 
-        refeicaoSelect.addEventListener('change', function() {
-            if (this.value === 'Jejum') {
-                searchInput.value = '';
-                resultsContainer.innerHTML = '';
-                listaAlimentos.innerHTML = '';
-                atualizarTotais();
-                searchInput.disabled = true;
-            } else {
-                searchInput.disabled = false;
-            }
-        });
+        // --- Funções de Utilitário ---
 
-        searchInput.addEventListener('input', function() {
-            clearTimeout(timeoutId);
-            const termo = searchInput.value;
-            
-            if (termo.length < 3) {
-                resultsContainer.innerHTML = '';
-                return;
+        /** Atualiza o campo data_hora para o momento atual. */
+        function preencherDataHoraAtual() {
+            const dataHoraInput = document.getElementById('data_hora');
+            if (!dataHoraInput.value) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                dataHoraInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
             }
-
-            timeoutId = setTimeout(() => {
-                fetch('/buscar_alimentos', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `termo_pesquisa=${encodeURIComponent(termo)}`
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Erro na resposta do servidor.');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    exibirResultados(data.resultados);
-                })
-                .catch(error => {
-                    console.error('Erro na requisição:', error);
-                    resultsContainer.innerHTML = '<p class="list-group-item text-danger">Erro ao conectar com o servidor.</p>';
-                });
-            }, 500);
-        });
-
-        function exibirResultados(alimentos) {
-            let html = '';
-            if (alimentos.length === 0) {
-                html = '<div class="list-group-item text-muted">Nenhum alimento encontrado.</div>';
-            } else {
-                alimentos.forEach(alimento => {
-                    const nome = alimento.ALIMENTO;
-                    const carbs = alimento.CARBOIDRATOS_100G;
-                    const kcal = alimento.ENERGIA_KCAL;
-                    const medida = alimento.MEDIDA_CASEIRA;
-                    const peso = alimento.PESO_G;
-                    
-                    html += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>${nome}</strong>
-                                <br>
-                                <small>Carboidratos: ${carbs}g | Calorias: ${kcal}kcal | Medida: ${medida}</small>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-outline-primary adicionar-alimento-btn" 
-                                data-nome="${nome}" data-carbs="${carbs}" data-kcal="${kcal}" data-medida="${medida}" data-peso="${peso}">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    `;
-                });
-            }
-            resultsContainer.innerHTML = html;
-            
-            document.querySelectorAll('.adicionar-alimento-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const { nome, carbs, kcal, medida, peso } = this.dataset;
-                    adicionarAlimentoNaLista(nome, parseFloat(carbs), parseFloat(kcal), medida, parseFloat(peso));
-                    searchInput.value = '';
-                    resultsContainer.innerHTML = '';
-                });
-            });
         }
 
-        function adicionarAlimentoNaLista(nome, carbsPorMedida, kcalPorMedida, medidaCaseira, pesoGrama) {
-            const novoItem = document.createElement('li');
-            novoItem.classList.add('list-group-item', 'd-flex', 'flex-column', 'bg-light', 'rounded-3', 'mb-2', 'p-3');
-            novoItem.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span><strong>${nome}</strong></span>
-                    <button type="button" class="btn btn-sm btn-danger remover-alimento-btn">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="row g-2">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label d-block text-muted small">Carboidratos por medida:</label>
-                        <span class="text-primary fw-bold carbs-base">${carbsPorMedida}</span>g / 
-                        <span class="text-muted small">${medidaCaseira} (${pesoGrama}g)</span>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label d-block text-muted small">Calorias por medida:</label>
-                        <span class="text-primary fw-bold kcal-base">${kcalPorMedida}</span>kcal / 
-                        <span class="text-muted small">${medidaCaseira} (${pesoGrama}g)</span>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <label class="form-label d-block text-muted small">Quantidade consumida:</label>
-                    <div class="input-group">
-                        <input type="number" step="0.1" class="form-control form-control-sm input-quantidade" value="1" min="0.1">
-                        <span class="input-group-text">${medidaCaseira}</span>
-                    </div>
-                </div>
-                <div class="mt-2 text-end">
-                    <span class="fw-bold">Total:</span> <span class="carbs-calculados fw-bold text-success">0.0</span>g | <span class="fw-bold">Calorias:</span> <span class="kcal-calculados fw-bold text-success">0.0</span>kcal
-                </div>
-                <input type="hidden" class="alimento-nome" value="${nome}">
-                <input type="hidden" class="alimento-carbs-base" value="${carbsPorMedida}">
-                <input type="hidden" class="alimento-kcal-base" value="${kcalPorMedida}">
-                <input type="hidden" class="alimento-medida" value="${medidaCaseira}">
-                <input type="hidden" class="alimento-peso" value="${pesoGrama}">
-            `;
-            
-            listaAlimentos.appendChild(novoItem);
-            
-            const inputQuantidade = novoItem.querySelector('.input-quantidade');
-            
-            inputQuantidade.addEventListener('input', function() {
-                recalcularItem(novoItem);
-                atualizarTotais();
-            });
-            
-            novoItem.querySelector('.remover-alimento-btn').addEventListener('click', function() {
-                novoItem.remove();
-                atualizarTotais();
-            });
-
-            recalcularItem(novoItem);
-            atualizarTotais();
-        }
-        
+        /** Recalcula os totais de carboidratos e calorias de um item individual. */
         function recalcularItem(item) {
             const quantidade = parseFloat(item.querySelector('.input-quantidade').value) || 0;
             const carbsPorMedida = parseFloat(item.querySelector('.alimento-carbs-base').value) || 0;
             const kcalPorMedida = parseFloat(item.querySelector('.alimento-kcal-base').value) || 0;
             const pesoGrama = parseFloat(item.querySelector('.alimento-peso').value) || 0;
-            
-            let totalItemCarbs = 0;
-            let totalItemKcal = 0;
 
-            if (!isNaN(pesoGrama) && pesoGrama > 0) {
-                totalItemCarbs = (carbsPorMedida / pesoGrama) * (quantidade * pesoGrama);
-                totalItemKcal = (kcalPorMedida / pesoGrama) * (quantidade * pesoGrama);
-            } else {
-                totalItemCarbs = quantidade * carbsPorMedida;
-                totalItemKcal = quantidade * kcalPorMedida;
-            }
-            
+            // Calcula o total do item baseado na quantidade (e peso, se disponível)
+            const totalItemCarbs = quantidade * carbsPorMedida;
+            const totalItemKcal = quantidade * kcalPorMedida;
+
             item.querySelector('.carbs-calculados').textContent = totalItemCarbs.toFixed(2);
             item.querySelector('.kcal-calculados').textContent = totalItemKcal.toFixed(2);
         }
-        
+
+        /** Soma os totais de todos os itens e atualiza os campos de exibição e ocultos. */
         function atualizarTotais() {
             let totalCarbs = 0;
             let totalKcal = 0;
-            
+
+            // Soma os totais calculados
             document.querySelectorAll('.carbs-calculados').forEach(span => {
                 totalCarbs += parseFloat(span.textContent) || 0;
             });
@@ -279,15 +158,16 @@
                 totalKcal += parseFloat(span.textContent) || 0;
             });
 
+            // Atualiza exibição e campos ocultos
             totalCarbsSpan.textContent = totalCarbs.toFixed(2);
             totalKcalSpan.textContent = totalKcal.toFixed(2);
-
             totalCarbsInput.value = totalCarbs.toFixed(2);
             totalKcalInput.value = totalKcal.toFixed(2);
-            
+
             atualizarCampoOculto();
         }
 
+        /** Coleta os dados de todos os itens da lista e serializa para JSON. */
         function atualizarCampoOculto() {
             const alimentos = [];
             document.querySelectorAll('#lista_alimentos_selecionados > li').forEach(li => {
@@ -306,23 +186,166 @@
             alimentosSelecionadosInput.value = JSON.stringify(alimentos);
         }
 
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
+        /** Adiciona um alimento selecionado à lista na interface. */
+        function adicionarAlimentoNaLista(nome, carbsPorMedida, kcalPorMedida, medidaCaseira, pesoGrama) {
+            const novoItem = document.createElement('li');
+            novoItem.classList.add('list-group-item', 'd-flex', 'flex-column', 'bg-light', 'rounded-3', 'mb-2', 'p-3');
+            novoItem.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span><strong>${nome}</strong></span>
+                    <button type="button" class="btn btn-sm btn-danger remover-alimento-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label d-block text-muted small">Carbs por porção:</label>
+                        <span class="text-primary fw-bold carbs-base">${carbsPorMedida}</span>g / 
+                        <span class="text-muted small">${medidaCaseira} (${pesoGrama}g)</span>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label d-block text-muted small">Kcal por porção:</label>
+                        <span class="text-primary fw-bold kcal-base">${kcalPorMedida}</span>kcal
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <label class="form-label d-block text-muted small">Quantidade consumida:</label>
+                    <div class="input-group">
+                        <input type="number" step="0.1" class="form-control form-control-sm input-quantidade" value="1" min="0.1">
+                        <span class="input-group-text">${medidaCaseira}</span>
+                    </div>
+                </div>
+                <div class="mt-2 text-end">
+                    <span class="fw-bold">Total CHO:</span> <span class="carbs-calculados fw-bold text-success">0.00</span>g | 
+                    <span class="fw-bold">Total Kcal:</span> <span class="kcal-calculados fw-bold text-success">0.00</span>kcal
+                </div>
+                <input type="hidden" class="alimento-nome" value="${nome}">
+                <input type="hidden" class="alimento-carbs-base" value="${carbsPorMedida}">
+                <input type="hidden" class="alimento-kcal-base" value="${kcalPorMedida}">
+                <input type="hidden" class="alimento-medida" value="${medidaCaseira}">
+                <input type="hidden" class="alimento-peso" value="${pesoGrama}">
+            `;
+
+            listaAlimentos.appendChild(novoItem);
+
+            // Adiciona Listeners para o novo item
+            const inputQuantidade = novoItem.querySelector('.input-quantidade');
+            inputQuantidade.addEventListener('input', function () {
+                recalcularItem(novoItem);
+                atualizarTotais();
+            });
+
+            novoItem.querySelector('.remover-alimento-btn').addEventListener('click', function () {
+                novoItem.remove();
+                atualizarTotais();
+            });
+
+            recalcularItem(novoItem); // Calcula os valores iniciais (1 porção)
+            atualizarTotais();
+        }
+
+        /** Processa e exibe os resultados da busca de alimentos. */
+        function exibirResultados(alimentos) {
+            let html = '';
+            if (!alimentos || alimentos.length === 0) {
+                html = '<div class="list-group-item text-muted">Nenhum alimento encontrado.</div>';
+            } else {
+                alimentos.forEach(alimento => {
+                    // ------------------------------------------------------------------
+                    // 🚨 CORREÇÃO PRINCIPAL: Usando as chaves EXATAS do seu DB (alimento, carbs, kcal, medida_caseira)
+                    // ------------------------------------------------------------------
+                    const nome = alimento.alimento;
+                    const carbs = alimento.carbs || 0;
+                    const kcal = alimento.kcal || 0;
+                    const medida = alimento.medida_caseira || 'Porção';
+                    const peso = alimento.peso || 100;
+
+                    html += `
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${nome}</strong>
+                                <br>
+                                <small>Carbs: ${carbs}g | Kcal: ${kcal}kcal | Porção: ${medida}</small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary adicionar-alimento-btn" 
+                                data-nome="${nome}" data-carbs="${carbs}" data-kcal="${kcal}" data-medida="${medida}" data-peso="${peso}">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+            resultsContainer.innerHTML = html;
+
+            // Adiciona listener para os botões 'Adicionar'
+            document.querySelectorAll('.adicionar-alimento-btn').forEach(button => {
+                button.addEventListener('click', function () {
+                    const { nome, carbs, kcal, medida, peso } = this.dataset;
+                    adicionarAlimentoNaLista(nome, parseFloat(carbs), parseFloat(kcal), medida, parseFloat(peso));
+                    searchInput.value = '';
+                    resultsContainer.innerHTML = '';
+                });
+            });
+        }
+
+
+        // --- Listeners de Eventos ---
+
+        // Listener para Busca de Alimentos (Debounce)
+        searchInput.addEventListener('input', function () {
+            clearTimeout(timeoutId);
+            const termo = searchInput.value.trim();
+
+            if (termo.length < 3) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            timeoutId = setTimeout(() => {
+                // Requisição POST para o backend
+                fetch(URL_BUSCA_ALIMENTOS, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `termo_pesquisa=${encodeURIComponent(termo)}`
+                })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Erro na resposta do servidor.');
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Atenção: A resposta do Flask deve vir como { "resultados": [array de alimentos] }
+                        exibirResultados(data.resultados);
+                    })
+                    .catch(error => {
+                        console.error('Erro na requisição:', error);
+                        resultsContainer.innerHTML = '<p class="list-group-item text-danger">Erro ao buscar alimentos.</p>';
+                    });
+            }, 500); // 500ms de debounce
+        });
+
+        // Listener para Tipo de Refeição (Desabilita busca em 'Jejum')
+        refeicaoSelect.addEventListener('change', function () {
+            if (this.value === 'Jejum') {
+                searchInput.value = '';
+                resultsContainer.innerHTML = '';
+                listaAlimentos.innerHTML = '';
+                atualizarTotais();
+                searchInput.disabled = true;
+            } else {
+                searchInput.disabled = false;
             }
         });
 
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const day = now.getDate().toString().padStart(2, '0');
-        const hour = now.getHours().toString().padStart(2, '0');
-        const minute = now.getMinutes().toString().padStart(2, '0');
-        document.getElementById('data_hora').value = `${year}-${month}-${day}T${hour}:${minute}`;
+        // Impede que a tecla ENTER no campo de busca submeta o formulário
+        searchInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') e.preventDefault();
+        });
 
-        if (refeicaoSelect.value === 'Jejum') {
-            searchInput.disabled = true;
-        }
+        // --- Inicialização ---
+        preencherDataHoraAtual();
+        if (refeicaoSelect.value === 'Jejum') searchInput.disabled = true;
     });
 </script>
 {% endblock %}

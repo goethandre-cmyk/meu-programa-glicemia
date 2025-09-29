@@ -3,57 +3,88 @@
 {% block title %}Gerenciar Usuários{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">
-        <i class="fas fa-users-cog me-2"></i>Gerenciar Usuários
-    </h1>
 
-    <div class="card p-4 shadow-sm">
-        <div class="d-flex justify-content-end mb-3">
-            <a href="{{ url_for('cadastro') }}" class="btn btn-success">
-                <i class="fas fa-user-plus me-2"></i>Novo Usuário
-            </a>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-primary">
-                    <tr>
-                        <th>Nome de Usuário</th>
-                        <th>Email</th>
-                        <th>Função</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for usuario in usuarios %}
-                    <tr>
-                        <td>{{ usuario['username'] }}</td>
-                        <td>{{ usuario.get('email', 'N/A') }}</td>
-                        <td>{{ usuario.get('role', 'padrão') }}</td>
-                        <td>
-                            {% if usuario.get('role') == 'user' %}
-                            <a href="{{ url_for('ficha_acompanhamento', paciente_id=usuario['id']) }}" class="btn btn-sm btn-info text-white me-2" title="Acompanhar Exames Laboratoriais">
-                                <i class="fas fa-file-medical"></i> Ficha
-                            </a>
-                            <a href="{{ url_for('vincular_cuidador', username=usuario['username']) }}" class="btn btn-sm btn-secondary me-2">
-                                <i class="fas fa-handshake"></i> Cuidador
-                            </a>
-                            {% endif %}
-                            
-                            <a href="{{ url_for('editar_usuario', username=usuario['username']) }}" class="btn btn-sm btn-warning me-2">
-                                <i class="fas fa-edit"></i> Editar
-                            </a>
-                            <a href="{{ url_for('excluir_usuario', username=usuario['username']) }}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir este usuário?');">
-                                <i class="fas fa-trash-alt"></i> Excluir
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary mt-3">Voltar ao Painel</a>
+<div class="card p-4 shadow-sm mb-4">
+
+    <h2 class="mb-4 text-center text-primary">
+        <i class="bi bi-people me-2"></i>Gerenciamento de Usuários
+    </h2>
+
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{{ url_for('cadastro') }}" class="btn btn-primary">
+            <i class="bi bi-person-plus-fill me-2"></i>Novo Usuário
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Nome de Usuário</th>
+                    <th>Email</th>
+                    <th>Função</th>
+                    <th class="text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr>
+                    <td>{{ usuario['username'] }}</td>
+                    <td>{{ usuario.get('email', 'N/A') }}</td>
+                    <td>
+                        {% set role = usuario.get('role', 'padrão') %}
+                        <span class="badge rounded-pill bg-{{ 
+                            'success' if role == 'medico' else 
+                            'primary' if role == 'admin' else 
+                            'info' if role == 'paciente' or role == 'user' else 
+                            'warning text-dark' if role == 'cuidador' else 
+                            'secondary'
+                        }}">
+                            {{ role|capitalize }}
+                        </span>
+                    </td>
+                    <td class="text-center actions-column">
+
+                        {% if usuario.get('role') == 'user' or usuario.get('role') == 'paciente' %}
+
+                        <a href="{{ url_for('ficha_acompanhamento', paciente_id=usuario['id']) }}"
+                            class="btn btn-sm btn-outline-info me-1" title="Ficha Clínica">
+                            <i class="bi bi-file-earmark-medical"></i>
+                        </a>
+
+                        <a href="{{ url_for('vincular_cuidador', username=usuario['username']) }}"
+                            class="btn btn-sm btn-outline-secondary me-1" title="Vincular Cuidador">
+                            <i class="bi bi-hand-index"></i>
+                        </a>
+                        {% endif %}
+
+                        <a href="{{ url_for('editar_usuario', username=usuario['username']) }}"
+                            class="btn btn-sm btn-outline-primary me-1" title="Editar Usuário">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+
+                        <form method="POST" action="{{ url_for('excluir_usuario', username=usuario['username']) }}"
+                            style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir Usuário"
+                                onclick="return confirm('Tem certeza que deseja excluir o usuário {{ usuario.username }}?');">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center py-4">Nenhum usuário cadastrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="text-center">
+        <a href="{{ url_for('dashboard_gestao') }}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left-circle me-2"></i>Voltar ao Painel
+        </a>
     </div>
 </div>
 {% endblock %}

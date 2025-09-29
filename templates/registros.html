@@ -10,7 +10,7 @@
         </h1>
         <p class="lead text-muted">Acompanhe seu histórico de glicemia e refeições de forma clara e organizada.</p>
     </div>
-    
+
     <div class="card p-4 shadow-lg rounded-3">
         <div class="table-responsive">
             <table class="table table-striped table-hover records-table">
@@ -25,59 +25,63 @@
                 </thead>
                 <tbody>
                     {% if registros %}
-                        {% for registro in registros %}
-                        <tr>
-                            <td>
-                                {% if registro.data_hora %}
-                                    {{ registro.data_hora.strftime('%d/%m/%Y %H:%M') }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                            <td>{{ registro.tipo }}</td>
-                            
-                            {% if registro.tipo == 'Glicemia' %}
-                                <td class="glicemia-status {{ get_status_class(registro.valor) }}">
-                                    <span class="fw-bold">{{ "%.1f"|format(registro.valor) }} mg/dL</span>
-                                </td>
+                    {% for registro in registros %}
+                    <tr>
+                        <td>
+                            {% if registro.data_hora %}
+                            {{ registro.data_hora.strftime('%d/%m/%Y %H:%M') }}
                             {% else %}
-                                <td>
-                                    <div class="d-flex flex-column">
-                                        <div class="mb-1">
-                                            <i class="fas fa-burger me-2"></i>
-                                            <span class="fw-bold">{{ registro.tipo }}</span>
-                                        </div>
-                                        <small class="text-muted">
-                                            <i class="fas fa-fire-alt me-1"></i>
-                                            <span class="fw-bold text-success">{{ "%.1f"|format(registro.total_calorias) }} Kcal</span>
-                                            <span class="mx-1">|</span>
-                                            <i class="fas fa-bread-slice me-1"></i>
-                                            <span class="fw-bold text-success">{{ "%.1f"|format(registro.total_carbs) }}g de CHO</span>
-                                        </small>
-                                        <a href="#" class="mt-2 text-decoration-none small" data-bs-toggle="modal" data-bs-target="#alimentosModal{{ registro.id }}">Ver Detalhes</a>
-                                    </div>
-                                </td>
+                            N/A
                             {% endif %}
+                        </td>
+                        <td>{{ registro.tipo }}</td>
 
-                            <td>{{ registro.observacoes if registro.observacoes else 'N/A' }}</td>
-                            <td class="action-buttons">
-                                <a href="{{ url_for('editar_registo', id=registro.id) }}" class="btn btn-sm btn-outline-warning">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <form action="{{ url_for('excluir_registo', id=registro.id) }}" method="post" 
-                                    onsubmit="return confirm('Tem certeza que deseja excluir este registro?');"
-                                    style="display: inline;">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                        {% if registro.tipo == 'Glicemia' %}
+                        <td class="glicemia-status {{ get_status_class(registro.valor) }}">
+                            <span class="fw-bold">{{ "{:.1f}".format(registro.valor | default(0.0)) }} mg/dL</span>
+                        </td>
+                        {% else %}
+                        <td>
+                            <div class="d-flex flex-column">
+                                <div class="mb-1">
+                                    <i class="fas fa-burger me-2"></i>
+                                    <span class="fw-bold">{{ registro.tipo }}</span>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-fire-alt me-1"></i>
+                                    <span class="fw-bold text-success">{{ "{:.1f}".format(registro.total_calorias |
+                                        default(0.0)) }} Kcal</span>
+
+                                    <i class="fas fa-bread-slice me-1"></i>
+                                    <span class="fw-bold text-primary">{{ "{:.1f}".format(registro.total_carboidratos |
+                                        default(0.0)) }}g Carbs</span>
+                                </small>
+                                <a href="#" class="mt-2 text-decoration-none small" data-bs-toggle="modal"
+                                    data-bs-target="#alimentosModal{{ registro.id | string }}">Ver Detalhes</a>
+                            </div>
+                        </td>
+                        {% endif %}
+
+                        <td>{{ registro.observacoes if registro.observacoes else 'N/A' }}</td>
+                        <td class="action-buttons">
+                            <a href="{{ url_for('editar_registo', id=registro.id) }}"
+                                class="btn btn-sm btn-outline-warning">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form action="{{ url_for('excluir_registo', id=registro.id) }}" method="post"
+                                onsubmit="return confirm('Tem certeza que deseja excluir este registro?');"
+                                style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
                     {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
-                        </tr>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">Nenhum registro encontrado.</td>
+                    </tr>
                     {% endif %}
                 </tbody>
             </table>
@@ -86,39 +90,46 @@
 </div>
 
 {% for registro in registros %}
-    {% if registro.tipo != 'Glicemia' and registro.alimentos_json %}
-        <div class="modal fade" id="alimentosModal{{ registro.id }}" tabindex="-1" aria-labelledby="alimentosModalLabel{{ registro.id }}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title" id="alimentosModalLabel{{ registro.id }}">
-                            <i class="fas fa-list me-2"></i>Alimentos da Refeição
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <ul class="list-group list-group-flush">
-                            {% set alimentos = from_json(registro.alimentos_json) %}
-                            {% for alimento in alimentos %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ alimento.get('ALIMENTO', 'N/A') }}</strong>
-                                        <small class="d-block text-muted">
-                                            {{ "%.1f"|format(alimento.get('CHO (g)', 0.0)) }}g CHO | {{ "%.1f"|format(alimento.get('KCAL', 0.0)) }} Kcal
-                                        </small>
-                                    </div>
-                                    <span class="badge bg-secondary rounded-pill">{{ "%.1f"|format(alimento.get('quantidade', 0.0)) }} unidade(s)</span>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    </div>
-                </div>
+{% if registro.tipo != 'Glicemia' and registro.alimentos_json %}
+<div class="modal fade" id='alimentosModal{{ registro.id | string }}' tabindex="-1"
+    aria-labelledby='alimentosModalLabel{{ registro.id | string }}' aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id='alimentosModalLabel{{ registro.id | string }}'>
+                    <i class="fas fa-list me-2"></i>Alimentos da Refeição
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="list-group list-group-flush">
+                    {% set alimentos = from_json(registro.alimentos_json) %}
+
+                    {% for alimento in alimentos %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ alimento.get('nome', alimento.get('ALIMENTO', 'N/A')) }}</strong>
+                            <small class="d-block text-muted">
+                                {{ "{:.1f}".format(alimento.get('cho', alimento.get('CHO (g)', 0.0))) }}g CHO | {{
+                                "{:.1f}".format(alimento.get('kcal', alimento.get('KCAL', 0.0))) }} Kcal
+                            </small>
+                        </div>
+                        <span class="badge bg-secondary rounded-pill">{{ "{:.1f}".format(alimento.get('quantidade',
+                            0.0))
+                            }} unidade(s)</span>
+                    </li>
+                    {% endfor %}
+
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
-    {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endfor %}
 
 {% endblock %}

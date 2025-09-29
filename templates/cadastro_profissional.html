@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastro de Profissional{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Cadastrar Novo Profissional de Saúde/Gestão</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('cadastro_profissional') }}">
+        
+        <div class="mb-3">
+            <label for="username" class="form-label">Nome de Usuário</label>
+            <input type="text" class="form-control" id="username" name="username" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="email" class="form-label">E-mail</label>
+            <input type="email" class="form-control" id="email" name="email" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="password" class="form-label">Senha</label>
+            <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="role" class="form-label">Papel / Função</label>
+            <select class="form-select" id="role" name="role" required>
+                <option value="" selected disabled>Selecione a função</option>
+                <option value="medico">Médico</option>
+                <option value="secretario">Secretário</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-success">Cadastrar Profissional</button>
+        <a href="{{ url_for('dashboard_gestao') }}" class="btn btn-secondary">Voltar</a>
+    </form>
+</div>
+{% endblock %}

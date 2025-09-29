@@ -1,10 +1,10 @@
 # Importa a classe principal do Flask e outros módulos
 from flask import Flask
 # Importa as classes que você criou em outros arquivos
-from .db_manager import DatabaseManager
+from .appgemini import DatabaseManager
 from .logica import AppCore, AuthManager
 # Importa a blueprint que contém as rotas da aplicação
-from .app import routes_bp
+from .appgemini import routes_bp
 
 def create_app():
     """

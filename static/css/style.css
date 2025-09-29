@@ -1,582 +1,161 @@
-/* Reseta as margens e preenchimentos padrão */
-html, body {
-    margin: 0;
-    padding: 0;
-}
 /* -------------------------------------------------------------------------- */
-/* VARIÁVEIS GLOBAIS DE COR E ESTILO                                         */
+/* VARIÁVEIS GLOBAIS DE COR E ESTILO (Bootstrap-like)                         */
 /* -------------------------------------------------------------------------- */
 :root {
+    /* Cores Principais - Foco no Blue/Purple Gradient */
     --primary-color: #007bff;
-    --primary-hover-color: #0056b3;
-    --secondary-color: #6c757d;
-    --secondary-hover-color: #5a6268;
-    --background-color: #f0f8ff; /* Azul claro, quase branco */
-    --container-bg-color: #ffffff;
-    --text-color: #344759;
-    --border-color: #e0e6ed;
+    /* Azul Padrão */
+    --accent-color: #6a11cb;
+    /* Roxo do Gradiente */
+    --text-dark: #344759;
+    /* Cor principal do texto (em elementos brancos) */
+    --text-light: white;
+    /* Cor do texto no fundo gradiente */
+
+    /* Fundo da Aplicação */
+    --gradient-bg: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+
+    /* Cores de Status */
     --success-color: #28a745;
     --danger-color: #dc3545;
     --info-color: #17a2b8;
-    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+    /* Efeitos */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* -------------------------------------------------------------------------- */
-/* ESTILOS BASE DO DOCUMENTO E ESTRUTURA                                     */
+/* ESTILOS BASE E ESTRUTURA (Aplicando o novo visual)                         */
 /* -------------------------------------------------------------------------- */
 
-html, body {
-    height: 100%;
+body,
+html {
     margin: 0;
+    padding: 0;
+    height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: var(--text-color);
-    box-sizing: border-box;
+    color: var(--text-dark);
+    /* Texto padrão em conteúdo branco */
 }
 
-#app-wrapper {
-    /* NOVO: Aplica o gradiente diretamente no wrapper */
-    background: linear-gradient(to top, #e3f2fd, #ffffff);
-    background-attachment: fixed;
+/* Fundo principal da aplicação (gradiente roxo/azul) */
+#app-wrapper,
+body {
+    background: var(--gradient-bg);
     min-height: 100vh;
 }
 
-/* -------------------------------------------------------------------------- */
-/* ESTILOS DO MENU LATERAL (SIDEBAR)                                         */
-/* -------------------------------------------------------------------------- */
-
-#sidebar-collapse {
-    width: 250px;
-    padding-top: 56px !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    z-index: 1000;
-    background-color: var(--secondary-color);
-}
-
-.nav-link {
-    color: white !important;
-}
-
-.nav-link:hover {
-    background-color: var(--secondary-hover-color);
-}
-
-.nav-link.active {
-    background-color: var(--primary-color);
-}
-
-.main-content {
-    margin-left: 250px;
-    position: relative;
-    z-index: 1;
-}
-
-/* -------------------------------------------------------------------------- */
-/* ESTILOS DE PÁGINAS E COMPONENTES                                          */
-/* -------------------------------------------------------------------------- */
-
-.container-page, .container-login {
-    background-color: var(--container-bg-color);
-    padding: 30px 40px;
+/* Força o conteúdo a estar num container de contraste */
+#main-content .container {
+    background-color: rgba(255, 255, 255, 0.95);
+    /* Fundo branco semi-transparente */
+    padding: 30px;
     border-radius: 12px;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-lg);
+    max-width: 1200px;
     width: 100%;
-    max-width: 960px;
-    text-align: center;
-    margin: auto;
-    position: relative;
-    z-index: 2;
+    margin-top: 30px;
+    /* Garante que não cole na navbar */
 }
 
-.container-login {
-    max-width: 450px;
+/* -------------------------------------------------------------------------- */
+/* TIPOGRAFIA, NAVBAR E ALERTAS (Texto em branco no gradiente)                */
+/* -------------------------------------------------------------------------- */
+
+/* Links de Navegação e Textos de Destaque no Gradiente */
+.navbar-nav .nav-link,
+.navbar-brand {
+    color: var(--text-light) !important;
 }
+
+/* Títulos dentro do container (voltando para cor escura) */
+h1,
+h2,
+h3 {
+    color: var(--accent-color);
+    /* Roxo */
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+/* Alertas de Mensagem (no fundo gradiente, transparentes) */
+.alert,
+.flashes li {
+    background: rgba(255, 255, 255, 0.15);
+    /* Fundo translúcido */
+    color: var(--text-light) !important;
+    border: none;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 20px;
+}
+
+/* Ações de Sucesso/Perigo nos Alerts - Mantenha o contraste branco */
+.alert-danger,
+.flashes .danger {
+    background: rgba(220, 53, 69, 0.5) !important;
+}
+
+.alert-success,
+.flashes .success {
+    background: rgba(40, 167, 69, 0.5) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* COMPONENTES (Cards e Tabelas - Interior do Container Branco)                */
+/* -------------------------------------------------------------------------- */
 
 .card {
-    background-color: var(--container-bg-color);
-    border: 1px solid var(--border-color);
+    background-color: white;
+    /* Força branco para contraste */
+    border: 1px solid #e0e6ed;
     border-radius: 8px;
+    box-shadow: var(--shadow-sm);
     padding: 20px;
     margin-bottom: 20px;
-    text-align: left;
-}
-
-/* --- Tipografia --- */
-h1, h2 {
-    color: var(--primary-color);
-    margin-bottom: 20px;
-    text-align: center;
-}
-
-h1 { font-size: 2.2em; }
-h2 {
-    font-size: 1.6em;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 10px;
-    margin-top: 30px;
-}
-
-p { line-height: 1.6; }
-
-/* --- Formulários e Inputs --- */
-form { display: flex; flex-direction: column; gap: 15px; }
-label {
-    align-self: flex-start;
-    font-weight: 600;
-    margin-top: 5px;
-    color: var(--secondary-color);
-}
-
-input[type="text"], input[type="password"], input[type="number"], input[type="date"], select {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    box-sizing: border-box;
-    font-size: 1em;
-    transition: border-color 0.3s;
-}
-
-input:focus, select:focus {
-    border-color: var(--primary-color);
-    outline: none;
-}
-
-/* --- Botões --- */
-button, .btn {
-    padding: 12px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: bold;
-    text-decoration: none;
-    transition: background-color 0.3s, transform 0.2s;
-}
-
-.btn-primary { 
-    background-color: var(--primary-color); 
-    color: white;
-    border: 1px solid var(--primary-color);
-}
-.btn-primary:hover { 
-    background-color: var(--primary-hover-color); 
-    border-color: var(--primary-hover-color);
-    transform: translateY(-2px); 
-}
-
-.btn-secondary { 
-    background-color: var(--secondary-color); 
-    color: white;
-    border: 1px solid var(--secondary-color);
-}
-.btn-secondary:hover { 
-    background-color: var(--secondary-hover-color); 
-    border-color: var(--secondary-hover-color);
-    transform: translateY(-2px); 
-}
-
-.btn-danger { 
-    background-color: var(--danger-color);
-    color: white;
-    border: 1px solid var(--danger-color);
-}
-.btn-danger:hover { 
-    background-color: #c82333; 
-    border-color: #c82333;
-    transform: translateY(-2px); 
-}
-
-/* Botões para a tabela */
-.btn-sm { padding: 6px 10px; font-size: 0.875em; }
-
-.btn-outline-primary {
-    background-color: transparent;
-    color: var(--primary-color);
-    border: 1px solid var(--primary-color);
-}
-.btn-outline-primary:hover {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-/* --- Flashes e Alertas --- */
-.flashes { list-style-type: none; padding: 0; margin-bottom: 20px; }
-.flashes li { padding: 12px; margin-bottom: 10px; border-radius: 8px; font-weight: bold; }
-.flashes .success { background-color: #d4edda; color: var(--success-color); border: 1px solid var(--success-color); }
-.flashes .danger, .flashes .error { background-color: #f8d7da; color: var(--danger-color); border: 1px solid var(--danger-color); }
-.flashes .info { background-color: #d1ecf1; color: var(--info-color); border: 1px solid var(--info-color); }
-
-.back-link { display: inline-block; margin-bottom: 20px; color: var(--primary-color); text-decoration: none; font-weight: bold; }
-.back-link:hover { text-decoration: underline; }
-
-/* --- Estilos de Tabela --- */
-.table-responsive { overflow-x: auto; margin-top: 20px; }
-.table { width: 100%; border-collapse: collapse; }
-.table thead { background-color: #e9ecef; }
-.table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); }
-.table th { font-weight: bold; background-color: #f2f2f2; }
-.table tr:nth-child(even) { background-color: #f9f9f9; }
-.table tr:hover { background-color: #f1f1f1; }
-
-/* -------------------------------------------------------------------------- */
-/* ESTILOS RESPONSIVOS PARA TELAS MENORES (MENU COLAPSADO)                   */
-/* -------------------------------------------------------------------------- */
-
-@media (max-width: 991.98px) {
-    #sidebar-collapse {
-        height: 100vh;
-        width: 100%;
-        top: 56px;
-        transition: transform 0.3s ease-in-out;
-    }
-
-    .main-content {
-        margin-left: 0;
-        padding-top: 56px;
-    }
-}
-/* Seção de Destaque (Hero) */
-.hero-section {
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-    color: white;
-    padding-top: 8rem;
-    padding-bottom: 8rem;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-
-.hero-section .display-4 {
-    font-size: 3.5rem;
-}
-
-.hero-section .lead {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
 }
 
 /* Botões */
-.custom-btn {
-    border-radius: 50px;
-    padding: 12px 30px;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
-}
-
-.custom-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-/* Seção de Recursos (Features) */
-.features-section {
-    background-color: #f8f9fa; /* Fundo cinza claro */
-}
-
-.feature-card {
-    background-color: #ffffff;
-    border-radius: 1rem;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
-    height: 100%;
-}
-
-.feature-card:hover {
-    transform: translateY(-5px);
-}
-.carousel-item {
-    height: 50vh;
-    background-size: cover;
-    background-position: center;
-    position: relative;
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
     color: white;
 }
 
-.carousel-caption {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5); /* Overlay para legibilidade */
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
 }
 
-/* Opcional: Efeitos de Transição */
-.carousel-caption h1 {
-    animation-duration: 1s;
-    animation-fill-mode: both;
-}
-
-.carousel-caption p {
-    animation-duration: 1s;
-    animation-fill-mode: both;
-    animation-delay: 0.5s;
-}
-
-.carousel-caption .custom-btn {
-    animation-duration: 1s;
-    animation-fill-mode: both;
-    animation-delay: 1s;
-}
-/* Efeitos para os cards de conteúdo */
-.info-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.info-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-}
-
-/* Círculos para os ícones */
-.icon-circle {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.5rem;
-}
-/* Sidebar Styling */
-#sidebar-collapse {
-    width: 250px; /* Largura da barra lateral */
-    min-height: 100vh;
-    position: fixed;
-    top: 0;
-    left: 0;
-    transition: all 0.3s;
-    z-index: 1000;
-}
-
-/* Ajuste para o conteúdo principal */
-.main-content {
-    margin-left: 250px; /* Mesma largura da sidebar */
-    padding-top: 20px;
-}
-
-/* Link da barra lateral */
-#sidebar-collapse .nav-link {
-    color: #f8f9fa !important;
-    padding: 1rem;
-    transition: background-color 0.3s;
-}
-
-#sidebar-collapse .nav-link:hover {
-    background-color: #495057; /* Cor de fundo ao passar o mouse */
-    border-radius: 5px;
-}
-
-/* Ícones da barra lateral */
-#sidebar-collapse .nav-link i {
-    font-size: 1.2rem;
-    width: 2rem;
-}
-/* Estilo para os cartões do dashboard */
-.dashboard-card {
-    border-radius: 1rem;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    border: none !important;
-}
-
-.dashboard-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Estilo para a seção de herói do dashboard */
-.hero-dashboard {
-    background: linear-gradient(45deg, #0d6efd, #0b4e8c);
-}
-
-/* Ajusta o estilo dos botões nos cartões */
-.tool-card .btn {
-    width: 80%;
-}
-/* Estilo para reduzir a altura do carrossel */
-.hero-carousel-short {
-    max-height: 50vh; /* 50% da altura da tela */
-    overflow: hidden;
-}
-
-.hero-carousel-short .carousel-item {
-    height: 50vh;
-}
-
-/* Estilo para as imagens do carrossel */
-.carousel-item img {
-    height: 100%;
-    width: 100%;
-    object-fit: cover;
-}
-
-/* Estilo para os cards de conteúdo */
-.feature-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.feature-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-}
-
-/* Estilo para imagens dentro dos cards */
-.feature-card img {
-    max-height: 200px; /* Altura fixa para as imagens dentro dos cartões */
-    object-fit: cover;
-    width: 100%;
-}
-/* -------------------------------------------------------------------------- */
-/* ESTILOS DE DASHBOARD DE MÉDICO                                            */
-/* -------------------------------------------------------------------------- */
-.container {
-    max-width: 1200px;
-    margin: 20px auto;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-.user-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-.user-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px;
-    border-bottom: 1px solid #eee;
-    transition: background-color 0.3s ease;
-}
-.user-list-item:hover {
-    background-color: #eef;
-}
-.user-info h3 {
-    margin: 0;
-    font-size: 1.2em;
-}
-.user-info p {
-    margin: 5px 0 0;
-    color: #777;
-}
-.user-actions a {
-    margin-left: 10px;
-    padding: 8px 12px;
-    border-radius: 5px;
-    text-decoration: none;
-    color: white;
-}
-.user-actions .btn-perfil {
-    background-color: #007bff;
-}
-.user-actions .btn-editar {
-    background-color: #ffc107;
-}
-.user-actions .btn-excluir {
-    background-color: #dc3545;
-}
-.add-user-btn {
-    background-color: #28a745;
-    color: white;
-    padding: 10px 15px;
-    border-radius: 5px;
-    text-decoration: none;
-    font-size: 1em;
-    display: inline-block;
-    margin-top: 20px;
-}
-
-/* -------------------------------------------------------------------------- */
-/* ESTILOS DE PERFIL DE PACIENTE                                             */
-/* -------------------------------------------------------------------------- */
-
-.info-card {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
-}
-.info-card h3 {
-    margin-top: 0;
-    color: #333;
-}
-.info-card p {
-    margin: 5px 0;
-}
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-th, td {
-    text-align: left;
-    padding: 12px;
-    border-bottom: 1px solid #ddd;
-}
-th {
-    background-color: #007bff;
+/* Tabelas */
+.table th {
+    background-color: var(--accent-color);
+    /* Roxo */
     color: white;
     font-weight: bold;
 }
-tr:nth-child(even) {
-    background-color: #f2f2f2;
+
+.table td {
+    color: var(--text-dark);
+    /* Garante cor escura nas células */
 }
-.actions-btn {
-    display: inline-block;
-    padding: 6px 10px;
-    border-radius: 4px;
-    text-decoration: none;
+
+/* Correção para elementos que foram forçados a ser brancos */
+.card a,
+.card h6,
+.card p {
+    color: var(--text-dark) !important;
+    background: transparent !important;
+}
+
+/* Adicione esta regra ao seu style.css, se necessário: */
+.table thead {
+    /* Roxo mais escuro para garantir contraste */
+    background-color: #5d2590;
+}
+
+.table th {
     color: white;
-    margin-right: 5px;
+    font-weight: 600;
+    /* Mais sutil que negrito total */
 }
-.btn-edit { background-color: #ffc107; }
-.btn-delete { background-color: #dc3545; }
-
-/* -------------------------------------------------------------------------- */
-/* AJUSTES PARA BADGES DE GLICEMIA                                            */
-/* -------------------------------------------------------------------------- */
-.badge {
-    display: inline-block;
-    padding: 0.25em 0.4em;
-    font-size: 75%;
-    font-weight: 700;
-    line-height: 1;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: baseline;
-    border-radius: 0.25rem;
-    color: white;
-}
-.badge-primary { background-color: #007bff; }
-.badge-success { background-color: #28a745; }
-.badge-warning { background-color: #ffc107; }
-.badge-danger { background-color: #dc3545; }
-.badge-info { background-color: #17a2b8; }
-.badge-dark { background-color: #343a40; }
-.badge-light { background-color: #f8f9fa; color: black; }
-
-
-/* -------------------------------------------------------------------------- */
-/* ESTILOS ESPECÍFICOS DE RÓTULOS (BADGES) PARA GLICEMIA                      */
-/* -------------------------------------------------------------------------- */
-.glicemia-otimo { background-color: var(--success-color); }
-.glicemia-alerta { background-color: var(--warning-color); }
-.glicemia-perigo { background-color: var(--danger-color); }
-
-/* -------------------------------------------------------------------------- */
-/* AJUSTES ADICIONAIS E UTILITIES                                            */
-/* -------------------------------------------------------------------------- */
-.text-center { text-align: center; }
-.mb-4 { margin-bottom: 1.5rem; }
-.mt-5 { margin-top: 3rem; }
-.py-4 { padding-top: 1.5rem; padding-bottom: 1.5rem; }

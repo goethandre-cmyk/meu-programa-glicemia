@@ -1,0 +1,979 @@
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
+from functools import wraps
+import json
+import logging
+import plotly.graph_objects as go
+import numpy as np
+import os
+
+from database_manager import DatabaseManager 
+from models import User 
+from relatorios import relatorios_bp 
+db_manager = DatabaseManager() # ISSO CRIA O OBJETO 'db_manager'
+
+app = Flask(__name__)
+app.secret_key = 'sua_chave_secreta'
+
+# ---------------------- FLASK-LOGIN INICIALIZAÇÃO ----------------------
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'index' # Diz ao Flask-Login para usar a função 'index()' como login
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Carrega o objeto User a partir do ID na sessão."""
+    # Garanta que esta função exista em seu database_manager.py
+    return db_manager.get_user_by_id(int(user_id))
+
+# ---------------------- DECORATORS DE AUTENTICAÇÃO E PERMISSÃO ----------------------
+
+# Decorator genérico para verificar login
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash("Você precisa estar logado para acessar esta página.", "warning")
+            # Redireciona para a rota 'index' (que renderiza index.html)
+            return redirect(url_for('index', next=request.url)) 
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Decorator para verificar perfil de gestão/admin (Usando o login_required)
+def gestao_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if getattr(current_user, 'perfil', None) != 'gestao':
+            flash("Acesso negado: apenas gestores podem acessar esta página.", "danger")
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Decorator para verificar perfil de médico (Usando o login_required)
+def medico_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if getattr(current_user, 'perfil', None) != 'medico':
+            flash("Acesso negado: apenas médicos podem acessar esta página.", "danger")
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Decorator para verificar perfil de paciente (Usando o login_required)
+def paciente_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if getattr(current_user, 'perfil', None) != 'paciente':
+            flash("Acesso negado: apenas pacientes podem acessar esta página.", "danger")
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Decorator para verificar perfil de cuidador (Usando o login_required)
+def cuidador_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if getattr(current_user, 'perfil', None) != 'cuidador':
+            flash("Acesso negado: apenas cuidadores podem acessar esta página.", "danger")
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ---------------------- ROTAS DE LOGIN E INDEX ----------------------
+@app.route('/login')
+def login_redirect(): # Altere o nome da função para algo único, como 'login_redirect'
+    """Esta rota garante que qualquer chamada interna 'url_for('login')' seja resolvida."""
+    # O url_for('index') ainda aponta para sua rota de login principal
+    return redirect(url_for('index'))
+
+@app.route('/')
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return render_template('index.html')
+
+# ... (Seu código das outras rotas: /registrar_refeicao, /excluir_registo, etc.)
+
+@app.route('/registrar_refeicao', methods=['POST'])
+@login_required
+def registrar_refeicao():
+    try:
+        registro_refeicao = request.form.to_dict()
+        alimentos_json_str = registro_refeicao.get('alimentos_selecionados', '[]')
+        alimentos_list = json.loads(alimentos_json_str)
+
+        # Cálculo dos totais
+        registro_refeicao['total_carbs'] = sum(item.get('carbs', 0) * item.get('quantidade', 1) for item in alimentos_list)
+        registro_refeicao['total_calorias'] = sum(item.get('kcal', 0) * item.get('quantidade', 1) for item in alimentos_list)
+
+        db_manager.salvar_registro(registro_refeicao)
+        flash('Refeição registrada com sucesso!', 'success')
+        return redirect(url_for('dashboard'))
+
+    except ValueError:
+        flash('Formato de Data/Hora ou Totais de Nutrientes inválido.', 'danger')
+        return redirect(url_for('refeicao'))
+    except json.JSONDecodeError:
+        flash('Erro ao processar a lista de alimentos. Tente novamente.', 'danger')
+        return redirect(url_for('refeicao'))
+    except Exception as e:
+        app.logger.error(f"Erro ao salvar refeição: {e}")
+        flash('Erro interno ao salvar o registro da refeição.', 'danger')
+        return redirect(url_for('refeicao'))
+
+@app.route('/excluir_registo/<int:id>', methods=['POST'])
+@login_required
+def excluir_registo(id):
+    registro_para_excluir = db_manager.encontrar_registro(id)
+    if not registro_para_excluir or registro_para_excluir['user_id'] != current_user.id:
+        flash('Registro não encontrado ou você não tem permissão para excluí-lo.', 'danger')
+        return redirect(url_for('registros'))
+
+    sucesso = db_manager.excluir_registro(id)
+    if sucesso:
+        flash('Registro excluído com sucesso!', 'success')
+        app_core.salvar_log_acao(f'Registro {id} excluído', current_user.username)
+    else:
+        flash('Erro ao excluir o registro.', 'danger')
+    return redirect(url_for('registros'))
+
+@app.route('/editar_registo/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_registo(id):
+    registro = db_manager.encontrar_registro(id)
+    if not registro or registro.get('user_id') != current_user.id:
+        flash('Registro não encontrado ou você não tem permissão para editá-lo.', 'danger')
+        return redirect(url_for('registros'))
+
+    if request.method == 'POST':
+        if registro.get('tipo') == 'Glicemia':
+            valor_glicemia = request.form.get('valor_glicemia')
+            data_hora_str = request.form.get('data_hora')
+            observacoes = request.form.get('observacoes')
+
+            try:
+                data_hora = datetime.fromisoformat(data_hora_str)
+                valor_glicemia = float(valor_glicemia.replace(',', '.'))
+            except (ValueError, TypeError):
+                flash('Valores de glicemia ou data/hora inválidos.', 'danger')
+                return redirect(url_for('editar_registo', id=id))
+
+            registro['valor'] = valor_glicemia
+            registro['data_hora'] = data_hora.isoformat()
+            registro['observacoes'] = observacoes
+
+            if db_manager.atualizar_registro(registro):
+                flash('Registro de glicemia atualizado com sucesso!', 'success')
+                app_core.salvar_log_acao(f'Registro de glicemia {id} atualizado', current_user.username)
+            else:
+                flash('Erro ao atualizar registro.', 'danger')
+            return redirect(url_for('registros'))
+
+        elif registro.get('tipo') == 'Refeição':
+            data_hora_str = request.form.get('data_hora')
+            observacoes = request.form.get('observacoes')
+            alimentos_json_str = request.form.get('alimentos_selecionados')
+            tipo_refeicao_especifica = request.form.get('tipo_refeicao')
+
+            if not data_hora_str or not alimentos_json_str:
+                flash('Por favor, preencha todos os campos obrigatórios.', 'danger')
+                return redirect(url_for('editar_registo', id=id))
+
+            try:
+                data_hora = datetime.fromisoformat(data_hora_str)
+                alimentos_list = json.loads(alimentos_json_str)
+                total_carbs = sum(item.get('carbs', 0) * item.get('quantidade', 1) for item in alimentos_list)
+                total_calorias = sum(item.get('kcal', 0) * item.get('quantidade', 1) for item in alimentos_list)
+            except (ValueError, TypeError, json.JSONDecodeError) as e:
+                flash(f'Dados de refeição inválidos: {e}', 'danger')
+                return redirect(url_for('editar_registo', id=id))
+
+            registro.update({
+                'data_hora': data_hora.isoformat(),
+                'observacoes': observacoes,
+                'alimentos_json': alimentos_json_str,
+                'total_carbs': total_carbs,
+                'total_calorias': total_calorias,
+                'tipo_refeicao': tipo_refeicao_especifica
+            })
+
+            if db_manager.atualizar_registro(registro):
+                flash('Registro de refeição atualizado com sucesso!', 'success')
+                app_core.salvar_log_acao(f'Registro de refeição {id} atualizado', current_user.username)
+            else:
+                flash('Erro ao atualizar registro de refeição.', 'danger')
+            return redirect(url_for('registros'))
+
+        else:
+            flash('Tipo de registro inválido.', 'danger')
+            return redirect(url_for('registros'))
+
+    else:
+        if registro.get('tipo') == 'Glicemia':
+            if 'data_hora' in registro and isinstance(registro['data_hora'], str):
+                try:
+                    registro['data_hora'] = datetime.fromisoformat(registro['data_hora'])
+                except ValueError:
+                    pass
+            return render_template('editar_glicemia.html', registro=registro)
+        elif registro.get('tipo') == 'Refeição':
+            alimentos = db_manager.carregar_alimentos()
+            return render_template('editar_refeicao.html', registro=registro, alimentos=alimentos, tipos_refeicao=app_core.obter_tipos_refeicao())
+
+# ---------------------- ROTAS DE ALIMENTOS ----------------------
+@app.route('/login')
+def login():
+    """Redireciona para a rota index, que é a página de login."""
+    return redirect(url_for('index'))
+
+
+@app.route('/alimentos')
+@login_required
+@gestao_required
+def alimentos():
+    lista_alimentos = db_manager.carregar_alimentos()
+    return render_template('alimentos.html', alimentos=lista_alimentos)
+
+@app.route('/excluir_alimento/<int:id>', methods=['POST'])
+@login_required
+@gestao_required
+def excluir_alimento(id):
+    sucesso = db_manager.excluir_alimento(id)
+    if sucesso:
+        flash('Alimento excluído com sucesso!', 'success')
+    else:
+        flash('Erro ao excluir o alimento.', 'danger')
+    return redirect(url_for('alimentos'))
+
+@app.route('/adicionar_alimento', methods=['GET', 'POST'])
+@login_required
+@gestao_required
+def adicionar_alimento():
+    if request.method == 'POST':
+        try:
+            nome = request.form['nome']
+            medida_caseira = request.form['medida_caseira']
+            peso_g = float(request.form['peso_g'].replace(',', '.'))
+            kcal = float(request.form['kcal'].replace(',', '.'))
+            carbs_100g = float(request.form['carbs_100g'].replace(',', '.'))
+
+            novo_alimento = {
+                'alimento': nome, 'medida_caseira': medida_caseira, 'peso': peso_g,
+                'kcal': kcal, 'carbs': carbs_100g
+            }
+
+            if db_manager.salvar_alimento(novo_alimento):
+                flash('Alimento adicionado com sucesso!', 'success')
+            else:
+                flash('Erro ao adicionar o alimento.', 'danger')
+        except (ValueError, TypeError):
+            flash('Dados do alimento inválidos. Por favor, verifique os valores numéricos.', 'danger')
+        return redirect(url_for('alimentos'))
+
+    alimentos = db_manager.carregar_alimentos()
+    return render_template('adicionar_alimento.html', alimentos=alimentos)
+
+@app.route('/registrar_alimento')
+@login_required
+def registrar_alimento_redirect():
+    return redirect(url_for('adicionar_alimento'))
+
+# ---------------------- ROTAS GERAIS ----------------------
+
+@app.route('/refeicao')
+@login_required
+def refeicao():
+    return render_template('registrar_refeicao.html')
+
+@app.route('/buscar_alimentos', methods=['GET', 'POST'])
+def buscar_alimentos():
+    query = request.args.get('query', '') or request.form.get('termo_pesquisa', '')
+    if len(query) >= 3:
+        resultados_originais = db_manager.buscar_alimentos_por_nome(query)
+        resultados_padronizados = [{
+            'nome': item.get('alimento', 'undefined'),
+            'Carbs': item.get('cho', 0.0),
+            'Kcal': item.get('kcal', 0.0),
+            'Porcao': item.get('medida_caseira', '100g'),
+            'cho': item.get('cho', 0.0),
+            'kcal': item.get('kcal', 0.0),
+            'alimento': item.get('alimento', 'undefined'),
+            'id': item.get('id', None),
+            'porcao_peso': item.get('peso', 100.0)
+        } for item in resultados_originais]
+        return jsonify(resultados=resultados_padronizados)
+    return jsonify(resultados=[])
+
+@app.route("/calculadora-bolus")
+def calculadora_bolus():
+    return render_template("calculadora.html")
+# ---------------------- ROTAS DA ÁREA MÉDICA ----------------------
+
+@app.route('/medico/novo_paciente', methods=['GET', 'POST'])
+@login_required 
+@gestao_required
+def novo_paciente():
+    TIPOS_DIABETES = ['Tipo 1', 'Tipo 2', 'Gestacional', 'Outro']
+    if request.method == 'POST':
+        nome_completo = request.form.get('nome_completo')
+        email = request.form.get('email')
+        senha = request.form.get('senha')
+        data_nascimento_str = request.form.get('data_nascimento')
+        tipo_diabetes = request.form.get('tipo_diabetes')
+        medico_id = current_user.id
+
+        if not nome_completo or not email or not senha or not data_nascimento_str or not tipo_diabetes:
+            flash('Por favor, preencha todos os campos do formulário.', 'warning')
+            return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+
+        try:
+            hashed_password = generate_password_hash(senha)
+            datetime.strptime(data_nascimento_str, '%Y-%m-%d').date()
+            novo_usuario_data = {
+                'username': email, 'email': email, 'password_hash': hashed_password,
+                'nome_completo': nome_completo, 'data_nascimento': data_nascimento_str
+            }
+            ficha_inicial_data = {
+                'tipo_diabetes': tipo_diabetes, 
+                'data_diagnostico': datetime.now().strftime('%Y-%m-%d')
+            }
+            if db_manager.criar_paciente_e_ficha_inicial(novo_usuario_data, medico_id, ficha_inicial_data):
+                flash(f'Paciente {nome_completo} cadastrado e vinculado com sucesso!', 'success')
+                return redirect(url_for('lista_pacientes'))
+            else:
+                flash('Erro: O nome de usuário/e-mail já existe ou houve falha no DB.', 'danger')
+                return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+        except Exception as e:
+            app.logger.error(f"Erro ao cadastrar paciente: {e}") 
+            flash('Erro interno ao cadastrar paciente. Verifique o log do servidor.', 'danger')
+            return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+
+    return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+
+@app.route('/medico/pacientes')
+@login_required
+@medico_required
+def lista_pacientes():
+    medico_id = current_user.id
+    try:
+        pacientes = db_manager.obter_pacientes_por_medico(medico_id)
+    except Exception as e:
+        app.logger.error(f"Erro ao carregar pacientes para o médico {medico_id}: {e}")
+        flash('Erro ao carregar lista de pacientes.', 'danger')
+        pacientes = []
+    return render_template('lista_pacientes.html', pacientes=pacientes)
+
+@app.route('/pacientes')
+@login_required
+def pacientes():
+    if not current_user.is_medico:
+        flash('Acesso não autorizado. Esta página é exclusiva para médicos.', 'danger')
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('lista_pacientes'))
+
+@app.route('/relatorio_medico')
+@login_required
+@medico_required
+def relatorio_medico():
+    return render_template('relatorio_medico.html')
+
+@app.route('/paciente/<int:paciente_id>')
+@login_required
+def perfil_paciente(paciente_id):
+    if not (current_user.is_medico or current_user.is_admin):
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+    if not current_user.is_admin and not db_manager.medico_tem_acesso_a_paciente(current_user.id, paciente_id):
+        flash('Acesso não autorizado a este paciente.', 'danger')
+        return redirect(url_for('dashboard_medico'))
+
+    paciente = db_manager.carregar_usuario_por_id(paciente_id)
+    registros = db_manager.carregar_registros(paciente_id)
+    ficha_medica = db_manager.carregar_ficha_medica(paciente_id)
+    return render_template('perfil_paciente.html', paciente=paciente, registros_glicemia=registros, ficha_medica=ficha_medica)
+
+@app.route('/ficha_medica/<int:paciente_id>', methods=['GET', 'POST'])
+@login_required
+def ficha_medica(paciente_id):
+    paciente = db_manager.carregar_usuario_por_id(paciente_id)
+    if not paciente or paciente.get('role') not in ['paciente', 'user']:
+        flash('Paciente não encontrado.', 'danger')
+        return redirect(url_for('dashboard'))
+    if not current_user.is_admin and not db_manager.medico_tem_acesso_a_paciente(current_user.id, paciente_id):
+        flash('Acesso negado. Você não tem permissão para visualizar a ficha deste paciente.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    ficha_medica_data = db_manager.carregar_ficha_medica(paciente_id) or {'paciente_id': paciente_id}
+    if request.method == 'POST':
+        ficha_medica_data.update({
+            'tipo_diabetes': request.form.get('tipo_diabetes'),
+            'insulina_basal': request.form.get('insulina_basal'),
+            'insulina_bolus': request.form.get('insulina_bolus'),
+            'observacoes': request.form.get('observacoes'),
+            'data_diagnostico': request.form.get('data_diagnostico')
+        })
+        db_manager.salvar_ficha_medica(ficha_medica_data)
+        flash('Ficha médica atualizada com sucesso!', 'success')
+        return redirect(url_for('perfil_paciente', paciente_id=paciente_id))
+
+    TIPOS_DIABETES = ['Tipo 1', 'Tipo 2', 'Gestacional', 'Outro']
+    return render_template('ficha_medica.html', paciente=paciente, ficha=ficha_medica_data, tipos_diabetes=TIPOS_DIABETES)
+
+@app.route('/salvar_ficha_medica', methods=['POST'])
+@login_required
+@gestao_required
+def salvar_ficha_medica():
+    try:
+        paciente_id = int(request.form['paciente_id'])
+        ficha_data = {
+            'paciente_id': paciente_id,
+            'condicao_atual': request.form['condicao_atual'],
+            'alergias': request.form['alergias'],
+            'historico_familiar': request.form['historico_familiar'],
+            'medicamentos_uso': request.form['medicamentos_uso']
+        }
+        if db_manager.salvar_ficha_medica(ficha_data):
+            flash('Ficha médica salva com sucesso!', 'success')
+        else:
+            flash('Erro ao salvar a ficha médica.', 'danger')
+        return redirect(url_for('perfil_paciente', paciente_id=paciente_id))
+    except Exception as e:
+        flash(f'Ocorreu um erro: {e}', 'danger')
+        return redirect(url_for('dashboard'))
+
+@app.route('/medico/ficha_acompanhamento/<int:paciente_id>', methods=['GET'])
+@login_required
+def ficha_acompanhamento(paciente_id):
+    if not current_user.is_medico and not current_user.is_admin:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+    paciente = db_manager.carregar_usuario_por_id(paciente_id)
+    if not paciente:
+        flash('Paciente não encontrado.', 'danger')
+        return redirect(url_for('dashboard_medico'))
+    exames_anteriores = db_manager.buscar_exames_paciente(paciente_id)
+    return render_template('ficha_acompanhamento.html', paciente=paciente, exames_anteriores=exames_anteriores)
+
+@app.route('/medico/salvar_ficha_exame/<int:paciente_id>', methods=['POST'])
+@login_required
+@gestao_required
+def salvar_ficha_exame(paciente_id):
+    novo_exame = {
+        'paciente_id': paciente_id,
+        'data_exame': request.form.get('data_exame'),
+        'hb_a1c': float(request.form.get('hb_a1c', 0.0)),
+        'glicose_jejum': int(request.form.get('glicose_jejum', 0)),
+        'ldl': int(request.form.get('ldl', 0)),
+        'triglicerides': int(request.form.get('triglicerides', 0)),
+        'obs_medico': request.form.get('obs_medico')
+    }
+    if db_manager.salvar_exame_laboratorial(novo_exame):
+        flash('Ficha de exame salva com sucesso!', 'success')
+    else:
+        flash('Erro ao salvar ficha de exame.', 'danger')
+    return redirect(url_for('ficha_acompanhamento', paciente_id=paciente_id))
+# ---------------------- ROTAS DE AGENDAMENTO ----------------------
+
+@app.route('/agendamentos')
+@login_required
+def agendamentos_redirect():
+    return redirect(url_for('gerenciar_agendamentos'))
+
+@app.route('/minhas_consultas')
+@login_required
+def minhas_consultas():
+    if not current_user.is_paciente:
+        flash('Acesso não autorizado. Esta página é para pacientes.', 'danger')
+        return redirect(url_for('dashboard'))
+    agendamentos = db_manager.buscar_agendamentos_paciente(current_user.id)
+    return render_template('minhas_consultas.html', agendamentos=agendamentos)
+
+@app.route('/atualizar_status_paciente/<int:id>', methods=['POST'])
+@login_required
+def atualizar_status_paciente(id):
+    if not current_user.is_paciente:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+    novo_status = request.form.get('novo_status')
+    if db_manager.atualizar_status_agendamento(id, novo_status):
+        flash('Status da consulta atualizado com sucesso.', 'success')
+    else:
+        flash('Erro ao atualizar o status da consulta.', 'danger')
+    return redirect(url_for('minhas_consultas'))
+
+@app.route('/gerenciar_agendamentos')
+@login_required
+@gestao_required
+def gerenciar_agendamentos():
+    if current_user.is_admin:
+        agendamentos = db_manager.buscar_todos_agendamentos()
+    else:
+        medico_id = current_user.id if current_user.is_medico else getattr(current_user, 'medico_id', None)
+        if not medico_id:
+            flash('Você não está vinculado a um médico para gerenciar agendamentos.', 'warning')
+            return redirect(url_for('dashboard'))
+        agendamentos = db_manager.buscar_agendamentos_por_medico(medico_id)
+    return render_template('gerenciar_agendamentos.html', agendamentos=agendamentos)
+
+@app.route('/agendar_para_paciente', methods=['GET', 'POST'])
+@login_required
+@gestao_required
+def agendar_para_paciente():
+    if request.method == 'POST':
+        try:
+            paciente_username = request.form['paciente_username']
+            medico_username = request.form['medico_username']
+            data_hora = request.form['data_hora']
+            observacoes = request.form.get('observacoes', '')
+
+            paciente_id = db_manager.get_user_id_by_username(paciente_username)
+            medico_id = db_manager.get_user_id_by_username(medico_username)
+
+            if not paciente_id or not medico_id:
+                flash('Paciente ou médico não encontrado.', 'danger')
+                return redirect(url_for('agendar_para_paciente'))
+
+            if db_manager.salvar_agendamento(paciente_id, medico_id, data_hora, observacoes):
+                flash('Agendamento criado com sucesso!', 'success')
+                return redirect(url_for('gerenciar_agendamentos'))
+            else:
+                flash('Erro ao salvar agendamento.', 'danger')
+                return redirect(url_for('agendar_para_paciente'))
+        except Exception as e:
+            flash(f'Ocorreu um erro: {e}', 'danger')
+            return redirect(url_for('agendar_para_paciente'))
+
+    pacientes = db_manager.carregar_todos_os_usuarios('paciente')
+    medicos = db_manager.carregar_todos_os_usuarios('medico')
+    return render_template('agendar_para_paciente.html', pacientes=pacientes, medicos=medicos)
+
+@app.route('/agendar_consulta', methods=['GET', 'POST'])
+@login_required
+def agendar_consulta():
+    if request.method == 'POST':
+        medico_id = request.form.get('medico_id')
+        data_hora = request.form.get('data_agendamento')
+        observacoes = request.form.get('observacoes')
+        paciente_id = current_user.id 
+
+        if db_manager.salvar_agendamento(paciente_id, medico_id, data_hora, observacoes):
+            flash('Consulta agendada com sucesso!', 'success')
+            return redirect(url_for('minhas_consultas'))
+        else:
+            flash('Erro ao agendar consulta. Tente novamente.', 'danger')
+            return redirect(url_for('agendar_consulta'))
+
+    medicos = db_manager.carregar_todos_os_usuarios(perfil='medico')
+    return render_template('agendar_consulta.html', medicos=medicos)
+
+# ---------------------- ROTAS DE CADASTRO DE PROFISSIONAIS ----------------------
+
+@app.route('/cadastrar_profissional', methods=['GET', 'POST'])
+@login_required
+@gestao_required
+def cadastrar_profissional():
+    medicos = db_manager.carregar_todos_os_usuarios(perfil='medico')
+    if request.method == 'GET':
+        return render_template('cadastro_profissional.html', medicos=medicos)
+
+    nome_completo = request.form.get('nome_completo')
+    email = request.form.get('email')
+    senha = request.form.get('senha')
+    role = request.form.get('role', 'medico')
+    medico_mestre_id = request.form.get('medico_mestre_id')
+
+    try:
+        hashed_password = generate_password_hash(senha)
+        novo_usuario_data = {
+            'username': email, 'email': email, 'password_hash': hashed_password,
+            'role': role, 'nome_completo': nome_completo,
+        }
+        if role == 'secretario' and medico_mestre_id:
+            novo_usuario_data['medico_id'] = int(medico_mestre_id)
+
+        if db_manager.salvar_usuario(novo_usuario_data):
+            flash(f'Profissional {nome_completo} ({role}) cadastrado com sucesso!', 'success')
+            return redirect(url_for('gerenciar_usuarios'))
+        else:
+            flash('Erro: O e-mail já está em uso ou houve falha no banco de dados.', 'danger')
+    except Exception as e:
+        app.logger.error(f"Erro ao cadastrar profissional: {e}")
+        flash('Erro interno ao cadastrar profissional. Tente novamente.', 'danger')
+
+    return render_template('cadastro_profissional.html', medicos=medicos)
+
+
+
+# --- ROTAS DE UTILIDADE GERAL ---
+@app.route('/refeicao')
+@login_required
+def refeicao():
+    return render_template('registrar_refeicao.html')
+
+@app.route('/buscar_alimentos', methods=['GET', 'POST'])
+def buscar_alimentos():
+    query = request.args.get('query', '') or request.form.get('termo_pesquisa', '')
+    if len(query) >= 3:
+        resultados_originais = db_manager.buscar_alimentos_por_nome(query)
+        resultados_padronizados = []
+        for item in resultados_originais:
+            resultados_padronizados.append({
+                'nome': item.get('alimento', 'undefined'),       
+                'Carbs': item.get('cho', 0.0),
+                'Kcal': item.get('kcal', 0.0),
+                'Porcao': item.get('medida_caseira', '100g'),
+                'cho': item.get('cho', 0.0),
+                'kcal': item.get('kcal', 0.0),
+                'alimento': item.get('alimento', 'undefined'),
+                'id': item.get('id', None),
+                'porcao_peso': item.get('peso', 100.0) 
+            })
+        return jsonify(resultados=resultados_padronizados)
+    return jsonify(resultados=[])
+
+@app.route("/calculadora-bolus")
+def calculadora_bolus():
+    return render_template("calculadora.html")
+# --- ROTAS DA ÁREA MÉDICA ---
+
+# Rota para o Cadastro de Novo Paciente
+@app.route('/medico/novo_paciente', methods=['GET', 'POST'])
+@login_required 
+@gestao_required
+def novo_paciente():
+    TIPOS_DIABETES = ['Tipo 1', 'Tipo 2', 'Gestacional', 'Outro'] # Assumindo que esta lista está definida
+    
+    if request.method == 'POST':
+        # 1. Obter os dados do formulário
+        nome_completo = request.form.get('nome_completo')
+        email = request.form.get('email')
+        senha = request.form.get('senha')
+        data_nascimento_str = request.form.get('data_nascimento') 
+        tipo_diabetes = request.form.get('tipo_diabetes')
+
+        # 2. Obter o ID do Médico Logado
+        medico_id = current_user.id # <--- AQUI ESTÁ O VÍNCULO!
+
+        if not nome_completo or not email or not senha or not data_nascimento_str or not tipo_diabetes:
+            flash('Por favor, preencha todos os campos do formulário.', 'warning')
+            return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+
+        try:
+            hashed_password = generate_password_hash(senha)
+            datetime.strptime(data_nascimento_str, '%Y-%m-%d').date()
+            
+            # Dados do Usuário
+            novo_usuario_data = {
+                'username': email, 'email': email, 'password_hash': hashed_password,
+                'nome_completo': nome_completo, 'data_nascimento': data_nascimento_str, 
+            }
+            # Dados da Ficha Inicial (Anamnese simplificada)
+            ficha_inicial_data = {
+                'tipo_diabetes': tipo_diabetes, 
+                'data_diagnostico': datetime.now().strftime('%Y-%m-%d') # Usa a data de cadastro como data de diagnóstico inicial
+            }
+
+            # *** IMPORTANTE: USAR A FUNÇÃO QUE CRIA O PACIENTE E VINCULA O ID DO MÉDICO ***
+            if db_manager.criar_paciente_e_ficha_inicial(novo_usuario_data, medico_id, ficha_inicial_data):
+                flash(f'Paciente {nome_completo} cadastrado e **vinculado** com sucesso!', 'success')
+                return redirect(url_for('lista_pacientes'))
+            else:
+                flash('Erro: O nome de usuário/e-mail já existe ou houve falha no DB.', 'danger')
+                return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+
+        except Exception as e:
+            app.logger.error(f"Erro ao cadastrar paciente: {e}") 
+            flash('Erro interno ao cadastrar paciente. Verifique o log do servidor.', 'danger')
+            return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+
+    # Se for GET
+    return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
+
+# Rota para a Lista de Pacientes do Médico
+@app.route('/medico/pacientes')
+@login_required
+@medico_required
+def lista_pacientes():
+    medico_id = current_user.id
+    try:
+        pacientes = db_manager.obter_pacientes_por_medico(medico_id) 
+    except Exception as e:
+        app.logger.error(f"Erro ao carregar pacientes para o médico {medico_id}: {e}")
+        flash('Erro ao carregar lista de pacientes.', 'danger')
+        pacientes = []
+    return render_template('lista_pacientes.html', pacientes=pacientes)
+
+# Rotas restantes (perfil_paciente, ficha_medica, agendamentos, etc.) mantidas com as verificações de permissão mais complexas ou o novo @gestao_required:
+
+@app.route('/pacientes')
+@login_required
+def pacientes():
+    if not current_user.is_medico:
+        flash('Acesso não autorizado. Esta página é exclusiva para médicos.', 'danger')
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('lista_pacientes'))
+
+@app.route('/relatorio_medico')
+@login_required
+@medico_required
+def relatorio_medico():
+    return render_template('relatorio_medico.html')
+
+@app.route('/paciente/<int:paciente_id>')
+@login_required
+def perfil_paciente(paciente_id):
+    if not (current_user.is_medico or current_user.is_admin):
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+    if not current_user.is_admin and not db_manager.medico_tem_acesso_a_paciente(current_user.id, paciente_id):
+        flash('Acesso não autorizado a este paciente.', 'danger')
+        return redirect(url_for('dashboard_medico'))
+    
+    paciente = db_manager.carregar_usuario_por_id(paciente_id)
+    registros = db_manager.carregar_registros(paciente_id)
+    ficha_medica = db_manager.carregar_ficha_medica(paciente_id)
+    return render_template('perfil_paciente.html', paciente=paciente, registros_glicemia=registros, ficha_medica=ficha_medica)
+
+@app.route('/ficha_medica/<int:paciente_id>', methods=['GET', 'POST'])
+@login_required
+def ficha_medica(paciente_id):
+    paciente = db_manager.carregar_usuario_por_id(paciente_id)
+    if not paciente or paciente.get('role') not in ['paciente', 'user']:
+        flash('Paciente não encontrado.', 'danger')
+        return redirect(url_for('dashboard'))
+    if not current_user.is_admin and not db_manager.medico_tem_acesso_a_paciente(current_user.id, paciente_id):
+        flash('Acesso negado. Você não tem permissão para visualizar a ficha deste paciente.', 'danger')
+        return redirect(url_for('dashboard'))
+        
+    ficha_medica_data = db_manager.carregar_ficha_medica(paciente_id)
+    if not ficha_medica_data: ficha_medica_data = {'paciente_id': paciente_id}
+
+    if request.method == 'POST':
+        ficha_medica_data['tipo_diabetes'] = request.form.get('tipo_diabetes')
+        ficha_medica_data['insulina_basal'] = request.form.get('insulina_basal')
+        ficha_medica_data['insulina_bolus'] = request.form.get('insulina_bolus')
+        ficha_medica_data['observacoes'] = request.form.get('observacoes')
+        ficha_medica_data['data_diagnostico'] = request.form.get('data_diagnostico')
+
+        db_manager.salvar_ficha_medica(ficha_medica_data)
+        flash('Ficha médica atualizada com sucesso!', 'success')
+        return redirect(url_for('perfil_paciente', paciente_id=paciente_id))
+
+    return render_template('ficha_medica.html', paciente=paciente, ficha=ficha_medica_data, tipos_diabetes=TIPOS_DIABETES)
+
+@app.route('/salvar_ficha_medica', methods=['POST'])
+@login_required
+@gestao_required # DECORADOR APLICADO
+def salvar_ficha_medica():
+    try:
+        paciente_id = int(request.form['paciente_id'])
+        ficha_data = {
+            'paciente_id': paciente_id, 'condicao_atual': request.form['condicao_atual'],
+            'alergias': request.form['alergias'], 'historico_familiar': request.form['historico_familiar'],
+            'medicamentos_uso': request.form['medicamentos_uso']
+        }
+        if db_manager.salvar_ficha_medica(ficha_data):
+            flash('Ficha médica salva com sucesso!', 'success')
+        else:
+            flash('Erro ao salvar a ficha médica.', 'danger')
+        return redirect(url_for('perfil_paciente', paciente_id=paciente_id))
+    except Exception as e:
+        flash(f'Ocorreu um erro: {e}', 'danger')
+        return redirect(url_for('dashboard'))
+    
+@app.route('/medico/ficha_acompanhamento/<int:paciente_id>', methods=['GET'])
+@login_required
+def ficha_acompanhamento(paciente_id):
+    if not current_user.is_medico and not current_user.is_admin:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+    paciente = db_manager.carregar_usuario_por_id(paciente_id) 
+    if not paciente:
+        flash('Paciente não encontrado.', 'danger')
+        return redirect(url_for('dashboard_medico')) 
+    exames_anteriores = db_manager.buscar_exames_paciente(paciente_id)
+    return render_template('ficha_acompanhamento.html', paciente=paciente, exames_anteriores=exames_anteriores)
+
+@app.route('/medico/salvar_ficha_exame/<int:paciente_id>', methods=['POST'])
+@login_required
+@gestao_required # DECORADOR APLICADO
+def salvar_ficha_exame(paciente_id):
+    novo_exame = {
+        'paciente_id': paciente_id, 'data_exame': request.form.get('data_exame'), 
+        'hb_a1c': float(request.form.get('hb_a1c', 0.0)), 'glicose_jejum': int(request.form.get('glicose_jejum', 0)),
+        'ldl': int(request.form.get('ldl', 0)), 'triglicerides': int(request.form.get('triglicerides', 0)),
+        'obs_medico': request.form.get('obs_medico')
+    }
+    if db_manager.salvar_exame_laboratorial(novo_exame):
+        flash('Ficha de exame salva com sucesso!', 'success')
+    else:
+        flash('Erro ao salvar ficha de exame.', 'danger')
+    return redirect(url_for('ficha_acompanhamento', paciente_id=paciente_id))
+
+# --- ROTAS DE AGENDAMENTO ---
+
+@app.route('/agendamentos')
+@login_required
+def agendamentos_redirect():
+    return redirect(url_for('gerenciar_agendamentos'))
+
+@app.route('/minhas_consultas')
+@login_required
+def minhas_consultas():
+    if not current_user.is_paciente:
+        flash('Acesso não autorizado. Esta página é para pacientes.', 'danger')
+        return redirect(url_for('dashboard'))
+    agendamentos = db_manager.buscar_agendamentos_paciente(current_user.id)
+    return render_template('minhas_consultas.html', agendamentos=agendamentos)
+
+@app.route('/atualizar_status_paciente/<int:id>', methods=['POST'])
+@login_required
+def atualizar_status_paciente(id):
+    if not current_user.is_paciente:
+        flash('Acesso não autorizado.', 'danger')
+        return redirect(url_for('dashboard'))
+    novo_status = request.form.get('novo_status')
+    if db_manager.atualizar_status_agendamento(id, novo_status):
+        flash('Status da consulta atualizado com sucesso.', 'success')
+    else:
+        flash('Erro ao atualizar o status da consulta.', 'danger')
+    return redirect(url_for('minhas_consultas'))
+
+@app.route('/gerenciar_agendamentos')
+@login_required
+@gestao_required 
+def gerenciar_agendamentos():
+    # 1. APENAS admins veem TUDO
+    if current_user.is_admin:
+        agendamentos = db_manager.buscar_todos_agendamentos()
+    # 2. Médicos e Secretários só veem os DELES
+    else:
+        # Se for Médico, usa o próprio ID
+        if current_user.is_medico:
+            medico_id = current_user.id
+        # Se for Secretário, usa o ID do Médico Mestre (medico_id do próprio secretário)
+        elif current_user.is_secretario and current_user.medico_id:
+            medico_id = current_user.medico_id
+        else:
+            flash('Você não está vinculado a um médico para gerenciar agendamentos.', 'warning')
+            return redirect(url_for('dashboard'))
+
+        # Chamada à função de filtro específica
+        agendamentos = db_manager.buscar_agendamentos_por_medico(medico_id)
+
+    return render_template('gerenciar_agendamentos.html', agendamentos=agendamentos)
+
+
+
+@app.route('/agendar_para_paciente', methods=['GET', 'POST'])
+@login_required
+@gestao_required # DECORADOR APLICADO
+def agendar_para_paciente():
+    if request.method == 'POST':
+        try:
+            paciente_username = request.form['paciente_username']
+            medico_username = request.form['medico_username']
+            data_hora = request.form['data_hora']
+            observacoes = request.form.get('observacoes', '')
+
+            paciente_id = db_manager.get_user_id_by_username(paciente_username)
+            medico_id = db_manager.get_user_id_by_username(medico_username)
+
+            if not paciente_id or not medico_id:
+                flash('Paciente ou médico não encontrado.', 'danger')
+                return redirect(url_for('agendar_para_paciente'))
+
+            if db_manager.salvar_agendamento(paciente_id, medico_id, data_hora, observacoes):
+                flash('Agendamento criado com sucesso!', 'success')
+                return redirect(url_for('gerenciar_agendamentos'))
+            else:
+                flash('Erro ao salvar agendamento.', 'danger')
+                return redirect(url_for('agendar_para_paciente'))
+        except Exception as e:
+            flash(f'Ocorreu um erro: {e}', 'danger')
+            return redirect(url_for('agendar_para_paciente'))
+
+    pacientes = db_manager.carregar_todos_os_usuarios('paciente')
+    medicos = db_manager.carregar_todos_os_usuarios('medico')
+    return render_template('agendar_para_paciente.html', pacientes=pacientes, medicos=medicos)
+
+@app.route('/agendar_consulta', methods=['GET', 'POST'])
+@login_required
+def agendar_consulta():
+    if request.method == 'POST':
+        medico_id = request.form.get('medico_id')
+        data_hora = request.form.get('data_agendamento')
+        observacoes = request.form.get('observacoes')
+        paciente_id = current_user.id 
+
+        if db_manager.salvar_agendamento(paciente_id, medico_id, data_hora, observacoes):
+            flash('Consulta agendada com sucesso!', 'success')
+            return redirect(url_for('minhas_consultas'))
+        else:
+            flash('Erro ao agendar consulta. Tente novamente.', 'danger')
+            return redirect(url_for('agendar_consulta'))
+
+    medicos = db_manager.carregar_todos_os_usuarios(perfil='medico')
+    return render_template('agendar_consulta.html', medicos=medicos)
+# No seu app.py, adicione a rota de cadastro de profissional
+
+@app.route('/cadastrar_profissional', methods=['GET', 'POST'])
+@login_required 
+@gestao_required # Garante que apenas Admins ou Gestores possam acessar
+def cadastrar_profissional():
+    # Carrega todos os médicos para a lista de seleção (dropdown)
+    # Assumindo que você tem uma função no db_manager para isso.
+    medicos = db_manager.carregar_todos_os_usuarios(perfil='medico') 
+
+    if request.method == 'GET':
+        # Passa a lista de médicos para o template
+        return render_template('cadastro_profissional.html', medicos=medicos)
+
+    if request.method == 'POST':
+        # 1. Capture os dados do formulário
+        nome_completo = request.form.get('nome_completo')
+        email = request.form.get('email')
+        senha = request.form.get('senha')
+        role = request.form.get('role', 'medico') 
+        
+        # Novo campo: Captura o ID do Médico Mestre selecionado (usado apenas para Secretário)
+        medico_mestre_id = request.form.get('medico_mestre_id') # Recebe o ID como string
+        
+        # ... (restante da validação) ...
+
+        try:
+            hashed_password = generate_password_hash(senha)
+            novo_usuario_data = {
+                'username': email, 'email': email, 'password_hash': hashed_password,
+                'role': role, 'nome_completo': nome_completo,
+            }
+            
+            # 2. LÓGICA CRÍTICA DE VÍNCULO (II.8):
+            # Se o papel for 'secretario', adiciona o medico_id para ser salvo
+            if role == 'secretario' and medico_mestre_id:
+                # O campo medico_id do Secretário é o ID do seu Médico Mestre
+                novo_usuario_data['medico_id'] = int(medico_mestre_id)
+            
+            # Assumindo que salvar_usuario é capaz de receber e salvar o 'medico_id'
+            # no dicionário (você precisará adaptar salvar_usuario no db_manager para aceitar 'medico_id').
+            if db_manager.salvar_usuario(novo_usuario_data):
+                flash(f'Profissional {nome_completo} ({role}) cadastrado com sucesso!', 'success')
+                return redirect(url_for('gerenciar_usuarios'))
+            else:
+                flash('Erro: O e-mail já está em uso ou houve falha no banco de dados.', 'danger')
+
+        except Exception as e:
+            app.logger.error(f"Erro ao cadastrar profissional: {e}")
+            flash('Erro interno ao cadastrar profissional. Tente novamente.', 'danger')
+        
+        # Retorna o template em caso de falha no POST, garantindo que os médicos sejam passados novamente
+        return render_template('cadastro_profissional.html', medicos=medicos)
+
+if __name__ == '__main__':
+    app.run(debug=True)

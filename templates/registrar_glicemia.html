@@ -3,33 +3,39 @@
 {% block title %}Registrar Glicemia{% endblock %}
 
 {% block content %}
-<div class="container-page">
-    <div class="card p-4 shadow-sm">
-        <h1 class="mb-4">
-            <i class="fas fa-plus-circle me-2"></i>Registrar Glicemia
+<div class="container mt-4">
+    <div class="card p-4 shadow-lg border-0 bg-white">
+        <h1 class="mb-4 text-primary">
+            <i class="fas fa-plus-circle me-3"></i>Novo Registro
         </h1>
-        
+
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
+        {% if messages %}
+        <div class="mb-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         {% endwith %}
 
-        <form id="form-registro-glicemia" action="{{ url_for('salvar_glicemia') }}" method="post">
+        <form id="form-registro-glicemia" action="{{ url_for('registrar_glicemia') }}" method="post">
+
+            <h5 class="text-secondary mb-3"><i class="fas fa-drop text-danger me-2"></i>Dados de Glicemia</h5>
+
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
                 <div class="form-floating">
-                    <input type="number" step="0.1" class="form-control" id="valor_glicemia" name="valor" placeholder="Valor da Glicemia (mg/dL)" required>
+                    <input type="number" class="form-control" id="valor_glicemia" name="valor"
+                        placeholder="Valor da Glicemia (mg/dL)" required min="1">
                     <label for="valor_glicemia">Valor da Glicemia (mg/dL)</label>
                 </div>
             </div>
-            
-            <div class="mb-3 input-group">
+
+            <div class="mb-4 input-group">
                 <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
                 <div class="form-floating">
                     <input type="datetime-local" class="form-control" id="data_hora" name="data_hora" required>
@@ -37,18 +43,40 @@
                 </div>
             </div>
 
-            <div class="mb-3 input-group">
-                <span class="input-group-text"><i class="fas fa-comment-dots"></i></span>
+            <div class="mb-4 input-group">
+                <span class="input-group-text align-items-start pt-3"><i class="fas fa-comment-dots"></i></span>
                 <div class="form-floating">
-                    <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Observações (opcional)"></textarea>
+                    <textarea class="form-control" id="observacoes" name="observacao" rows="3"
+                        placeholder="Observações (ex: antes/depois da refeição, exercício)"></textarea>
                     <label for="observacoes">Observações (opcional)</label>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">
-                <i class="fas fa-save me-2"></i>Registrar Glicemia
+            <button type="submit" class="btn btn-primary w-100 btn-lg shadow-lg">
+                <i class="fas fa-save me-2"></i>Salvar Registro
             </button>
         </form>
     </div>
 </div>
+
+<script>
+    // Função para pré-preencher o campo datetime-local com o momento atual
+    document.addEventListener('DOMContentLoaded', function () {
+        const dataHoraInput = document.getElementById('data_hora');
+
+        // Se o valor já estiver preenchido (ex: após um erro de validação do Flask), não altera.
+        if (!dataHoraInput.value) {
+            const now = new Date();
+            // Formata para o formato YYYY-MM-DDTHH:MM, exigido pelo input datetime-local
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+
+            const formattedDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            dataHoraInput.value = formattedDateTime;
+        }
+    });
+</script>
 {% endblock %}

@@ -5,36 +5,46 @@
 {% block content %}
 <div id="heroCarousel" class="carousel slide hero-carousel-short" data-bs-ride="carousel">
     <div class="carousel-indicators">
-        <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+        <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active" aria-current="true"
+            aria-label="Slide 1"></button>
         <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
         <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
     </div>
 
     <div class="carousel-inner">
-        <div class="carousel-item active" style="background-image: url('{{ url_for('static', filename='imagens/slide1.jpg') }}');">
+        <div class="carousel-item active"
+            style="background-image: url('{{ url_for('static', filename='imagens/slide1.jpg') }}');">
             <div class="carousel-caption d-flex flex-column justify-content-center align-items-center">
                 <h1 class="display-4 fw-bold text-white mb-4">Gerencie sua Glicemia com Facilidade</h1>
-                <p class="lead text-white-50 mb-4">Simplifique o controle da sua diabetes com nosso aplicativo intuitivo e eficiente.</p>
+                <p class="lead text-white-50 mb-4">Simplifique o controle da sua diabetes com nosso aplicativo intuitivo
+                    e eficiente.</p>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg px-4 me-md-2 fw-bold custom-btn">Entrar</a>
-                    <a href="{{ url_for('cadastro') }}" class="btn btn-outline-light btn-lg px-4 custom-btn">Cadastre-se</a>
+                    <a href="{{ url_for('login') }}"
+                        class="btn btn-primary btn-lg px-4 me-md-2 fw-bold custom-btn">Entrar</a>
+                    <a href="{{ url_for('cadastro') }}"
+                        class="btn btn-outline-light btn-lg px-4 custom-btn">Cadastre-se</a>
                 </div>
             </div>
         </div>
-        
-        <div class="carousel-item" style="background-image: url('{{ url_for('static', filename='imagens/slide2.jpg') }}');">
+
+        <div class="carousel-item"
+            style="background-image: url('{{ url_for('static', filename='imagens/slide2.jpg') }}');">
             <div class="carousel-caption d-flex flex-column justify-content-center align-items-center">
                 <h1 class="display-4 fw-bold text-white mb-4">Relatórios Detalhados para o Seu Bem-Estar</h1>
-                <p class="lead text-white-50 mb-4">Acompanhe seu progresso, identifique tendências e compartilhe dados com seu médico.</p>
+                <p class="lead text-white-50 mb-4">Acompanhe seu progresso, identifique tendências e compartilhe dados
+                    com seu médico.</p>
                 <a href="{{ url_for('cadastro') }}" class="btn btn-primary btn-lg px-4 custom-btn">Começar Agora</a>
             </div>
         </div>
 
-        <div class="carousel-item" style="background-image: url('{{ url_for('static', filename='imagens/slide3.jpg') }}');">
+        <div class="carousel-item"
+            style="background-image: url('{{ url_for('static', filename='imagens/slide3.jpg') }}');">
             <div class="carousel-caption d-flex flex-column justify-content-center align-items-center">
                 <h1 class="display-4 fw-bold text-white mb-4">Cálculos de Bolus Precisos e Rápidos</h1>
-                <p class="lead text-white-50 mb-4">Nossa calculadora inteligente sugere a dose ideal de insulina para você, com base em suas configurações.</p>
-                <a href="{{ url_for('cadastro') }}" class="btn btn-primary btn-lg px-4 custom-btn">Conhecer a Ferramenta</a>
+                <p class="lead text-white-50 mb-4">Nossa calculadora inteligente sugere a dose ideal de insulina para
+                    você, com base em suas configurações.</p>
+                <a href="{{ url_for('cadastro') }}" class="btn btn-primary btn-lg px-4 custom-btn">Conhecer a
+                    Ferramenta</a>
             </div>
         </div>
     </div>
@@ -56,10 +66,12 @@
         <div class="row g-4 justify-content-center">
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card h-100 shadow-sm info-card">
-                    <img src="{{ url_for('static', filename='imagens/slide1.jpg') }}" class="card-img-top" alt="Gerenciar Glicemia">
+                    <img src="{{ url_for('static', filename='imagens/slide1.jpg') }}" class="card-img-top"
+                        alt="Gerenciar Glicemia">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold text-primary">Gerencie sua Glicemia com Facilidade</h5>
-                        <p class="card-text">Simplifique o controle da sua diabetes com nosso aplicativo intuitivo e eficiente. Registre suas medições e refeições em segundos.</p>
+                        <p class="card-text">Simplifique o controle da sua diabetes com nosso aplicativo intuitivo e
+                            eficiente. Registre suas medições e refeições em segundos.</p>
                         <a href="{{ url_for('refeicao') }}" class="btn btn-primary mt-auto">Saiba Mais</a>
                     </div>
                 </div>
@@ -67,21 +79,26 @@
 
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card h-100 shadow-sm info-card">
-                    <img src="{{ url_for('static', filename='imagens/slide2.jpg') }}" class="card-img-top" alt="Relatórios Detalhados">
+                    <img src="{{ url_for('static', filename='imagens/slide2.jpg') }}" class="card-img-top"
+                        alt="Relatórios Detalhados">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold text-primary">Relatórios Detalhados para o Seu Bem-Estar</h5>
-                        <p class="card-text">Acompanhe seu progresso, identifique tendências e compartilhe dados com seu médico. Nossos gráficos ajudam você a visualizar seu histórico.</p>
-                        <a href="{{ url_for('relatorios') }}" class="btn btn-primary mt-auto">Ver Relatórios</a>
+                        <p class="card-text">Acompanhe seu progresso, identifique tendências e compartilhe dados com seu
+                            médico. Nossos gráficos ajudam você a visualizar seu histórico.</p>
+                        <a href="{{ url_for('relatorios.relatorios') }}" class="btn btn-primary mt-auto">Ver
+                            Relatórios</a>
                     </div>
                 </div>
             </div>
 
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card h-100 shadow-sm info-card">
-                    <img src="{{ url_for('static', filename='imagens/slide3.jpg') }}" class="card-img-top" alt="Cálculos de Bolus">
+                    <img src="{{ url_for('static', filename='imagens/slide3.jpg') }}" class="card-img-top"
+                        alt="Cálculos de Bolus">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold text-primary">Cálculos de Bolus Precisos e Rápidos</h5>
-                        <p class="card-text">Nossa calculadora inteligente sugere a dose ideal de insulina para você, com base em suas configurações. Evite erros e tenha mais segurança.</p>
+                        <p class="card-text">Nossa calculadora inteligente sugere a dose ideal de insulina para você,
+                            com base em suas configurações. Evite erros e tenha mais segurança.</p>
                         <a href="{{ url_for('calculadora_bolus') }}" class="btn btn-primary mt-auto">Calcular Bolus</a>
                     </div>
                 </div>
@@ -99,17 +116,21 @@
                 <div class="card h-100 p-3 shadow-sm info-card">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold text-primary">O que é Glicemia?</h5>
-                        <p class="card-text">Glicemia normal significa que a quantidade de glicose, ou açúcar, no sangue está dentro de um intervalo que o corpo pode gerenciar de forma eficaz, sem causar estresse ou dano aos órgãos e sistemas do corpo.</p>
-                        <p class="card-text">Para adultos, um nível de glicemia de jejum considerado normal fica geralmente entre 70 e 99 mg/dL.</p>
+                        <p class="card-text">Glicemia normal significa que a quantidade de glicose, ou açúcar, no sangue
+                            está dentro de um intervalo que o corpo pode gerenciar de forma eficaz, sem causar estresse
+                            ou dano aos órgãos e sistemas do corpo.</p>
+                        <p class="card-text">Para adultos, um nível de glicemia de jejum considerado normal fica
+                            geralmente entre 70 e 99 mg/dL.</p>
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card h-100 p-3 shadow-sm info-card">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold text-primary">Como medir a Glicemia?</h5>
-                        <p class="card-text">A medição da glicemia é um processo importante para a gestão da saúde. Existem várias formas de monitoramento, desde métodos caseiros até exames laboratoriais.</p>
+                        <p class="card-text">A medição da glicemia é um processo importante para a gestão da saúde.
+                            Existem várias formas de monitoramento, desde métodos caseiros até exames laboratoriais.</p>
                         <ul class="list-group list-group-flush mt-3">
                             <li class="list-group-item">1. Monitoramento da Glicemia Capilar</li>
                             <li class="list-group-item">2. Glicemia de Jejum</li>
@@ -154,12 +175,14 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-12 col-md-6">
                 <div class="card h-100 p-3 shadow-sm info-card">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold text-primary">Sintomas e Causas da Glicemia Alta</h5>
-                        <p class="card-text">Hiperglicemia é o excesso de glicose no sangue. Sintomas podem incluir sede excessiva, aumento da frequência urinária, fadiga e visão embaçada. Pode ser causada por diabetes, dieta inadequada, falta de exercício e estresse.</p>
+                        <p class="card-text">Hiperglicemia é o excesso de glicose no sangue. Sintomas podem incluir sede
+                            excessiva, aumento da frequência urinária, fadiga e visão embaçada. Pode ser causada por
+                            diabetes, dieta inadequada, falta de exercício e estresse.</p>
                     </div>
                 </div>
             </div>
@@ -167,7 +190,9 @@
                 <div class="card h-100 p-3 shadow-sm info-card">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold text-primary">Sintomas e Causas da Glicemia Baixa</h5>
-                        <p class="card-text">Hipoglicemia é quando a glicose cai abaixo de 70 mg/dL. Os sintomas são tremores, suor frio, tontura, fome súbita e confusão mental. As causas mais comuns são doses excessivas de medicação, pular refeições ou jejum prolongado, e exercício excessivo.</p>
+                        <p class="card-text">Hipoglicemia é quando a glicose cai abaixo de 70 mg/dL. Os sintomas são
+                            tremores, suor frio, tontura, fome súbita e confusão mental. As causas mais comuns são doses
+                            excessivas de medicação, pular refeições ou jejum prolongado, e exercício excessivo.</p>
                     </div>
                 </div>
             </div>
@@ -179,7 +204,8 @@
 <section class="final-cta py-5 bg-dark text-white text-center">
     <div class="container">
         <h2 class="display-4 fw-bold mb-4">Pronto para assumir o controle?</h2>
-        <p class="lead mb-4">Junte-se a milhares de usuários que estão gerenciando sua diabetes de forma mais eficaz.</p>
+        <p class="lead mb-4">Junte-se a milhares de usuários que estão gerenciando sua diabetes de forma mais eficaz.
+        </p>
         <a href="{{ url_for('cadastro') }}" class="btn btn-primary btn-lg custom-btn">Começar Agora</a>
     </div>
 </section>

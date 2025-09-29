@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Novo Paciente{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow-lg">
+                <div class="card-body">
+                    <h1 class="card-title text-center mb-4">
+                        <i class="fas fa-user-plus me-2"></i>Cadastro de Novo Paciente
+                    </h1>
+                    <p class="text-muted text-center mb-4">
+                        Preencha os dados do novo paciente e sua ficha médica inicial (anamnese).
+                    </p>
+                    
+                    <form action="{{ url_for('novo_paciente') }}" method="post">
+                        
+                        <h5 class="mb-3 text-primary"><i class="fas fa-lock me-2"></i>Dados de Acesso</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="username" class="form-label">Usuário (Login)</label>
+                                <input type="text" class="form-control" id="username" name="username"
+                                    placeholder="Nome de Usuário" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">E-mail</label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                    placeholder="exemplo@dominio.com">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="password" class="form-label">Senha Inicial</label>
+                                <input type="password" class="form-control" id="password" name="password"
+                                    placeholder="Senha (Mínimo 6 caracteres)" required minlength="6">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="password_confirm" class="form-label">Confirmar Senha</label>
+                                <input type="password" class="form-control" id="password_confirm"
+                                    name="password_confirm" placeholder="Confirme a Senha" required>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <h5 class="mb-3 text-primary"><i class="fas fa-user-circle me-2"></i>Dados Pessoais</h5>
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="nome_completo" class="form-label">Nome Completo</label>
+                                <input type="text" class="form-control" id="nome_completo" name="nome_completo"
+                                    placeholder="Nome Completo do Paciente" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="data_nascimento" class="form-label">Data de Nascimento</label>
+                                <input type="date" class="form-control" id="data_nascimento" name="data_nascimento">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sexo" class="form-label">Sexo</label>
+                                <select class="form-select" id="sexo" name="sexo">
+                                    <option value="">Selecione...</option>
+                                    <option value="F">Feminino</option>
+                                    <option value="M">Masculino</option>
+                                    <option value="O">Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="telefone" class="form-label">Telefone</label>
+                                <input type="tel" class="form-control" id="telefone" name="telefone"
+                                    placeholder="(99) 99999-9999">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="razao_ic" class="form-label">Razão I:C (Unidades/Carboidrato)</label>
+                                <input type="number" step="0.1" class="form-control" id="razao_ic" name="razao_ic"
+                                    value="1.0" min="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="fator_sensibilidade" class="form-label">Fator de Sensibilidade</label>
+                                <input type="number" step="1" class="form-control" id="fator_sensibilidade" name="fator_sensibilidade"
+                                    value="1.0" min="0">
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <h5 class="mb-3 text-primary"><i class="fas fa-notes-medical me-2"></i>Anamnese Inicial</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="tipo_diabetes" class="form-label">Tipo de Diabetes</label>
+                                <select class="form-select" id="tipo_diabetes" name="tipo_diabetes" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Tipo 1">Tipo 1</option>
+                                    <option value="Tipo 2">Tipo 2</option>
+                                    <option value="LADA">LADA</option>
+                                    <option value="Gestacional">Gestacional</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="data_diagnostico" class="form-label">Data do Diagnóstico</label>
+                                <input type="date" class="form-control" id="data_diagnostico" name="data_diagnostico">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="historico_familiar" class="form-label">Histórico Familiar</label>
+                                <textarea class="form-control" id="historico_familiar" name="historico_familiar" rows="2"
+                                    placeholder="Ex: Mãe com DM2, Tio com Hipertensão."></textarea>
+                            </div>
+                            <div class="col-md-12">
+                                <label for="outras_comorbidades" class="form-label">Outras Comorbidades / Condições</label>
+                                <textarea class="form-control" id="outras_comorbidades" name="outras_comorbidades" rows="2"
+                                    placeholder="Ex: Hipertensão, Obesidade, Doença Celíaca."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-save me-2"></i>Salvar Paciente e Ficha
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
