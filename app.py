@@ -652,7 +652,7 @@ def registros():
         get_status_class=get_status_class 
     )
     
-@app.route('/registrar_glicemia', methods=['GET'])
+@app.route('/registrar_glicemia', methods=['GET', 'POST'])
 @login_required
 def registrar_glicemia():
     return render_template('registrar_glicemia.html') 
@@ -684,7 +684,7 @@ def salvar_glicemia():
         'total_carbs': None,
         'total_calorias': None,
         'alimentos_json': None,
-        'tipo_refeicao': None,
+       
     }
     
     if db_manager.salvar_registro(dados_registro):
@@ -737,7 +737,8 @@ def registrar_refeicao():
     now = datetime.now().strftime('%Y-%m-%dT%H:%M')
     
     # Usa a função do AppCore para obter a lista de tipos
-    return render_template('registrar_refeicao.html', alimentos=alimentos, now=now, tipos_refeicao=app_core.obter_tipos_refeicao())
+
+    return render_template('registrar_refeicao.html', alimentos=alimentos, tipos_refeicao=app_core.obter_tipos_refeicao())
     
 @app.route('/excluir_registo/<int:id>', methods=['POST'])
 @login_required
@@ -969,15 +970,54 @@ def calcular_fs():
 def guia_insulina():
     return render_template('guia_insulina.html')
 
+# Certifique-se de que 'request', 'jsonify', 'login_required' e 'db_manager'
+# (ou o objeto que gerencia seu SQLite) estejam importados corretamente.
+
 @app.route('/buscar_alimentos', methods=['POST'])
+@login_required 
 def buscar_alimentos():
-    query = request.args.get('query', '')
-    if query:
-        # A função buscar_alimentos_por_nome precisa ser implementada no AppCore ou DatabaseManager
-        # resultados = db_manager.buscar_alimentos_por_nome(query) 
-        resultados = [] # Simulação
-        return jsonify(resultados)
-    return jsonify([])
+    termo = request.form.get('termo_pesquisa', '') 
+    
+    if len(termo) < 3:
+        return jsonify({'resultados': []})
+        
+    try:
+        # A função deve retornar uma lista de dicionários/Rows com as chaves: 
+        # 'alimento', 'medida_caseira', 'peso', 'kcal', 'carbs'
+        alimentos_encontrados = db_manager.buscar_alimentos_por_nome(termo)
+    except Exception as e:
+        print(f"Erro no Database Manager ao buscar alimentos: {e}")
+        return jsonify({'resultados': []})
+    
+    resultados_finais = []
+    for item_db in alimentos_encontrados:
+        
+        # 🟢 Mapeamento 1 e 2: DB para chaves esperadas pelo JavaScript
+        nome_alimento = item_db.get('alimento', 'Nome Indefinido') # DB 'alimento' -> JSON 'nome'
+        peso_porcao = float(item_db.get('peso', 100))               # DB 'peso' -> JSON 'peso_g'
+        
+        # Mapeamento 3: Obter valores base
+        # ATENÇÃO: Estou assumindo que 'carbs' e 'kcal' são os valores por 100g.
+        # Se os valores em 'carbs' e 'kcal' já forem referentes ao peso da porção (coluna 'peso'), 
+        # a lógica de cálculo precisa ser simplificada (veja o bloco 'Atenção' abaixo).
+        carbs_100g_base = float(item_db.get('carbs', 0)) 
+        kcal_100g_base = float(item_db.get('kcal', 0))         
+        medida_caseira = item_db.get('medida_caseira', 'Porção')
+        
+        # Lógica de Cálculo: Usando o peso da porção e o valor por 100g
+        carbs_porcao = (carbs_100g_base * peso_porcao) / 100
+        kcal_porcao = (kcal_100g_base * peso_porcao) / 100
+        
+        # Monta o dicionário de SAÍDA (o que o JavaScript espera)
+        resultados_finais.append({
+            'nome': nome_alimento,          # O JS usa esta chave
+            'medida_caseira': medida_caseira,
+            'peso_g': peso_porcao,          # O JS usa esta chave
+            'carbs_porcao': carbs_porcao,   # O JS usa esta chave
+            'kcal_porcao': kcal_porcao      # O JS usa esta chave
+        })
+        
+    return jsonify({'resultados': resultados_finais})
 
 # --- ROTAS DA ÁREA MÉDICA ---
 

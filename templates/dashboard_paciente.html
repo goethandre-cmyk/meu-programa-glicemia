@@ -16,7 +16,7 @@
     <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido (Últimos 7 Dias)</h2>
     <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
 
-        {% set glicemia_valor = dados.ultimo_registro.valor | float %}
+        {% set glicemia_valor = resumo_dados.ultimo_registro.valor | float %}
         {% set status_class = 'text-danger' if glicemia_valor > 180 else ('text-warning' if glicemia_valor < 70
             else 'text-success' ) %} {% set status_icon='fa-arrow-up' if glicemia_valor> 180 else ('fa-arrow-down' if
             glicemia_valor < 70 else 'fa-check-circle' ) %} <div class="col">
@@ -24,9 +24,10 @@
                     <div class="card-body">
                         <i class="fas {{ status_icon }} fa-3x mb-3 {{ status_class }}"></i>
                         <h5 class="card-title text-secondary">Última Glicemia</h5>
-                        <h2 class="card-text display-6 fw-bold {{ status_class }}">{{ dados.ultimo_registro.valor }}
+                        <h2 class="card-text display-6 fw-bold {{ status_class }}">{{ resumo_dados.ultimo_registro.valor
+                            }}
                             mg/dL</h2>
-                        <p class="card-text"><small>{{ dados.ultimo_registro.tempo_desde_ultimo }}</small></p>
+                        <p class="card-text"><small>{{ resumo_dados.ultimo_registro.tempo_desde_ultimo }}</small></p>
                     </div>
                 </div>
     </div>
@@ -37,8 +38,8 @@
                 <i class="fas fa-chart-bar fa-3x mb-3 text-primary"></i>
                 <h5 class="card-title text-secondary">Média (Últimos 7 Dias)</h5>
                 <h2 class="card-text display-6 fw-bold text-dark">
-                    {% if dados.media_ultima_semana %}
-                    {{ dados.media_ultima_semana }} mg/dL
+                    {% if resumo_dados.media_ultima_semana %}
+                    {{ resumo_dados.media_ultima_semana }} mg/dL
                     {% else %}
                     N/A
                     {% endif %}
@@ -55,11 +56,11 @@
                 <h5 class="card-title text-secondary">Alertas de 7 Dias</h5>
                 <div class="d-flex justify-content-center align-items-center mt-3">
                     <div class="p-2 me-4">
-                        <h3 class="fw-bolder text-danger">{{ dados.hiperglicemia_count }}</h3>
+                        <h3 class="fw-bolder text-danger">{{ resumo_dados.hiperglicemia_count }}</h3>
                         <p class="mb-0 text-muted">Hiper</p>
                     </div>
                     <div class="p-2">
-                        <h3 class="fw-bolder text-warning">{{ dados.hipoglicemia_count }}</h3>
+                        <h3 class="fw-bolder text-warning">{{ resumo_dados.hipoglicemia_count }}</h3>
                         <p class="mb-0 text-muted">Hipo</p>
                     </div>
                 </div>

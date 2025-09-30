@@ -135,9 +135,7 @@
             const quantidade = parseFloat(item.querySelector('.input-quantidade').value) || 0;
             const carbsPorMedida = parseFloat(item.querySelector('.alimento-carbs-base').value) || 0;
             const kcalPorMedida = parseFloat(item.querySelector('.alimento-kcal-base').value) || 0;
-            const pesoGrama = parseFloat(item.querySelector('.alimento-peso').value) || 0;
 
-            // Calcula o total do item baseado na quantidade (e peso, se disponível)
             const totalItemCarbs = quantidade * carbsPorMedida;
             const totalItemKcal = quantidade * kcalPorMedida;
 
@@ -150,7 +148,6 @@
             let totalCarbs = 0;
             let totalKcal = 0;
 
-            // Soma os totais calculados
             document.querySelectorAll('.carbs-calculados').forEach(span => {
                 totalCarbs += parseFloat(span.textContent) || 0;
             });
@@ -175,12 +172,16 @@
                 const carbs = parseFloat(li.querySelector('.carbs-calculados').textContent);
                 const kcal = parseFloat(li.querySelector('.kcal-calculados').textContent);
                 const quantidade = parseFloat(li.querySelector('.input-quantidade').value);
+                const carbsPorMedidaBase = parseFloat(li.querySelector('.alimento-carbs-base').value);
+                const kcalPorMedidaBase = parseFloat(li.querySelector('.alimento-kcal-base').value);
 
                 alimentos.push({
-                    "ALIMENTO": nome,
-                    "CHO (g)": carbs,
-                    "KCAL": kcal,
-                    "quantidade": quantidade
+                    "nome": nome,
+                    "carbs_total": carbs,
+                    "kcal_total": kcal,
+                    "quantidade": quantidade,
+                    "carbs_base": carbsPorMedidaBase,
+                    "kcal_base": kcalPorMedidaBase
                 });
             });
             alimentosSelecionadosInput.value = JSON.stringify(alimentos);
@@ -200,12 +201,12 @@
                 <div class="row g-2">
                     <div class="col-12 col-md-6">
                         <label class="form-label d-block text-muted small">Carbs por porção:</label>
-                        <span class="text-primary fw-bold carbs-base">${carbsPorMedida}</span>g / 
-                        <span class="text-muted small">${medidaCaseira} (${pesoGrama}g)</span>
+                        <span class="text-primary fw-bold carbs-base">${carbsPorMedida.toFixed(2)}</span>g / 
+                        <span class="text-muted small">${medidaCaseira} (${pesoGrama.toFixed(0)}g)</span>
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label d-block text-muted small">Kcal por porção:</label>
-                        <span class="text-primary fw-bold kcal-base">${kcalPorMedida}</span>kcal
+                        <span class="text-primary fw-bold kcal-base">${kcalPorMedida.toFixed(2)}</span>kcal
                     </div>
                 </div>
                 <div class="mt-2">
@@ -251,24 +252,26 @@
                 html = '<div class="list-group-item text-muted">Nenhum alimento encontrado.</div>';
             } else {
                 alimentos.forEach(alimento => {
-                    // ------------------------------------------------------------------
-                    // 🚨 CORREÇÃO PRINCIPAL: Usando as chaves EXATAS do seu DB (alimento, carbs, kcal, medida_caseira)
-                    // ------------------------------------------------------------------
-                    const nome = alimento.alimento;
-                    const carbs = alimento.carbs || 0;
-                    const kcal = alimento.kcal || 0;
+                    // Chaves que DEVEM ser retornadas pelo Flask na rota /buscar_alimentos
+                    const nome = alimento.nome || 'Nome Indefinido';
+                    const carbsPorcao = alimento.carbs_porcao || 0;
+                    const kcalPorcao = alimento.kcal_porcao || 0;
                     const medida = alimento.medida_caseira || 'Porção';
-                    const peso = alimento.peso || 100;
+                    const peso = alimento.peso_g || 100;
 
                     html += `
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
                                 <strong>${nome}</strong>
                                 <br>
-                                <small>Carbs: ${carbs}g | Kcal: ${kcal}kcal | Porção: ${medida}</small>
+                                <small>Carbs: ${carbsPorcao.toFixed(2)}g | Kcal: ${kcalPorcao.toFixed(2)}kcal | Porção: ${medida}</small>
                             </div>
                             <button type="button" class="btn btn-sm btn-outline-primary adicionar-alimento-btn" 
-                                data-nome="${nome}" data-carbs="${carbs}" data-kcal="${kcal}" data-medida="${medida}" data-peso="${peso}">
+                                data-nome="${nome}" 
+                                data-carbs="${carbsPorcao}" 
+                                data-kcal="${kcalPorcao}" 
+                                data-medida="${medida}" 
+                                data-peso="${peso}">
                                 <i class="fas fa-plus"></i> Adicionar
                             </button>
                         </div>
@@ -315,7 +318,7 @@
                         return response.json();
                     })
                     .then(data => {
-                        // Atenção: A resposta do Flask deve vir como { "resultados": [array de alimentos] }
+                        // A resposta do Flask DEVE vir como { "resultados": [array de alimentos] }
                         exibirResultados(data.resultados);
                     })
                     .catch(error => {

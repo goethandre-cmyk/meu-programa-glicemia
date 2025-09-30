@@ -531,10 +531,10 @@ class DatabaseManager:
                         SELECT 
                             id, 
                             ALIMENTO, 
-                            "MEDIDA CASEIRA", 
-                            "PESO (g/ml)",    
+                            MEDIDA_CASEIRA, 
+                            PESO,    
                             Kcal, 
-                            "CHO (g)"         -- ESTE É O ÍNDICE 5 QUE O PYTHON VAI LER
+                            CARBS        -- ESTE É O ÍNDICE 5 QUE O PYTHON VAI LER
                         FROM alimentos 
                         WHERE ALIMENTO LIKE ? 
                         ORDER BY ALIMENTO ASC
@@ -553,7 +553,7 @@ class DatabaseManager:
                             'medida_caseira': item[2],     
                             'peso': item[3],               
                             'kcal': item[4],               
-                            'cho': item[5]                 
+                            'carbs': item[5]                 
                         })
                     
                     return alimentos_dict
@@ -561,15 +561,18 @@ class DatabaseManager:
                 print(f"Erro CRÍTICO na busca de alimentos: {e}")
                 return []
     def salvar_registro(self, registro_data):
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO registros (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (registro_data['user_id'], registro_data['data_hora'], registro_data['tipo'], registro_data.get('valor'), registro_data.get('observacoes'), registro_data.get('alimentos_json'), registro_data.get('total_calorias'), registro_data.get('total_carbs')))
-            conn.commit()
-            return True
-        
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO registros (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (registro_data['user_id'], registro_data['data_hora'], registro_data['tipo'], registro_data.get('valor'), registro_data.get('observacoes'), registro_data.get('alimentos_json'), registro_data.get('total_calorias'), registro_data.get('total_carbs')))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            print(f"ERRO DE SQL NO SALVAMENTO: {e}") # <-- Adicione esta linha!
+            return False
     def carregar_registros(self, user_id):
         with self.get_db_connection() as conn:
             cursor = conn.cursor()
