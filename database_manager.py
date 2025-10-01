@@ -1026,7 +1026,7 @@ class DatabaseManager:
             print(f"Erro na verificação de acesso do médico: {e}")
             return False    
 
-        def atualizar_status_agendamento(self, agendamento_id, novo_status):
+    def atualizar_status_agendamento(self, agendamento_id, novo_status):
             conn = self.get_db_connection()
             cursor = conn.cursor()
             try:
@@ -1065,7 +1065,7 @@ class DatabaseManager:
             print(f"Erro ao buscar todos os agendamentos: {e}")
             return []
     
-        def obter_pacientes_por_medico(self, medico_id):
+    def obter_pacientes_por_medico(self, medico_id):
             with self.get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -1076,3 +1076,79 @@ class DatabaseManager:
                 """, (medico_id, medico_id))
                 pacientes = cursor.fetchall()
                 return [dict(row) for row in pacientes]
+            # database_manager.py (Dentro da sua classe DatabaseManager)
+
+# ---------------------- NOVAS FUNÇÕES DE GRÁFICOS ----------------------
+
+    def obter_dados_glicemia_para_grafico(self, paciente_id):
+            """Retorna dados de glicemia (data e valor) ordenados por data."""
+            # Sua lógica de conexão aqui, talvez self.get_db_connection()
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT 
+                        strftime('%Y-%m-%d %H:%M', data_hora) as data_hora, 
+                        valor 
+                    FROM 
+                        registros 
+                    WHERE 
+                        user_id = ? 
+                        AND valor IS NOT NULL 
+                        AND tipo != 'Refeição'
+                    ORDER BY 
+                        data_hora ASC
+                """, (paciente_id,))
+                return [dict(row) for row in cursor.fetchall()]
+
+    def obter_carbs_diarios_para_grafico(self, paciente_id):
+            """Retorna a soma total de carboidratos por dia (apenas Refeições)."""
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT 
+                        strftime('%Y-%m-%d', data_hora) as data, 
+                        SUM(total_carbs) as total_carbs
+                    FROM 
+                        registros 
+                    WHERE 
+                        user_id = ? 
+                        AND tipo = 'Refeição' 
+                        AND total_carbs IS NOT NULL
+                    GROUP BY 
+                        data
+                    ORDER BY 
+                        data ASC
+                """, (paciente_id,))
+                return [dict(row) for row in cursor.fetchall()]
+
+    def obter_calorias_diarias_para_grafico(self, paciente_id):
+            """Retorna a soma total de calorias por dia (apenas Refeições)."""
+            # Você não tinha um campo 'total_calorias' no DB, então a consulta deve ser ajustada
+            # para somar a caloria de cada alimento dentro do JSON, ou usar um campo de soma
+            # que você já tenha. Assumindo que você tem um campo 'calorias_totais' ou similar:
+            
+            # 🚨 NOTA: Se você não tiver um campo de soma para calorias, esta função falhará.
+            # Vou usar 'total_calorias' como um placeholder para um campo de soma no registro:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT 
+                        strftime('%Y-%m-%d', data_hora) as data, 
+                        SUM(total_calorias) as total_calorias
+                    FROM 
+                        registros 
+                    WHERE 
+                        user_id = ? 
+                        AND tipo = 'Refeição'
+                        AND total_calorias IS NOT NULL
+                    GROUP BY 
+                        data
+                    ORDER BY 
+                        data ASC
+                """, (paciente_id,))
+                return [dict(row) for row in cursor.fetchall()]
+
+ # -----------------------------------------------------------------------

@@ -267,37 +267,7 @@ class DatabaseManager:
                 """, (dados['paciente_id'], dados['condicao_atual'], dados['alergias'], dados['historico_familiar'], dados['medicamentos_uso']))
             conn.commit()
 
-    def obter_dados_glicemia_json(self, user_id):
-        """Obtém dados de glicemia em um formato adequado para JSON."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT data_hora, valor FROM registros WHERE user_id = ? AND tipo = 'Glicemia' ORDER BY data_hora", (user_id,))
-            registros = cursor.fetchall()
-            return [{'x': reg['data_hora'], 'y': reg['valor']} for reg in registros]
-
-    def obter_dados_calorias_diarias(self, user_id):
-        """Obtém a soma de calorias por dia para gráficos."""
-        # TODO: Implementar a lógica de cálculo de calorias
-        return []
-
-    def obter_dados_carbs_diarios(self, user_id):
-        """Obtém a soma de carboidratos por dia para gráficos."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT 
-                    DATE(data_hora) as dia, 
-                    SUM(carboidratos) as total_carbs
-                FROM registros
-                WHERE user_id = ? AND tipo = 'Refeição'
-                GROUP BY dia
-                ORDER BY dia;
-            """, (user_id,))
-            dados = cursor.fetchall()
-            return [{'x': row['dia'], 'y': row['total_carbs']} for row in dados]
-
+    
     def criar_agendamento(self, paciente_id, medico_id, data_hora, observacoes):
         """Cria um novo agendamento."""
         try:

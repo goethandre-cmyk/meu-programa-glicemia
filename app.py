@@ -12,6 +12,7 @@ import numpy as np
 import os
 from relatorios import relatorios_bp
 from service_manager import formatar_registros_para_exibicao 
+from db_instance import db_manager # <--- NOVO: Importa a instância global
 
 
 # Certifique-se de que DatabaseManager está disponível
