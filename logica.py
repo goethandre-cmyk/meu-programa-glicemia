@@ -11,73 +11,7 @@ class DatabaseManager:
         self.db_path = db_path
         self.inicializar_db()
 
-    def inicializar_db(self):
-        """Cria as tabelas do banco de dados se elas não existirem."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS usuarios (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT NOT NULL UNIQUE,
-                    password_hash TEXT NOT NULL,
-                    email TEXT,
-                    role TEXT NOT NULL DEFAULT 'simples',
-                    data_nascimento TEXT,
-                    sexo TEXT,
-                    razao_ic REAL,
-                    fator_sensibilidade REAL,
-                    meta_glicemia REAL,
-                    is_active INTEGER DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS registros (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    data_hora TIMESTAMP NOT NULL,
-                    tipo TEXT,
-                    valor REAL,
-                    carboidratos REAL,
-                    observacoes TEXT,
-                    alimentos_refeicao TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES usuarios(id)
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS log_acoes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT NOT NULL,
-                    acao TEXT NOT NULL,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS fichas_medicas (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    paciente_id INTEGER NOT NULL UNIQUE,
-                    condicao_atual TEXT,
-                    alergias TEXT,
-                    historico_familiar TEXT,
-                    medicamentos_uso TEXT,
-                    FOREIGN KEY (paciente_id) REFERENCES usuarios(id)
-                );
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS agendamentos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    paciente_id INTEGER NOT NULL,
-                    medico_id INTEGER NOT NULL,
-                    data_hora TEXT NOT NULL,
-                    observacoes TEXT,
-                    status TEXT NOT NULL DEFAULT 'agendado',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (paciente_id) REFERENCES usuarios(id),
-                    FOREIGN KEY (medico_id) REFERENCES usuarios(id)
-                );
-            """)
-            conn.commit()
+    
     
     def salvar_usuario(self, username, password_hash, role='simples', email=None, data_nascimento=None, sexo=None, razao_ic=None, fator_sensibilidade=None, meta_glicemia=None):
         """Salva um novo usuário no banco de dados."""

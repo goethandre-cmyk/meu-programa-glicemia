@@ -34,45 +34,83 @@
                             N/A
                             {% endif %}
                         </td>
-                        <td>{{ registro.tipo }}</td>
 
-                        {% if registro.tipo == 'Glicemia' %}
-                        <td class="glicemia-status {{ get_status_class(registro.valor) }}">
-                            <span class="fw-bold">{{ "{:.1f}".format(registro.valor | default(0.0)) }} mg/dL</span>
+                        {# COLUNA TIPO (Exibe o tipo de medição ou Refeição) #}
+                        <td>
+                            {# Verifica se é GLICEMIA (Se tem valor preenchido E não é uma Refeição) #}
+                            {% if registro.valor is defined and registro.valor is not none and registro.tipo !=
+                            'Refeição' %}
+                            <span class="badge bg-info text-dark">
+                                {# Exibe o tipo de medição se existir (ou o próprio tipo se for Glicemia) #}
+                                {{ registro.tipo_medicao if registro.tipo_medicao else
+                                registro.tipo if registro.tipo != 'Glicemia' else 'Glicemia' }}
+                            </span>
+
+                            {# Se for REFEIÇÃO #}
+                            {% elif registro.tipo == 'Refeição' %}
+                            <span class="badge bg-success">{{ registro.tipo_refeicao if registro.tipo_refeicao else
+                                'Refeição' }}</span>
+
+                            {# Outros Tipos #}
+                            {% else %}
+                            {{ registro.tipo }}
+                            {% endif %}
                         </td>
-                        {% else %}
+
+                        {# COLUNA DETALHES (Simplificada para Glicemia) #}
+                        {% if registro.valor is defined and registro.valor is not none and registro.tipo != 'Refeição'
+                        %}
+
+                        {# Bloco GLICEMIA: Apenas valor e cor #}
+                        {% set glicemia_valor = registro.valor | default(0.0) | float %}
+                        <td class="glicemia-status {{ get_status_class(glicemia_valor) }}">
+                            <span class="fw-bold fs-5">
+                                {{ "{:.1f}".format(glicemia_valor) }} mg/dL
+                            </span>
+                        </td>
+
+                        {% elif registro.tipo == 'Refeição' %}
+
+                        {# Bloco REFEIÇÃO #}
                         <td>
                             <div class="d-flex flex-column">
-                                <div class="mb-1">
-                                    <i class="fas fa-burger me-2"></i>
-                                    <span class="fw-bold">{{ registro.tipo }}</span>
-                                </div>
                                 <small class="text-muted">
-                                    <i class="fas fa-fire-alt me-1"></i>
+                                    <i class="fas fa-fire-alt me-1 text-success"></i>
                                     <span class="fw-bold text-success">{{ "{:.1f}".format(registro.total_calorias |
-                                        default(0.0)) }} Kcal</span>
-
-                                    <i class="fas fa-bread-slice me-1"></i>
-                                    <span class="fw-bold text-primary">{{ "{:.1f}".format(registro.total_carboidratos |
-                                        default(0.0)) }}g Carbs</span>
+                                        default(0.0) | float) }} Kcal</span>
+                                    <br>
+                                    <i class="fas fa-bread-slice me-1 text-primary"></i>
+                                    <span class="fw-bold text-primary">{{ "{:.1f}".format(registro.total_carbs |
+                                        default(0.0) | float) }}g Carbs</span>
                                 </small>
+
+                                {% if registro.alimentos_json %}
                                 <a href="#" class="mt-2 text-decoration-none small" data-bs-toggle="modal"
-                                    data-bs-target="#alimentosModal{{ registro.id | string }}">Ver Detalhes</a>
+                                    data-bs-target="#alimentosModal{{ registro.id | string }}">Ver Alimentos</a>
+                                {% endif %}
                             </div>
                         </td>
+
+                        {% else %}
+                        <td>N/A</td>
                         {% endif %}
 
                         <td>{{ registro.observacoes if registro.observacoes else 'N/A' }}</td>
-                        <td class="action-buttons">
+
+                        <td class="action-buttons text-center">
+
                             <a href="{{ url_for('editar_registo', id=registro.id) }}"
-                                class="btn btn-sm btn-outline-warning">
-                                <i class="fas fa-edit"></i>
+                                class="btn btn-sm btn-link text-warning p-0 me-2" data-bs-toggle="tooltip"
+                                data-bs-placement="top" title="Editar Registro">
+                                <i class="fas fa-edit fa-lg"></i>
                             </a>
+
                             <form action="{{ url_for('excluir_registo', id=registro.id) }}" method="post"
                                 onsubmit="return confirm('Tem certeza que deseja excluir este registro?');"
                                 style="display: inline;">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                    <i class="fas fa-trash-alt"></i>
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-0"
+                                    data-bs-toggle="tooltip" data-bs-placement="top" title="Excluir Registro">
+                                    <i class="fas fa-trash-alt fa-lg"></i>
                                 </button>
                             </form>
                         </td>
@@ -90,14 +128,14 @@
 </div>
 
 {% for registro in registros %}
-{% if registro.tipo != 'Glicemia' and registro.alimentos_json %}
+{% if registro.tipo == 'Refeição' and registro.alimentos_json %}
 <div class="modal fade" id='alimentosModal{{ registro.id | string }}' tabindex="-1"
     aria-labelledby='alimentosModalLabel{{ registro.id | string }}' aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id='alimentosModalLabel{{ registro.id | string }}'>
-                    <i class="fas fa-list me-2"></i>Alimentos da Refeição
+                    <i class="fas fa-list me-2"></i>Alimentos da Refeição ({{ registro.tipo_refeicao }})
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                     aria-label="Close"></button>
@@ -109,15 +147,16 @@
                     {% for alimento in alimentos %}
                     <li class="list-group-item d-flex justify-content-between align-items-center">
                         <div>
-                            <strong>{{ alimento.get('nome', alimento.get('ALIMENTO', 'N/A')) }}</strong>
+                            <strong>{{ alimento.get('nome', 'Alimento N/A') }}</strong>
                             <small class="d-block text-muted">
-                                {{ "{:.1f}".format(alimento.get('cho', alimento.get('CHO (g)', 0.0))) }}g CHO | {{
-                                "{:.1f}".format(alimento.get('kcal', alimento.get('KCAL', 0.0))) }} Kcal
+                                CHO: <span class="fw-bold text-primary">{{ "{:.1f}".format(alimento.get('carbs_total',
+                                    0.0) | float) }}g</span> |
+                                Kcal: <span class="fw-bold text-success">{{ "{:.1f}".format(alimento.get('kcal_total',
+                                    0.0) | float) }}</span>
                             </small>
                         </div>
-                        <span class="badge bg-secondary rounded-pill">{{ "{:.1f}".format(alimento.get('quantidade',
-                            0.0))
-                            }} unidade(s)</span>
+                        <span class="badge bg-secondary rounded-pill">{{ "{:.1f}".format(alimento.get('quantidade', 0.0)
+                            | float) }} porção(ões)</span>
                     </li>
                     {% endfor %}
 
@@ -132,4 +171,13 @@
 {% endif %}
 {% endfor %}
 
+<script>
+    // Inicialização do Tooltip do Bootstrap
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    });
+</script>
 {% endblock %}

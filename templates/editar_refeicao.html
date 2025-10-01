@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Refeição{% endblock %}
+
+{% block content %}
+
+{% set tipos_refeicao = [
+('Jejum', 'Jejum'),
+('Café da Manhã', 'Café da Manhã'),
+('Almoço', 'Almoço'),
+('Janta', 'Janta'),
+('Lanche', 'Lanche'),
+('Colação', 'Colação'),
+] %}
+
+<div class="container my-5">
+    <div class="text-center mb-4">
+        <h1 class="display-5 fw-bold text-primary">
+            <i class="fas fa-edit me-3"></i>
+            Editar Refeição
+        </h1>
+        <p class="lead text-muted">Ajuste os detalhes desta entrada de refeição.</p>
+    </div>
+
+    <div class="card p-5 shadow-lg rounded-3">
+
+        {% if registro %}
+
+        <form method="POST" action="{{ url_for('editar_registo', id=registro.id) }}">
+
+            <input type="hidden" name="id" value="{{ registro.id }}">
+
+            <div class="mb-4 input-group">
+                <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                <div class="form-floating">
+                    {% set data_hora_formatada = registro.data_hora if registro.data_hora is string else
+                    registro.data_hora.strftime('%Y-%m-%dT%H:%M') %}
+                    <input type="datetime-local" class="form-control" id="data_hora" name="data_hora"
+                        value="{{ data_hora_formatada }}" required>
+                    <label for="data_hora">Data e Hora</label>
+                </div>
+            </div>
+
+            <div class="mb-4 input-group">
+                <span class="input-group-text"><i class="fas fa-utensils"></i></span>
+                <div class="form-floating">
+                    <select class="form-select" id="tipo_refeicao" name="tipo" required>
+                        <option value="" disabled>Selecione a Refeição...</option>
+                        {% for value, label in tipos_refeicao %}
+                        <option value="{{ value }}" {% if registro.tipo==value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <label for="tipo_refeicao">Tipo de Refeição</label>
+                </div>
+            </div>
+
+            <div class="mb-4 input-group">
+                <span class="input-group-text align-items-start pt-3"><i class="fas fa-comment-dots"></i></span>
+                <div class="form-floating">
+                    <textarea class="form-control" id="observacoes" name="observacoes" rows="3"
+                        placeholder="Observações (opcional)">{{ registro.observacoes or '' }}</textarea>
+                    <label for="observacoes">Observações</label>
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-4 text-center">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                **Atenção:** A edição detalhada dos alimentos (quantidade, carbs, kcal) requer lógica **JavaScript
+                complexa** e não está implementada nesta versão simples do template. Por favor, edite apenas as
+                informações básicas.
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                <a href="{{ url_for('registros') }}" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-arrow-left me-2"></i>Cancelar
+                </a>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-save me-2"></i>Salvar Alterações
+                </button>
+            </div>
+        </form>
+
+        {% else %}
+        <div class="alert alert-danger text-center">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Registro não encontrado.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

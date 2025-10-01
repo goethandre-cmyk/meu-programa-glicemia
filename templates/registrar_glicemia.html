@@ -6,7 +6,7 @@
 <div class="container mt-4">
     <div class="card p-4 shadow-lg border-0 bg-white">
         <h1 class="mb-4 text-primary">
-            <i class="fas fa-plus-circle me-3"></i>Novo Registro
+            <i class="fas fa-plus-circle me-3"></i>Registrar Glicemia
         </h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -29,9 +29,24 @@
             <div class="mb-3 input-group">
                 <span class="input-group-text"><i class="fas fa-tachometer-alt"></i></span>
                 <div class="form-floating">
-                    <input type="number" class="form-control" id="valor_glicemia" name="valor"
+                    <input type="number" step="1" class="form-control" id="valor_glicemia" name="valor"
                         placeholder="Valor da Glicemia (mg/dL)" required min="1">
                     <label for="valor_glicemia">Valor da Glicemia (mg/dL)</label>
+                </div>
+            </div>
+
+            <div class="mb-3 input-group">
+                <span class="input-group-text"><i class="fas fa-heartbeat"></i></span>
+                <div class="form-floating">
+                    <select class="form-select" id="tipo_glicemia" name="tipo" required>
+                        <option value="" disabled selected>Selecione o momento da medição...</option>
+                        <option value="Jejum">Jejum</option>
+                        <option value="Pre_Refeicao">Pré-Refeição</option>
+                        <option value="Pos_Prandial">Pós-Prandial (2 horas)</option>
+                        <option value="Antes_Dormir">Antes de Dormir</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                    <label for="tipo_glicemia">Tipo de Medição</label>
                 </div>
             </div>
 

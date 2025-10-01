@@ -1,8 +1,9 @@
 import os
 import sqlite3
 import json
+from sqlite3 import Row 
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta 
 
 
 class DatabaseManager:
@@ -12,12 +13,14 @@ class DatabaseManager:
         os.makedirs(db_folder, exist_ok=True)
         self.db_path = os.path.join(db_folder, db_path)
         
-        self.create_tables()
-        self.add_new_columns() # Mantido para garantir retrocompatibilidade em DBs existentes
-        self._migrate_json_to_sqlite()
+        # Chamadas agora devem funcionar:
+        self.inicializar_db() 
+        self.add_new_columns() # Certifique-se que esta função também esteja dentro da classe.
+        self._migrate_json_to_sqlite() # Certifique-se que esta função também esteja dentro da classe.
 
     def get_db_connection(self):
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON;")
         conn.row_factory = sqlite3.Row
         return conn
         
@@ -32,62 +35,86 @@ class DatabaseManager:
                 print("Aviso: Arquivo data.json está corrompido ou vazio.")
                 return {}
         return {}
-      # ==========================================================
-    # MÉTODO FALTANTE QUE DEVE SER INCLUÍDO AQUI
-    # ==========================================================
-    def create_tables(self):
-        try:
-            with self.get_db_connection() as conn:
-                cursor = conn.cursor()
-                
-                # --- 1. Tabela de Usuários ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY,
-                        username TEXT UNIQUE NOT NULL,
-                        password_hash TEXT NOT NULL,
-                        role TEXT NOT NULL DEFAULT 'paciente',
-                        email TEXT,
-                        nome_completo TEXT, 
-                        razao_ic REAL,
-                        fator_sensibilidade REAL,
-                        data_nascimento TEXT,
-                        sexo TEXT,
-                        telefone TEXT,
-                        medico_id INTEGER,
-                        meta_glicemia REAL,
-                        documento TEXT,
-                        crm TEXT,
-                        cns TEXT,
-                        especialidade TEXT
-                    );
-                """)
-                # --- 2. Tabela de Registros ---
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS registros (
-                        id INTEGER PRIMARY KEY,
-                        user_id INTEGER NOT NULL,
-                        data_hora TEXT NOT NULL,
-                        tipo TEXT NOT NULL,
-                        valor REAL,
-                        observacoes TEXT,
-                        alimentos_json TEXT,
-                        total_calorias REAL,
-                        total_carbs REAL,
-                        FOREIGN KEY (user_id) REFERENCES users (id)
-                    );
-                """)
-                
-                # [ADICIONE AQUI AS DEFINIÇÕES SQL PARA AS OUTRAS TABELAS (logs_acao, fichas_medicas, agendamentos, vinculos, exames, ficha_medica) ]
-                # ...
-                # ...
-                
-                conn.commit()
+
+    # 🚨 CORREÇÃO CRÍTICA: ESTE MÉTODO DEVE ESTAR DENTRO DA CLASSE
+    def inicializar_db(self): 
+        """Cria as tabelas do banco de dados se elas não existirem."""
         
-        except sqlite3.Error as e:
-            print(f"Erro ao criar tabelas no banco de dados: {e}")   
-    # Mantive a função add_new_columns para compatibilidade com DBs já criados, 
-    # embora as colunas já estejam na create_tables atualizada
+        with sqlite3.connect(self.db_path) as conn: 
+            cursor = conn.cursor()
+            
+            # --- 1. Tabela de Usuários (usuarios) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    email TEXT,
+                    role TEXT NOT NULL DEFAULT 'simples',
+                    data_nascimento TEXT,
+                    sexo TEXT,
+                    razao_ic REAL,
+                    fator_sensibilidade REAL,
+                    meta_glicemia REAL,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            
+            # --- 2. Tabela de Registros (registros) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS registros (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    data_hora TIMESTAMP NOT NULL,
+                    tipo TEXT,
+                    valor REAL,
+                    carboidratos REAL,
+                    observacoes TEXT,
+                    alimentos_refeicao TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
+            """)
+            
+            # --- 3. Outras Tabelas (log_acoes, fichas_medicas, agendamentos) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS log_acoes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL,
+                    acao TEXT NOT NULL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fichas_medicas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    paciente_id INTEGER NOT NULL UNIQUE,
+                    condicao_atual TEXT,
+                    alergias TEXT,
+                    historico_familiar TEXT,
+                    medicamentos_uso TEXT,
+                    FOREIGN KEY (paciente_id) REFERENCES users(id)
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS agendamentos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    paciente_id INTEGER NOT NULL,
+                    medico_id INTEGER NOT NULL,
+                    data_hora TEXT NOT NULL,
+                    observacoes TEXT,
+                    status TEXT NOT NULL DEFAULT 'agendado',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (paciente_id) REFERENCES users(id),
+                    FOREIGN KEY (medico_id) REFERENCES users(id)
+                );
+            """)
+            
+            conn.commit()
+
+
+
     def add_new_columns(self):
         """Adiciona novas colunas necessárias ao esquema do DB (migration)."""
         conn = self.get_db_connection()
@@ -574,52 +601,108 @@ class DatabaseManager:
             print(f"ERRO DE SQL NO SALVAMENTO: {e}") # <-- Adicione esta linha!
             return False
     def carregar_registros(self, user_id):
+        """
+        Carrega todos os registros (glicemia e refeição) do usuário
+        a partir da tabela unificada 'registros'.
+        """
+        # 🚨 CORREÇÃO: Buscar apenas na tabela 'registros'
+        sql = """
+            SELECT 
+            id, 
+            data_hora, 
+            tipo, 
+            valor, 
+            observacoes, 
+            alimentos_json,  /* 🚨 CORRIGIDO */
+            total_calorias,
+            total_carbs      /* 🚨 NOME CORRETO PARA CARBOIDRATOS */
+        FROM registros 
+        WHERE user_id = ?
+        ORDER BY data_hora DESC
+    """
         with self.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM registros WHERE user_id = ? ORDER BY data_hora DESC", (user_id,))
+        # Nota: Você não precisa redefinir conn.row_factory aqui se já o fez em get_db_connection
+            cursor = conn.cursor() 
+        try:
+            cursor.execute(sql, (user_id,)) 
             registros = cursor.fetchall()
-            return [dict(row) for row in registros]
-        
-    def carregar_registros_por_usuario(user_id, dias=30):
-        """
-        Carrega todos os registros (glicemia e refeição) de um usuário
-        dentro do período especificado.
-        """
-        data_limite = datetime.now() - timedelta(days=dias)
-        
-        # 1. Carregar Registros de Glicemia
-        # Assumindo que a coleção se chama 'registros_glicemia'
-        registros_glicemia = list(
-            db.registros_glicemia.find({
-                'user_id': user_id,
-                'data_hora': {'$gte': data_limite}
-            }).sort('data_hora', 1)
-        )
-
-        # 2. Carregar Registros de Refeição (para carbs/calorias)
-        # Assumindo que a coleção se chama 'registros_refeicao'
-        # Esta parte é crucial: Agrupar por dia para os gráficos de barra
-        pipeline_refeicao = [
-            {'$match': {'user_id': user_id, 'data_hora': {'$gte': data_limite}}},
-            {'$group': {
-                '_id': {'$dateToString': {'format': "%Y-%m-%d", 'date': "$data_hora"}},
-                'total_carbs': {'$sum': "$carboidratos"}, # Assumindo campo 'carboidratos' na refeição
-                'total_calorias': {'$sum': "$calorias"}   # Assumindo campo 'calorias' na refeição
-            }},
-            {'$sort': {'_id': 1}}
-        ]
-        registros_refeicao_agrupados = list(db.registros_refeicao.aggregate(pipeline_refeicao))
-        
-        return registros_glicemia, registros_refeicao_agrupados
-
-    def encontrar_registro(self, registro_id):
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM registros WHERE id = ?", (registro_id,))
-            registro = cursor.fetchone()
-            return dict(registro) if registro else None
             
-    def atualizar_registro(self, registro_data):
+            # Retorna a lista de dicionários
+            return [dict(row) for row in registros]
+            
+        except sqlite3.OperationalError as e:
+            # Captura erros como 'no such column' se o esquema do DB estiver desatualizado
+            print(f"Erro ao carregar registros: {e}")
+            return []
+        
+    # No database_manager.py, dentro da class DatabaseManager
+
+    def salvar_glicemia(self, user_id, valor, data_hora, tipo, observacao):
+        print(f"--- INICIANDO SALVAMENTO PARA USER ID: {user_id} ---") 
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        # DEBUG: Confirmação do ID do usuário.
+        print(f"DEBUG DB: user_id atual: {user_id}")
+        if user_id is None:
+            print("ALERTA: user_id é None.")
+            return False
+
+        sql = """
+            INSERT INTO registros 
+            (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        try:
+            cursor.execute(sql, (
+                user_id, 
+                data_hora, 
+                tipo, 
+                valor, 
+                observacao, 
+                None,        
+                None,        
+                None         
+            ))
+            
+            # 🚨 O PROBLEMA ESTÁ NESTE PONTO (commit falha)
+            conn.commit() 
+            print(f"DEBUG DB: INSERT BEM-SUCEDIDO. User ID: {user_id}")
+            return True 
+            
+        except sqlite3.Error as e:
+            conn.rollback()
+            # 🚨 Se o erro for capturado, ele nos dará a resposta
+            print(f"ERRO SQLITE REAL: {e}") 
+            return False
+        finally:
+            conn.close()
+    def encontrar_registo(self, registo_id): # <-- Parâmetro: registo_id
+        """Busca um registro (glicemia/refeição) pelo seu ID."""
+        try:
+            # Usando 'with' para garantir que a conexão seja fechada automaticamente
+            with self.get_db_connection() as conn:
+                # Garante que os resultados possam ser acessados por nome da coluna
+                conn.row_factory = sqlite3.Row 
+                cursor = conn.cursor()
+                
+                # A tabela 'registros' está correta. A variável agora está corrigida.
+                sql = "SELECT * FROM registros WHERE id = ?"
+                
+                # 🚨 CORREÇÃO AQUI: Mudança de (registos_id,) para (registo_id,)
+                cursor.execute(sql, (registo_id,)) 
+                
+                registro = cursor.fetchone()
+                
+                return dict(registro) if registro else None
+        
+        except Exception as e:
+            # Use a variável de parâmetro aqui se precisar depurar, ou apenas uma string
+            print(f"ERRO DB ao encontrar registo: {e}") 
+            return None
+                
+    def atualizar_registo(self, registro_data):
         with self.get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -628,6 +711,83 @@ class DatabaseManager:
             """, (registro_data['data_hora'], registro_data['tipo'], registro_data.get('valor'), registro_data.get('observacoes'), registro_data.get('alimentos_json'), registro_data.get('total_calorias'), registro_data.get('total_carbs'), registro_data['id']))
             conn.commit()
             return True
+    # NO database_manager.py, DENTRO da classe DatabaseManager
+
+    def atualizar_registro(self, registro_data):
+        """
+        Atualiza um registro existente no banco de dados com base no seu tipo (Glicemia ou Refeição).
+        O parâmetro registro_data é um dicionário contendo 'id' e 'tipo'.
+        """
+        conn = None
+        try:
+            conn = self.get_db_connection() # Abre a conexão
+            cursor = conn.cursor()
+            registro_id = registro_data.get('id')
+            tipo_principal = registro_data.get('tipo')
+
+            if not registro_id or not tipo_principal:
+                print("ERRO DB: ID ou Tipo principal ausente para atualização.")
+                return False
+
+            if tipo_principal == 'Glicemia':
+                # Atualiza APENAS os campos de Glicemia + Comuns
+                sql = """
+                    UPDATE registros SET 
+                        data_hora = ?, 
+                        observacoes = ?, 
+                        valor = ?,
+                        tipo = ?,
+                        tipo_medicao = ? 
+                    WHERE id = ?
+                """
+                params = (
+                    registro_data.get('data_hora'),
+                    registro_data.get('observacoes'),
+                    registro_data.get('valor'),
+                    registro_data.get('tipo'),        # 'Glicemia'
+                    registro_data.get('tipo_medicao'),# Adicione se for um campo que você usa
+                    registro_id
+                )
+            
+            elif tipo_principal == 'Refeição':
+                # Atualiza APENAS os campos de Refeição + Comuns
+                sql = """
+                    UPDATE registros SET 
+                        data_hora = ?, 
+                        observacoes = ?, 
+                        tipo = ?,
+                        alimentos_json = ?, 
+                        total_carbs = ?, 
+                        total_calorias = ?,
+                        tipo_refeicao = ? 
+                    WHERE id = ?
+                """
+                params = (
+                    registro_data.get('data_hora'),
+                    registro_data.get('observacoes'),
+                    registro_data.get('tipo'),        # 'Refeição'
+                    registro_data.get('alimentos_json'),
+                    registro_data.get('total_carbs'),
+                    registro_data.get('total_calorias'),
+                    registro_data.get('tipo_refeicao'), # O campo de dropdown
+                    registro_id
+                )
+            else:
+                print(f"ERRO DB: Tipo de registro desconhecido: {tipo_principal}")
+                return False
+                
+            cursor.execute(sql, params)
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except Exception as e:
+            print(f"ERRO DB ao atualizar registro {registro_id}: {e}")
+            if conn:
+                conn.rollback() # Reverte em caso de erro
+            return False
+        finally:
+            if conn:
+                conn.close() # Garante que a conexão seja fechada    
 
     def excluir_registro(self, registro_id):
         with self.get_db_connection() as conn:
