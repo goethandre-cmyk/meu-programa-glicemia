@@ -11,6 +11,8 @@ import plotly.graph_objects as go
 import numpy as np
 import os
 from relatorios import relatorios_bp
+from service_manager import formatar_registros_para_exibicao 
+
 
 # Certifique-se de que DatabaseManager está disponível
 # from database_manager import DatabaseManager 
@@ -627,48 +629,19 @@ def vincular_cuidador(username):
 @app.route('/registros')
 @login_required
 def registros():
-    # 1. Chame a função de consulta APENAS UMA VEZ. 
-    # Mantenha o nome da sua função original (seja 'carregar_registros' ou 'get_registros_by_user').
-    # Vou usar 'carregar_registros' como o principal.
-    registros_list = db_manager.carregar_registros(current_user.id)
+    # 1. Busca os dados brutos (usando a função correta: carregar_registros)
+    registros_brutos = db_manager.carregar_registros(current_user.id) 
     
-    import sys
-    print(f"DEBUG LEITURA: User ID atual: {current_user.id}", file=sys.stderr)
-    print(f"DEBUG LEITURA: Registros encontrados: {len(registros_list)}", file=sys.stderr)
-    sys.stderr.flush()
+    # 2. CHAMADA AO SERVIÇO: Formata os dados
+    registros_prontos = formatar_registros_para_exibicao(registros_brutos)
     
-    registros_formatados = []
-    
-    for registro in registros_list:
-        tipo = registro.get('tipo')
-        # Tenta pegar o tipo_refeicao primeiro, se não existir, usa o campo 'tipo'
-        tipo_exibicao = registro.get('tipo_refeicao', tipo) 
-        
-        data_hora_str = registro.get('data_hora')
-        if data_hora_str and isinstance(data_hora_str, str):
-            try:
-                # O registro é modificado aqui (se for um objeto mutável, como um dicionário)
-                registro['data_hora'] = datetime.fromisoformat(data_hora_str)
-            except ValueError:
-                pass 
-
-        registro['tipo_exibicao'] = tipo_exibicao
-        registros_formatados.append(registro)
-
-    # 🚨 NOTA: Removida a consulta duplicada: registros = db_manager.get_registros_by_user(current_user.id)
-    # E os prints de debug associados que estavam confusos.
-
+    # 3. Envia os dados LIMPOS e PRONTOS para o template
+    # ✅ CORRIGIDO: get_status_class agora é um argumento da função render_template.
     return render_template(
-        'registros.html', # Mudei para 'meus_registros.html' para ser consistente com a maioria das imagens
-        registros=registros_formatados, # <- Enviando a lista formatada e populada
-        current_user=current_user,
+        'registros.html', 
+        registros=registros_prontos,
         get_status_class=get_status_class 
     )
-from datetime import datetime
-from flask import request, redirect, url_for, flash, render_template
-from flask_login import current_user, login_required
-
-# Substitua suas duas rotas por esta única função
 @app.route('/registrar_glicemia', methods=['GET', 'POST'])
 @login_required
 def registrar_glicemia():

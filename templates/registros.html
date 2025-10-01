@@ -28,40 +28,24 @@
                     {% for registro in registros %}
                     <tr>
                         <td>
-                            {% if registro.data_hora %}
-                            {{ registro.data_hora.strftime('%d/%m/%Y %H:%M') }}
-                            {% else %}
-                            N/A
-                            {% endif %}
+                            {# Data e Hora #}
+                            {{ registro.data_hora.strftime('%d/%m/%Y %H:%M') if registro.data_hora else 'N/A' }}
                         </td>
 
-                        {# COLUNA TIPO (Exibe o tipo de medição ou Refeição) #}
+                        {# COLUNA TIPO (Simplificada) #}
                         <td>
-                            {# Verifica se é GLICEMIA (Se tem valor preenchido E não é uma Refeição) #}
-                            {% if registro.valor is defined and registro.valor is not none and registro.tipo !=
-                            'Refeição' %}
-                            <span class="badge bg-info text-dark">
-                                {# Exibe o tipo de medição se existir (ou o próprio tipo se for Glicemia) #}
-                                {{ registro.tipo_medicao if registro.tipo_medicao else
-                                registro.tipo if registro.tipo != 'Glicemia' else 'Glicemia' }}
-                            </span>
-
-                            {# Se for REFEIÇÃO #}
-                            {% elif registro.tipo == 'Refeição' %}
-                            <span class="badge bg-success">{{ registro.tipo_refeicao if registro.tipo_refeicao else
-                                'Refeição' }}</span>
-
-                            {# Outros Tipos #}
+                            {% if registro.is_glicemia %}
+                            <span class="badge bg-info text-dark">{{ registro.tipo_exibicao }}</span>
+                            {% elif registro.is_refeicao %}
+                            <span class="badge bg-success">{{ registro.tipo_exibicao }}</span>
                             {% else %}
                             {{ registro.tipo }}
                             {% endif %}
                         </td>
 
-                        {# COLUNA DETALHES (Simplificada para Glicemia) #}
-                        {% if registro.valor is defined and registro.valor is not none and registro.tipo != 'Refeição'
-                        %}
-
-                        {# Bloco GLICEMIA: Apenas valor e cor #}
+                        {# COLUNA DETALHES (Simplificada) #}
+                        {% if registro.is_glicemia %}
+                        {# Bloco GLICEMIA: Apenas valor e cor de status #}
                         {% set glicemia_valor = registro.valor | default(0.0) | float %}
                         <td class="glicemia-status {{ get_status_class(glicemia_valor) }}">
                             <span class="fw-bold fs-5">
@@ -69,8 +53,7 @@
                             </span>
                         </td>
 
-                        {% elif registro.tipo == 'Refeição' %}
-
+                        {% elif registro.is_refeicao %}
                         {# Bloco REFEIÇÃO #}
                         <td>
                             <div class="d-flex flex-column">
@@ -95,10 +78,11 @@
                         <td>N/A</td>
                         {% endif %}
 
+                        {# COLUNA OBSERVAÇÕES #}
                         <td>{{ registro.observacoes if registro.observacoes else 'N/A' }}</td>
 
+                        {# COLUNA AÇÕES (Não mudou) #}
                         <td class="action-buttons text-center">
-
                             <a href="{{ url_for('editar_registo', id=registro.id) }}"
                                 class="btn btn-sm btn-link text-warning p-0 me-2" data-bs-toggle="tooltip"
                                 data-bs-placement="top" title="Editar Registro">
