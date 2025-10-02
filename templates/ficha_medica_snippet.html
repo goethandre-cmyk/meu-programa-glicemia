@@ -1,0 +1,38 @@
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <form action="{{ url_for('salvar_ficha_medica') }}" method="POST">
+            <input type="hidden" name="paciente_id" value="{{ paciente.id }}">
+            <input type="hidden" name="paciente_username" value="{{ paciente.username }}">
+
+            <div class="mb-3">
+                <label for="condicao_atual" class="form-label fw-bold">Condição Atual/Histórico:</label>
+                <textarea id="condicao_atual" name="condicao_atual" class="form-control" rows="4"
+                    placeholder="Descreva a condição de saúde atual, histórico de diabetes, etc.">{{ ficha.condicao_atual if ficha and ficha.condicao_atual is not none else '' }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="alergias" class="form-label fw-bold">Alergias Conhecidas:</label>
+                <textarea id="alergias" name="alergias" class="form-control" rows="2"
+                    placeholder="Liste as alergias do paciente...">{{ ficha.alergias if ficha and ficha.alergias is not none else '' }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="historico_familiar" class="form-label fw-bold">Histórico Familiar:</label>
+                <textarea id="historico_familiar" name="historico_familiar" class="form-control" rows="2"
+                    placeholder="Detalhe o histórico de doenças familiares relevantes (diabetes, hipertensão, etc.).">{{ ficha.historico_familiar if ficha and ficha.historico_familiar is not none else '' }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="medicamentos_uso" class="form-label fw-bold">Medicamentos em Uso (Contínuo):</label>
+                <textarea id="medicamentos_uso" name="medicamentos_uso" class="form-control" rows="3"
+                    placeholder="Liste os medicamentos que o paciente está a tomar (incluindo insulinas e dosagens).">{{ ficha.medicamentos_uso if ficha and ficha.medicamentos_uso is not none else '' }}</textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save me-2"></i>Salvar Ficha Médica
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

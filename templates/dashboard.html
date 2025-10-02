@@ -15,11 +15,13 @@
     <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido</h2>
     <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
         <div class="col">
-            <div class="dashboard-card text-center shadow-sm card-glicemia-{{ resumo_dados['ultimo_registro']['status'] }}">
+            <div
+                class="dashboard-card text-center shadow-sm card-glicemia-{{ resumo_dados['ultimo_registro']['status'] }}">
                 <div class="card-body">
                     <i class="fas fa-arrow-circle-right fa-3x mb-3 text-white"></i>
                     <h5 class="card-title text-white">Último Registro</h5>
-                    <h2 class="card-text display-6 fw-bold text-white">{{ resumo_dados['ultimo_registro']['valor'] }} mg/dL</h2>
+                    <h2 class="card-text display-6 fw-bold text-white">{{ resumo_dados['ultimo_registro']['valor'] }}
+                        mg/dL</h2>
                     <p class="card-text text-white"><small>{{ resumo_dados['tempo_desde_ultimo'] }}</small></p>
                 </div>
             </div>
@@ -74,7 +76,8 @@
                 <div class="card-body d-flex flex-column align-items-center text-center">
                     <i class="fas fa-chart-line fa-3x mb-3 text-primary"></i>
                     <h5 class="card-title">Ver Registros</h5>
-                    <p class="card-text text-muted">Visualize, edite e acompanhe seu histórico de glicemia e refeições.</p>
+                    <p class="card-text text-muted">Visualize, edite e acompanhe seu histórico de glicemia e refeições.
+                    </p>
                     <a href="{{ url_for('registros') }}" class="btn btn-outline-primary mt-auto">
                         <i class="fas fa-eye me-2"></i>Ver Registros
                     </a>
@@ -92,8 +95,9 @@
                 <div class="card-body d-flex flex-column align-items-center text-center">
                     <i class="fas fa-calculator fa-3x mb-3 text-info"></i>
                     <h5 class="card-title">Calcular Bolus</h5>
-                    <p class="card-text text-muted">Calcule a dose de insulina para sua refeição e correção de glicemia.</p>
-                    <a href="{{ url_for('calcular_bolus') }}" class="btn btn-outline-info mt-auto">
+                    <p class="card-text text-muted">Calcule a dose de insulina para sua refeição e correção de glicemia.
+                    </p>
+                    <a href="{{ url_for('calculadora_bolus') }}" class="btn btn-outline-info mt-auto">
                         <i class="fas fa-calculator me-2"></i>Calcular
                     </a>
                 </div>
@@ -104,7 +108,8 @@
                 <div class="card-body d-flex flex-column align-items-center text-center">
                     <i class="fas fa-microscope fa-3x mb-3 text-dark"></i>
                     <h5 class="card-title">Calcular Fator de Sensibilidade</h5>
-                    <p class="card-text text-muted">Descubra seu Fator de Sensibilidade à Insulina com base no seu DTDI.</p>
+                    <p class="card-text text-muted">Descubra seu Fator de Sensibilidade à Insulina com base no seu DTDI.
+                    </p>
                     <a href="{{ url_for('calcular_fs') }}" class="btn btn-outline-dark mt-auto">
                         <i class="fas fa-hand-point-right me-2"></i>Calcular
                     </a>
@@ -122,7 +127,8 @@
                 <div class="card-body d-flex flex-column align-items-center text-center">
                     <i class="fas fa-book-medical fa-3x mb-3 text-secondary"></i>
                     <h5 class="card-title">Guia Completo sobre Insulina</h5>
-                    <p class="card-text text-muted">Leia nosso guia detalhado e aprenda mais sobre o uso e tipos de insulina.</p>
+                    <p class="card-text text-muted">Leia nosso guia detalhado e aprenda mais sobre o uso e tipos de
+                        insulina.</p>
                     <a href="{{ url_for('guia_insulina') }}" class="btn btn-outline-secondary mt-auto">
                         <i class="fas fa-book me-2"></i>Abrir Guia
                     </a>

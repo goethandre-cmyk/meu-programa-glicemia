@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Adicionar Alimento{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-md-10">
+        <h2 class="text-center fw-bold mb-4">Adicionar Novo Alimento</h2>
+
+        <div class="card shadow p-4 mb-5 bg-white rounded">
+            <div class="card-body">
+                <form action="{{ url_for('adicionar_alimento') }}" method="post" novalidate>
+
+                    {# LINHA REMOVIDA: {{ form.hidden_tag() }} CAUSA O ERRO 'form' is undefined #}
+                    {# ATENÇÃO: Ao remover, você desabilita a proteção CSRF automática do Flask-WTF. #}
+
+                    <div class="mb-3">
+                        <label for="alimento_input" class="form-label">Nome do Alimento</label>
+                        <input type="text" class="form-control" id="alimento_input" name="nome" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="medida_caseira_input" class="form-label">Medida Caseira</label>
+                        <input type="text" class="form-control" id="medida_caseira_input" name="medida_caseira"
+                            required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="peso_input" class="form-label">Peso (g/ml)</label>
+                        <input type="number" step="0.01" class="form-control" id="peso_input" name="peso_g" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="kcal_input" class="form-label">Kcal</label>
+                        <input type="number" step="0.01" class="form-control" id="kcal_input" name="kcal" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="carbs_input" class="form-label">Carboidratos (g)</label>
+                        <input type="number" step="0.01" class="form-control" id="carbs_input" name="carbs_100g"
+                            required>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-success">Adicionar Alimento</button>
+                        <a href="{{ url_for('alimentos') }}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

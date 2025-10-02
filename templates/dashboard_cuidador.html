@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard do Cuidador{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Pacientes Monitorados (Cuidador)</h2>
+    <p>Você está monitorando {{ pacientes | length }} paciente(s).</p>
+
+    <div class="row">
+        {% for paciente in pacientes %}
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">{{ paciente.nome_completo }}</h5>
+                    <p class="card-text">Email: {{ paciente.email }}</p>
+                    <p class="card-text">Nascimento: {{ paciente.data_nascimento }}</p>
+                    <a href="{{ url_for('detalhes_paciente', paciente_id=paciente.id) }}"
+                        class="btn btn-sm btn-primary">Ver Relatórios</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <p class="alert alert-info">Nenhum paciente está vinculado a você. Peça ao administrador ou ao paciente para
+                vincular sua conta.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

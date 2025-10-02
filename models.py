@@ -41,7 +41,8 @@ class User(UserMixin):
         
     @property
     def is_medico(self):
-        return self.role == 'medico'
+        # CORREÇÃO AQUI: Inclui o 'admin' para que ele tenha todas as permissões de médico.
+        return self.role in ['medico', 'admin']
 
     @property
     def is_admin(self):

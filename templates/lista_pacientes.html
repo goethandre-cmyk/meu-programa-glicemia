@@ -25,14 +25,15 @@
                 {% for paciente in pacientes %}
                 <tr>
                     <th scope="row">{{ paciente.id }}</th>
-                    <td>{{ paciente.nome }}</td>
+                    <td>{{ paciente.username }}</td>
                     <td>{{ paciente.email }}</td>
                     <td>
-                        <a href="{{ url_for('perfil_paciente', paciente_id=paciente.id) }}" class="btn btn-sm btn-info text-white me-2">
+                        <a href="{{ url_for('perfil_paciente', paciente_id=paciente.id) }}"
+                            class="btn btn-sm btn-info text-white me-2">
                             <i class="fas fa-eye"></i> Ver Detalhes
                         </a>
-                        
-                        </td>
+
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

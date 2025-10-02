@@ -13,6 +13,7 @@ import os
 from relatorios import relatorios_bp
 from service_manager import formatar_registros_para_exibicao 
 from db_instance import db_manager # <--- NOVO: Importa a instância global
+from models import User 
 
 
 # Certifique-se de que DatabaseManager está disponível
@@ -95,7 +96,30 @@ def from_json_filter(json_string):
 
 app.jinja_env.filters['from_json'] = from_json_filter
 
+# --- DECORADOR DE ACESSO EXCLUSIVO PARA ADMIN ---
+def admin_only(f):
+    @wraps(f)
+    @login_required # Garante que o usuário esteja logado
+    def decorated_function(*args, **kwargs):
+        
+        # Apenas permite se a propriedade 'is_admin' for True
+        if not current_user.is_admin: 
+            flash('Acesso negado. Apenas administradores do sistema podem acessar esta função.', 'danger')
+            return redirect(url_for('dashboard')) 
+            
+        return f(*args, **kwargs)
+    return decorated_function
 
+def paciente_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Assumindo que current_user tem uma propriedade 'is_paciente' 
+        # OU o papel (role) é 'paciente'
+        if not current_user.is_authenticated or current_user.role != 'paciente':
+            flash('Acesso não autorizado. Esta página é exclusiva para pacientes.', 'danger')
+            return redirect(url_for('dashboard')) # Redireciona para um dashboard neutro
+        return f(*args, **kwargs)
+    return decorated_function
 # Funções de ajuda para os templates (AppCore)
 class AppCore:
     def __init__(self, db_manager):
@@ -201,64 +225,38 @@ ESPECIALIDADES_MEDICAS = [
     "Reumatologia", "Urologia", "Medicina Aeroespacial", "Medicina do Sono", "Toxicologia Médica", "Oncogenética"
 ]
 
-
-# --- Classes de Suporte ---
-class User(UserMixin):
-    def __init__(self, id, username, password_hash, role='user', email=None, razao_ic=1.0, fator_sensibilidade=1.0, data_nascimento=None, sexo=None):
-        self.id = id
-        self.username = username
-        self.password_hash = password_hash
-        self.role = role # Deve ser sempre minúsculo (paciente, medico, admin, cuidador)
-        self.email = email
-        self.razao_ic = razao_ic
-        self.fator_sensibilidade = fator_sensibilidade
-        self.data_nascimento = data_nascimento
-        self.sexo = sexo
-        
-    @property
-    def is_medico(self):
-        # Checa o papel em minúsculas
-        return self.role == 'medico'
-
-    @property
-    def is_admin(self):
-        # Checa o papel em minúsculas
-        return self.role == 'admin'
-
-    @property
-    def is_paciente(self):
-        # Checa o papel em minúsculas
-        return self.role == 'paciente' or self.role == 'user' # Mantendo 'user' por compatibilidade
-
-    @property
-    def is_cuidador(self):
-        # Checa o papel em minúsculas
-        return self.role == 'cuidador'
-    
 # --- Inicialização da AppCore com a instância GLOBAL do DatabaseManager
 app_core = AppCore(db_manager)
 
 # --- Carregador de Usuário para o Flask-Login ---
+# app.py (Função load_user com argumentos completos)
+
 @login_manager.user_loader
 def load_user(user_id):
     if db_manager:
         user_data = db_manager.carregar_usuario_por_id(int(user_id))
         if user_data:
-            # Passa todos os dados do usuário para a classe User
             return User(
                 id=user_data.get('id'),
                 username=user_data.get('username'),
                 password_hash=user_data.get('password_hash'),
-                # Garantindo que a role lida do DB seja usada, mesmo que o padrão seja 'user'
                 role=user_data.get('role', 'user').lower(), 
                 email=user_data.get('email'),
                 razao_ic=user_data.get('razao_ic', 1.0),
                 fator_sensibilidade=user_data.get('fator_sensibilidade', 1.0),
                 data_nascimento=user_data.get('data_nascimento'),
-                sexo=user_data.get('sexo')
+                sexo=user_data.get('sexo'),
+                
+                # ⭐ NOVOS CAMPOS QUE VOCÊ ADICIONOU ANTERIORMENTE DEVEM ESTAR AQUI:
+                nome_completo=user_data.get('nome_completo'),
+                telefone=user_data.get('telefone'),
+                documento=user_data.get('documento'),
+                crm=user_data.get('crm'),
+                cns=user_data.get('cns'),
+                especialidade=user_data.get('especialidade')
+                # ⭐ FIM DOS NOVOS CAMPOS
             )
     return None
-
 # --- DECORADOR DE ACESSO EXCLUSIVO PARA MÉDICOS ---
 def medico_required(f):
     @wraps(f)
@@ -276,12 +274,17 @@ def medico_required(f):
 # --- DECORADOR DE ACESSO EXCLUSIVO PARA ADMIN/GESTAO ---
 def gestao_required(f):
     @wraps(f)
-    @login_required # Garante que o usuário esteja logado
+    @login_required 
     def decorated_function(*args, **kwargs):
-        # O perfil 'role' para Gestão/Admin deve ser 'admin' (em minúsculo)
-        if not current_user.is_admin: # A propriedade .is_admin usa self.role == 'admin'
-            flash('Acesso negado. Apenas administradores podem acessar esta página.', 'danger')
+        
+        # Lista de todos os papéis que têm permissão de Gestão/Gerenciamento.
+        PAPEIS_DE_GESTAO = ['admin', 'secretario', 'medico']
+        
+        if current_user.role not in PAPEIS_DE_GESTAO:
+            # Note a mensagem mais clara sobre quem pode acessar
+            flash('Acesso negado. Apenas profissionais de gestão, médicos e administradores podem acessar esta página.', 'danger')
             return redirect(url_for('dashboard')) 
+            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -361,6 +364,7 @@ def login(): # O endpoint é 'login'
             
     # Se a requisição for GET ou o login falhar, renderiza o formulário de login
     return render_template('login.html')
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -369,6 +373,14 @@ def logout():
     flash('Você foi desconectado.', 'info')
     return redirect(url_for('login'))
 
+@app.route('/cuidador')
+@login_required
+def dashboard_cuidador(): # <--- O endpoint DEVE ser 'dashboard_cuidador'
+    
+    cuidador_id = current_user.id
+    pacientes_monitorados = db_manager.obter_pacientes_por_cuidador(cuidador_id)
+    
+    return render_template('dashboard_cuidador.html', pacientes=pacientes_monitorados)
 
 @app.route('/cadastro', methods=['GET', 'POST'])
 def cadastro():
@@ -422,66 +434,92 @@ def cadastro():
                 flash('Todos os campos de registro profissional (Médico) são obrigatórios.', 'danger')
                 return redirect(url_for('cadastro'))
 
-        # 5. Salvar usuário no DB
+    # 5. Salvar usuário no DB
         if db_manager.salvar_usuario(novo_usuario):
-            flash('Cadastro realizado com sucesso! Faça login para começar.', 'success')
-            app.logger.info(f'Novo usuário cadastrado: {username} ({role})')
-            return redirect(url_for('login'))
+            
+            # 5.1. Carregar o usuário recém-criado do banco
+            # Assumindo que você tem um método para carregar o usuário por username
+            user = db_manager.carregar_usuario_por_username(username) 
+            
+            if user:
+                # 5.2. Fazer o login automático
+                # Certifique-se de que a variável 'user' é um objeto User do Flask-Login
+                login_user(user) 
+                flash('Cadastro realizado com sucesso! Bem-vindo(a) ao HealthLink.', 'success')
+                app.logger.info(f'Novo usuário cadastrado e logado: {username} ({role})')
+                
+                # 5.3. Redirecionamento Condicional Imediato
+                if role == 'paciente':
+                    # Redireciona para o guia de glicemia (a página mais útil para começar)
+                    return redirect(url_for('guia_insulina')) 
+                elif role == 'medico':
+                    # Redireciona para o dashboard médico
+                    return redirect(url_for('dashboard_medico'))
+                else:
+                    # Redirecionamento padrão para outros papéis (secretario, admin)
+                    return redirect(url_for('dashboard')) 
+            else:
+                # Se o login automático falhar (usuário não encontrado após salvar)
+                flash('Cadastro realizado. Faça login para começar.', 'success')
+                return redirect(url_for('login'))
+
         else:
             flash('Nome de usuário já existe. Tente outro.', 'danger')
             return redirect(url_for('cadastro'))
             
     # Rota de Cadastro (GET) - Passa a lista para o template
     return render_template('cadastro.html', 
-                            especialidades=ESPECIALIDADES_MEDICAS)
+                             especialidades=ESPECIALIDADES_MEDICAS)
 
+
+# rota dashboard
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # 1. Verifica se é Médico/Admin e redireciona (CORRETO)
-    if current_user.is_medico:
+    
+    # 1. GESTORES (Admin/Secretario)
+    if current_user.role in ['admin', 'secretario']:
+        return redirect(url_for('dashboard_gestao'))
+    
+    # 2. MÉDICO
+    elif current_user.role == 'medico':
         return redirect(url_for('dashboard_medico'))
-    
-    if current_user.is_admin:
-        # Se você quiser que o Admin caia no dashboard de Gestão:
-        # return redirect(url_for('dashboard_gestao'))
-        # Se você quiser que o Admin caia no gerenciamento:
-        return redirect(url_for('gerenciar_usuarios')) # <--- OK, mantemos sua lógica
         
-    # 2. Se for PACIENTE ou outro usuário, carrega o Dashboard Paciente (CORRETO)
-    resumo_dados = carregar_dados_dashboard(current_user.id)
-    return render_template('dashboard_paciente.html', resumo_dados=resumo_dados)
-
-# Rota do Dashboard Médico (DEFINIÇÃO ÚNICA E CORRIGIDA)
-@app.route('/dashboard_medico')
-@login_required
-@medico_required
-def dashboard_medico():
-    # Lógica de carregamento de pacientes e resumo de dados
-    pacientes = db_manager.obter_pacientes_por_medico(current_user.id)
+    # 3. CUIDADOR/CAREGIVER <--- ADICIONE ESTE CASO!
+    elif current_user.role == 'cuidador':
+        return redirect(url_for('dashboard_cuidador'))
     
-    resumo_dados = {
-        'total_pacientes': len(pacientes) if pacientes else 0,
-        # Você pode adicionar outros dados de resumo aqui se precisar
-    }
+    # 4. PACIENTE
+    elif current_user.is_paciente:
+        # Lógica do paciente (renderiza template e não redireciona novamente)
+        paciente_id = current_user.id
+        resumo_dados = db_manager.obter_resumo_paciente(paciente_id) 
+        return render_template('dashboard.html', resumo_dados=resumo_dados) 
+        
+    # 5. Caso de segurança: se o papel não for reconhecido, desloga
+    flash("Seu perfil não está configurado. Por favor, entre em contato com o suporte.", 'danger')
+    return redirect(url_for('logout')) 
     
-    return render_template('dashboard_medico.html', pacientes=pacientes, resumo_dados=resumo_dados)
-
-@app.route('/dashboard/gestao')
+# ROTA 1: DASHBOARD DE GESTÃO (para Médicos, Admins, etc.)
+# O ENDPOINT DEVE ser 'dashboard_gestao' para corresponder ao redirect
+@app.route('/dashboard-gestao') # Use uma URL clara
 @login_required 
-@gestao_required 
-def dashboard_gestao(): 
+@gestao_required # <--- Use o decorador de segurança apropriado
+def dashboard_gestao(): # <-- O nome da função (endpoint) que o url_for espera
     """Página de dashboard para usuários com perfil de Gestão/Administrador."""
-    usuarios = db_manager.carregar_todos_os_usuarios()
 
-    resumo = {
-        'total_pacientes': 15,
-        'consultas_pendentes': 5,
-        'leituras_alto': 30,
-        'leituras_baixo': 10
-        }
-    return render_template('dashboard_gestao.html', usuarios=usuarios, resumo=resumo) 
+    # 🚨 Se a rota /dashboard-gestao for usada por MÉDICOS E ADMINS:
+    if current_user.role == 'medico':
+         # Lógica do médico (filtrada por paciente)
+        resumo = db_manager.obter_resumo_medico_filtrado(current_user.id)
+        pacientes = db_manager.obter_pacientes_por_medico(current_user.id) 
+        return render_template('dashboard_medico.html', pacientes=pacientes, resumo=resumo)
+    
+    else:
+        # Lógica de Admin/Secretário (resumo geral)
+        resumo_geral = db_manager.carregar_resumo_geral() # <--- Implemente esta função para dados gerais
+        return render_template('dash_gestao.html', resumo=resumo_geral)
 
 # --- ROTAS DA ÁREA ADMINISTRATIVA E DE GESTÃO ---
 
@@ -912,9 +950,13 @@ def editar_registo(id):
 
 @app.route('/alimentos')
 @login_required
+@admin_only # Use o decorador que criamos para restringir acesso
 def alimentos():
-    lista_alimentos = db_manager.carregar_alimentos()
-    return render_template('alimentos.html', alimentos=lista_alimentos)
+    # Lógica para carregar todos os alimentos do DB para a tabela de edição
+    alimentos = db_manager.carregar_alimentos() # Exemplo
+    
+    # Assumindo que você tem um template chamado 'gerenciar_alimentos.html'
+    return render_template('gerenciar_alimentos.html', alimentos=alimentos)
 
 @app.route('/excluir_alimento/<int:id>', methods=['POST'])
 @login_required
@@ -933,6 +975,7 @@ def excluir_alimento(id):
 # Rota Consolidada: use 'adicionar_alimento' como a rota principal
 @app.route('/adicionar_alimento', methods=['GET', 'POST'])
 @login_required
+@admin_only 
 def adicionar_alimento():
     if not (current_user.role in ['secretario', 'admin']):
         flash('Acesso não autorizado.', 'danger')
@@ -974,9 +1017,51 @@ def adicionar_alimento():
 @app.route('/registrar_alimento')
 @login_required
 def registrar_alimento_redirect():
-    return redirect(url_for('adicionar_alimento'))
+    # CORREÇÃO: Redirecionar para o endpoint que lista/gerencia os alimentos (ex: 'alimentos')
+    # Use 'alimentos' se esta for a rota que exibe a lista.
+    return redirect(url_for('alimentos')) 
+    
+# Remova ou comente a função adicionar_alimento() que não existe mais.
+# Se você tiver uma rota de 'adicionar_alimento', remova-a, pois a função
+# registrar_alimento_redirect estava chamando o endpoint dela.
+# app.py (Adicione esta nova rota)
 
+@app.route('/editar_alimento/<int:id>', methods=['GET', 'POST'])
+@admin_only # Garante que apenas Admin ou Gestão possa editar
+def editar_alimento(id):
+    # 1. Obter os dados do alimento
+    alimento = db_manager.carregar_alimento_por_id(id) # Você precisará criar este método no db_manager
+    if not alimento:
+        flash('Alimento não encontrado.', 'danger')
+        return redirect(url_for('alimentos'))
 
+    # 2. Lógica para POST (Salvar alterações)
+    if request.method == 'POST':
+        try:
+            # Coleta de dados do request.form (como você fez no adicionar_alimento)
+            dados_atualizados = {
+                'id': id,
+                'alimento': request.form['nome'],
+                'medida_caseira': request.form['medida_caseira'],
+                'peso': float(request.form['peso_g'].replace(',', '.')),
+                'kcal': float(request.form['kcal'].replace(',', '.')),
+                'carbs': float(request.form['carbs_100g'].replace(',', '.'))
+            }
+            
+            if db_manager.atualizar_alimento(dados_atualizados): # Você precisará criar este método
+                flash('Alimento atualizado com sucesso!', 'success')
+                return redirect(url_for('alimentos'))
+            else:
+                flash('Erro ao atualizar o alimento.', 'danger')
+        except (ValueError, TypeError) as e:
+            flash('Dados do alimento inválidos. Verifique os valores numéricos.', 'danger')
+            
+        # Se houve erro no POST, recarrega o formulário com os dados originais
+        alimento = db_manager.carregar_alimento_por_id(id) 
+
+    # 3. Renderizar o formulário (GET ou erro no POST)
+    # Nota: Assumindo que você tem um template chamado 'editar_alimento.html'
+    return render_template('editar_alimento.html', alimento=alimento)
 # --- ROTAS DE UTILIDADE ---
 
 @app.route('/refeicao')
@@ -1055,6 +1140,33 @@ def buscar_alimentos():
     return jsonify({'resultados': resultados_finais})
 
 # --- ROTAS DA ÁREA MÉDICA ---
+
+# Paciente
+@app.route('/paciente')
+@login_required
+@paciente_required # Decorador para garantir que só pacientes acessem
+def dashboard_paciente():
+    paciente_id = current_user.id
+    
+    # O método que carrega o resumo para o template simples
+    resumo_dados = db_manager.obter_resumo_paciente(paciente_id) 
+    
+    # Use o template mais simples que você quer para o paciente
+    return render_template('dashboard_paciente.html', resumo_dados=resumo_dados)
+
+# Medico
+@app.route('/medico')
+@login_required
+@medico_required
+def dashboard_medico():
+    # Carrega dados filtrados pelo médico logado
+    resumo = db_manager.obter_resumo_medico_filtrado(current_user.id)
+    pacientes = db_manager.obter_pacientes_por_medico(current_user.id) 
+    
+    # Renderiza o template do médico
+    return render_template('dashboard_medico.html', pacientes=pacientes, resumo=resumo)
+
+
 
 # Rota para o Cadastro de Novo Paciente
 @app.route('/medico/novo_paciente', methods=['GET', 'POST'])
@@ -1168,9 +1280,12 @@ def pacientes():
 def relatorio_medico():
     return render_template('relatorio_medico.html')
 
-@app.route('/paciente/<int:paciente_id>')
+# rota perfil_paciente #
+
+@app.route('/paciente/<int:paciente_id>') # URL está ok: /paciente/2
 @login_required
 def perfil_paciente(paciente_id):
+    # Lógica de permissão...
     if not current_user.is_medico and not current_user.is_admin:
         flash('Acesso não autorizado.', 'danger')
         return redirect(url_for('dashboard'))
@@ -1179,13 +1294,33 @@ def perfil_paciente(paciente_id):
         flash('Acesso não autorizado a este paciente.', 'danger')
         return redirect(url_for('dashboard_medico'))
     
+    # --- CARREGAMENTO DE DADOS COMPLETOS ---
     paciente = db_manager.carregar_usuario_por_id(paciente_id)
-    registros = db_manager.carregar_registros(paciente_id)
-    ficha_medica = db_manager.carregar_ficha_medica(paciente_id)
-    
-    return render_template('perfil_paciente.html', paciente=paciente, registros_glicemia=registros, ficha_medica=ficha_medica)
+    if not paciente:
+        flash('Paciente não encontrado.', 'danger')
+        return redirect(url_for('dashboard_medico'))
 
-# Rota para exibir/editar a ficha médica de um paciente
+    # Carrega todos os conjuntos de dados para as ABAS do perfil_paciente.html
+    registros_glicemia = db_manager.carregar_registros_glicemia_nutricao(paciente_id, limit=20) # Deve ter valor, carbos, kcal
+    ficha_data = db_manager.carregar_ficha_medica(paciente_id) # Usada na aba 'Ficha Médica'
+    agendamentos = db_manager.buscar_agendamentos_paciente(paciente_id) # Usada na aba 'Acompanhamento'
+    exames_anteriores = db_manager.buscar_exames_paciente(paciente_id) # Usada na aba 'Acompanhamento'
+    
+    if not ficha_data:
+        ficha_data = {} # Garante que o template não quebre se a ficha não existir
+        
+    # --- RENDERIZAÇÃO ---
+    return render_template(
+        'perfil_paciente.html', 
+        paciente=paciente, 
+        registros_glicemia=registros_glicemia, 
+        ficha=ficha_data, # Use 'ficha' para coincidir com os snippets
+        agendamentos=agendamentos,
+        exames_anteriores=exames_anteriores,
+        # Adicione sua função helper aqui se necessário
+        # get_status_class=get_status_class 
+    )
+
 @app.route('/ficha_medica/<int:paciente_id>', methods=['GET', 'POST'])
 @login_required
 def ficha_medica(paciente_id):
