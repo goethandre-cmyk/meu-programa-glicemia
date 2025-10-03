@@ -14,10 +14,9 @@ from relatorios import relatorios_bp
 from service_manager import formatar_registros_para_exibicao 
 from db_instance import db_manager # <--- NOVO: Importa a instância global
 from models import User 
+from service_manager import BolusService
+bolus_service = BolusService(db_manager) 
 
-
-# Certifique-se de que DatabaseManager está disponível
-# from database_manager import DatabaseManager 
 
 # --- Configuração da Aplicação ---
 app = Flask(__name__)
@@ -681,6 +680,8 @@ def registros():
         registros=registros_prontos,
         get_status_class=get_status_class 
     )
+
+
 @app.route('/registrar_glicemia', methods=['GET', 'POST'])
 @login_required
 def registrar_glicemia():
@@ -696,6 +697,9 @@ def registrar_glicemia():
         data_hora_str = request.form.get('data_hora')
         tipo = request.form.get('tipo') 
         observacao = request.form.get('observacao', '')
+        
+        # 🚨 CORREÇÃO: Capturar dose_aplicada
+        dose_aplicada_str = request.form.get('dose_aplicada')
 
         if not valor or not data_hora_str or not tipo:
             flash('Por favor, preencha todos os campos obrigatórios.', 'danger')
@@ -703,88 +707,140 @@ def registrar_glicemia():
 
         try:
             data_hora = datetime.fromisoformat(data_hora_str)
-            # Garante que o valor da glicemia é um float
             valor_glicemia = float(valor.replace(',', '.')) 
+            
+            # 🚨 CORREÇÃO: Converter dose_aplicada
+            dose_aplicada = float(dose_aplicada_str) if dose_aplicada_str else None
         except (ValueError, TypeError):
-            flash('Valores inválidos para glicemia ou data/hora.', 'danger')
+            flash('Valores inválidos para glicemia, dose aplicada ou data/hora.', 'danger')
             return redirect(url_for(URL_FAIL))
-        print(f"DEBUG: Tentando salvar para o user_id: {current_user.id}") # 🚨 IMPRIMA ISTO
+        print(f"DEBUG: Tentando salvar para o user_id: {current_user.id}")
 
-        # 2. Chamada da Função de Salvamento
+        # 2. Chamada da Função de Salvamento (Assumindo que salvar_glicemia salva no campo correto)
         try:
             # Tenta salvar no DB
+            # 🚨 CORREÇÃO: Incluindo dose_aplicada na chamada.
+            # Você precisará atualizar a assinatura de db_manager.salvar_glicemia
             sucesso = db_manager.salvar_glicemia(
                 current_user.id, 
                 valor_glicemia, 
                 data_hora.isoformat(), 
                 tipo, 
-                observacao
+                observacao,
+                dose_aplicada=dose_aplicada # NOVO ARGUMENTO AQUI
             )
             
         except Exception as e:
-            # Se ocorrer um erro Python (e.g., função não existe)
             print(f"ERRO CRÍTICO NO APP.PY AO CHAMAR SALVAR_GLICEMIA: {e}") 
             flash(f'Erro crítico no servidor: Verifique o log. (Código: {e.__class__.__name__})', 'danger')
             return redirect(url_for(URL_FAIL))
         
         # 3. Processamento do Resultado do DB (Garante o Retorno)
-        # Se chegamos aqui, sucesso foi definido
         if sucesso:
             flash('Registro de glicemia salvo com sucesso!', 'success')
             return redirect(url_for(URL_SUCCESS))
         else:
-            # Se salvar_glicemia retornou False (erro de SQLite no database_manager)
             print("ERRO INTERNO: salvar_glicemia retornou False. O erro real do SQLite foi impresso no terminal.")
             flash('Erro ao salvar no banco de dados. Verifique a integridade dos dados.', 'danger')
             return redirect(url_for(URL_FAIL))
 
     # Fora do if request.method == 'POST':
     return render_template('registrar_glicemia.html')
-
     
+# No seu arquivo app.py
+
 @app.route('/registrar_refeicao', methods=['GET', 'POST'])
 @login_required
 def registrar_refeicao():
+    
     if request.method == 'POST':
         try:
-            data_hora_str = request.form['data_hora']
-            tipo_refeicao = request.form['tipo'] # Novo campo 'tipo' para Jejum, Almoço, etc.
-            observacoes = request.form.get('observacoes')
+            user_id = current_user.id
             
+            # 1. COLETA DE DADOS CRUCIAIS
+            data_hora_str = request.form['data_hora']
+            tipo_refeicao = request.form['tipo'] 
+            glicemia_input = request.form.get('glicemia_atual') 
+            
+            # 🚨 CORREÇÃO: Usar a dose_aplicada enviada pelo formulário (Se o usuário ajustou/confirmou)
+            dose_aplicada_str = request.form.get('dose_aplicada')
+            try:
+                dose_aplicada = float(dose_aplicada_str) if dose_aplicada_str else None
+            except ValueError:
+                dose_aplicada = None
+                
             total_carbs = float(request.form['total_carbs'])
             total_kcal = float(request.form['total_kcal'])
             alimentos_selecionados_json = request.form['alimentos_selecionados']
+            observacoes = request.form.get('observacoes')
             
-            # Não é necessário carregar o JSON para salvá-lo, mas fazemos para validar
-            json.loads(alimentos_selecionados_json) 
+            # 2. DETERMINAR GC PARA O CÁLCULO
+            if glicemia_input and float(glicemia_input) > 0:
+                gc_atual = float(glicemia_input)
+                gc_fornecida = True
+            else:
+                gc_atual = db_manager.buscar_ultima_glicemia(user_id) or 0.0 
+                gc_fornecida = False
             
-            # O tipo principal é Refeição, mas usamos tipo_refeicao para o detalhe
-            registro_data = {
-                'user_id': current_user.id,
-                'data_hora': data_hora_str,
-                'tipo': 'Refeição', 
-                'valor': None,
-                'observacoes': observacoes,
-                'alimentos_json': alimentos_selecionados_json,
-                'total_calorias': total_kcal,
-                'total_carbs': total_carbs,
-                'tipo_refeicao': tipo_refeicao
-            }
+            # 3. CHAMAR O SERVIÇO DE CÁLCULO DE BÓLUS (ainda necessário para a sugestão)
+            resultado_bolus, erro = bolus_service.calcular_bolus_total(
+                gc_atual=gc_atual, 
+                carboidratos=total_carbs, 
+                paciente_id=user_id
+            )
+
+            if erro:
+                flash(f'Erro no cálculo do Bólus: {erro}', 'warning')
+                dose_sugerida = 0.0
+            else:
+                dose_sugerida = resultado_bolus['bolus_total']
+                
+                # 🚨 REMOVIDO: A linha "dose_aplicada = dose_sugerida" foi removida.
+                # Agora, 'dose_aplicada' contém o valor exato que o usuário digitou no campo.
+
+            # 4. SALVAR A INSULINA APLICADA (Bolus)
+            # 🚨 CORREÇÃO: Usa a dose_aplicada do formulário, garantindo que seja um float ou None.
+            if dose_aplicada is not None and dose_aplicada > 0:
+                 db_manager.salvar_registro_insulina(user_id, dose_aplicada, data_hora_str)
+
+            # 5. SALVAR O REGISTRO DA REFEIÇÃO
+            # 🚨 CORREÇÃO: Passa a dose_aplicada do formulário para salvar a refeição.
+            db_manager.salvar_refeicao(
+                user_id, 
+                data_hora_str, 
+                tipo_refeicao, 
+                total_carbs, 
+                total_kcal, 
+                alimentos_selecionados_json,
+                observacoes,
+                dose_aplicada=dose_aplicada
+            )
+
+            # 6. SALVAR A GLICEMIA (se o paciente forneceu)
+            # Usamos a dose_sugerida na observação, pois foi o que o sistema calculou.
+            if gc_fornecida:
+                db_manager.salvar_glicemia(
+                    user_id, 
+                    gc_atual, 
+                    data_hora_str, 
+                    'Pre_Refeicao', 
+                    f"GC medida antes de {tipo_refeicao}. Sugestão de Bólus: {dose_sugerida:.1f} UI"
+                )
             
-            db_manager.salvar_registro(registro_data)
-            
-            flash('Refeição registrada com sucesso!', 'success')
+            # Fim do processo, exibe a dose REAL aplicada
+            dose_msg = f"{dose_aplicada:.1f} UI" if dose_aplicada is not None else "N/A"
+            flash(f"Refeição registrada! Dose de Insulina Aplicada: {dose_msg}", 'success')
             return redirect(url_for('dashboard'))
 
         except Exception as e:
-            flash(f'Erro ao registrar a refeição: {e}', 'danger')
+            print(f'ERRO FATAL NA ROTA REFEIÇÃO: {e}')
+            flash(f'Erro fatal ao processar o registro: {e}', 'danger')
             return redirect(url_for('registrar_refeicao'))
 
+    # Lógica para GET (retorna o template)
     alimentos = db_manager.carregar_alimentos()
     now = datetime.now().strftime('%Y-%m-%dT%H:%M')
     
-    # Usa a função do AppCore para obter a lista de tipos
-
     return render_template('registrar_refeicao.html', alimentos=alimentos, tipos_refeicao=app_core.obter_tipos_refeicao())
     
 @app.route('/excluir_registo/<int:id>', methods=['POST'])

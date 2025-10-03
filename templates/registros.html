@@ -32,9 +32,11 @@
                             {{ registro.data_hora.strftime('%d/%m/%Y %H:%M') if registro.data_hora else 'N/A' }}
                         </td>
 
-                        {# COLUNA TIPO (Simplificada) #}
+                        {# COLUNA TIPO (Badge) #}
                         <td>
-                            {% if registro.is_glicemia %}
+                            {% if registro.is_glicemia and registro.is_refeicao %}
+                            <span class="badge bg-success">{{ registro.tipo_exibicao }} + GC</span>
+                            {% elif registro.is_glicemia %}
                             <span class="badge bg-info text-dark">{{ registro.tipo_exibicao }}</span>
                             {% elif registro.is_refeicao %}
                             <span class="badge bg-success">{{ registro.tipo_exibicao }}</span>
@@ -43,45 +45,56 @@
                             {% endif %}
                         </td>
 
-                        {# COLUNA DETALHES (Simplificada) #}
-                        {% if registro.is_glicemia %}
-                        {# Bloco GLICEMIA: Apenas valor e cor de status #}
-                        {% set glicemia_valor = registro.valor | default(0.0) | float %}
-                        <td class="glicemia-status {{ get_status_class(glicemia_valor) }}">
-                            <span class="fw-bold fs-5">
-                                {{ "{:.1f}".format(glicemia_valor) }} mg/dL
-                            </span>
-                        </td>
-
-                        {% elif registro.is_refeicao %}
-                        {# Bloco REFEIÇÃO #}
+                        {# COLUNA DETALHES (Permite a exibição combinada) #}
                         <td>
                             <div class="d-flex flex-column">
-                                <small class="text-muted">
+
+                                {# 1. BLOCO GLICEMIA (Sempre que o valor for detectado) #}
+                                {% if registro.is_glicemia %}
+                                {% set glicemia_valor = registro.valor | default(0.0) | float %}
+                                <div class="glicemia-status {{ get_status_class(glicemia_valor) }} mb-2 p-1 rounded-2">
+                                    <span class="fw-bold fs-5">
+                                        {{ "{:.1f}".format(glicemia_valor) }} mg/dL
+                                    </span>
+                                    <small class="text-muted d-block mt-n1">Glicemia</small>
+                                </div>
+                                {% endif %}
+
+                                {# 2. BLOCO REFEIÇÃO (CORRIGIDO: Só mostra se houver dados reais) #}
+                                {% set total_calorias = registro.total_calorias | default(0.0) | float %}
+                                {% set total_carbs = registro.total_carbs | default(0.0) | float %}
+
+                                {% if registro.is_refeicao and (total_calorias > 0 or total_carbs > 0) %}
+                                <small class="text-muted 
+                                    {% if registro.is_glicemia %}mt-2 pt-2 border-top{% endif %}">
                                     <i class="fas fa-fire-alt me-1 text-success"></i>
-                                    <span class="fw-bold text-success">{{ "{:.1f}".format(registro.total_calorias |
-                                        default(0.0) | float) }} Kcal</span>
+                                    <span class="fw-bold text-success">{{ "{:.1f}".format(total_calorias) }} Kcal</span>
                                     <br>
                                     <i class="fas fa-bread-slice me-1 text-primary"></i>
-                                    <span class="fw-bold text-primary">{{ "{:.1f}".format(registro.total_carbs |
-                                        default(0.0) | float) }}g Carbs</span>
+                                    <span class="fw-bold text-primary">{{ "{:.1f}".format(total_carbs) }}g Carbs</span>
                                 </small>
 
-                                {% if registro.alimentos_json %}
+                                {# CORREÇÃO: Link Ver Alimentos só aparece se o JSON for válido #}
+                                {% set alimentos_json_len = registro.alimentos_json | length if registro.alimentos_json
+                                is string else 0 %}
+                                {% if registro.alimentos_json is not none and alimentos_json_len > 2 %}
                                 <a href="#" class="mt-2 text-decoration-none small" data-bs-toggle="modal"
                                     data-bs-target="#alimentosModal{{ registro.id | string }}">Ver Alimentos</a>
                                 {% endif %}
+                                {% endif %}
+
+                                {# Fallback se for um registro que não é nem Glicemia nem Refeição #}
+                                {% if not registro.is_glicemia and not registro.is_refeicao %}
+                                N/A
+                                {% endif %}
+
                             </div>
                         </td>
-
-                        {% else %}
-                        <td>N/A</td>
-                        {% endif %}
 
                         {# COLUNA OBSERVAÇÕES #}
                         <td>{{ registro.observacoes if registro.observacoes else 'N/A' }}</td>
 
-                        {# COLUNA AÇÕES (Não mudou) #}
+                        {# COLUNA AÇÕES #}
                         <td class="action-buttons text-center">
                             <a href="{{ url_for('editar_registo', id=registro.id) }}"
                                 class="btn btn-sm btn-link text-warning p-0 me-2" data-bs-toggle="tooltip"
@@ -111,15 +124,19 @@
     </div>
 </div>
 
+{# MODAIS PARA DETALHES DE ALIMENTOS (CORRIGIDO: Apenas se is_refeicao for True) #}
 {% for registro in registros %}
-{% if registro.tipo == 'Refeição' and registro.alimentos_json %}
+{# A verificação no Modal deve ser a mesma usada para mostrar o link "Ver Alimentos" #}
+{% set alimentos_json_len = registro.alimentos_json | length if registro.alimentos_json is string else 0 %}
+{% if registro.is_refeicao and registro.alimentos_json is not none and alimentos_json_len > 2 %}
 <div class="modal fade" id='alimentosModal{{ registro.id | string }}' tabindex="-1"
     aria-labelledby='alimentosModalLabel{{ registro.id | string }}' aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id='alimentosModalLabel{{ registro.id | string }}'>
-                    <i class="fas fa-list me-2"></i>Alimentos da Refeição ({{ registro.tipo_refeicao }})
+                    <i class="fas fa-list me-2"></i>Alimentos da Refeição ({{ registro.tipo_refeicao |
+                    default('Refeição') }})
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                     aria-label="Close"></button>

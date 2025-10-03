@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta 
 LIMITE_HIPO = 70
 LIMITE_HIPER = 180
+
 class DatabaseManager:
     def __init__(self, db_path='glicemia.db'):
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,7 +37,6 @@ class DatabaseManager:
                 return {}
         return {}
 
-    # 🚨 CORREÇÃO CRÍTICA: ESTE MÉTODO DEVE ESTAR DENTRO DA CLASSE
     def inicializar_db(self): 
         """Cria as tabelas do banco de dados se elas não existirem."""
         
@@ -98,6 +98,16 @@ class DatabaseManager:
                 );
             """)
             cursor.execute("""
+                CREATE TABLE IF NOT EXISTS detalhes_refeicao (
+                    registro_id INTEGER PRIMARY KEY,
+                    tipo_refeicao TEXT NOT NULL,
+                    carboidratos REAL,
+                    calorias REAL,
+                    alimentos_json TEXT,
+                    FOREIGN KEY (registro_id) REFERENCES registros (id)
+                );
+            """)
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS agendamentos (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     paciente_id INTEGER NOT NULL,
@@ -112,6 +122,37 @@ class DatabaseManager:
             """)
             
             conn.commit()
+            
+
+    def adicionar_colunas_calculo(self):
+            """Adiciona colunas de cálculo de Bolus se elas não existirem."""
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # Lista de colunas a serem adicionadas, evitando repetição
+            colunas_a_adicionar = [
+                ('ric_manha', 'REAL'), 
+                ('ric_almoco', 'REAL'), 
+                ('ric_jantar', 'REAL'),
+                ('fsi_manha', 'REAL'), 
+                ('fsi_almoco', 'REAL'), 
+                ('fsi_jantar', 'REAL')
+            ]
+            
+            for nome, tipo in colunas_a_adicionar:
+                try:
+                    # Tenta adicionar a coluna
+                    cursor.execute(f"ALTER TABLE users ADD COLUMN {nome} {tipo}")
+                    print(f"Coluna '{nome}' adicionada com sucesso.")
+                except sqlite3.OperationalError as e:
+                    # Se a coluna já existir (erro: "duplicate column name"), ignora
+                    if 'duplicate column name' in str(e):
+                        pass
+                    else:
+                        print(f"Erro ao adicionar coluna {nome}: {e}")
+            
+            conn.commit()
+            conn.close()
 
 
 
@@ -491,9 +532,6 @@ class DatabaseManager:
                 print(f"Erro ao excluir usuário '{username}': {e}")
                 return False
 
-# No seu database_manager.py, adicione:
-
-    import sqlite3 # Certifique-se de importar o sqlite3
 
     def excluir_usuario_e_dados(self, username):
         """
@@ -588,6 +626,7 @@ class DatabaseManager:
             conn.close()
             
         return resumo
+    
     def carregar_alimentos(self):
         """Carrega todos os alimentos da tabela 'alimentos'. (Presumindo que essa tabela exista, embora não esteja no CREATE TABLE)"""
         try:
@@ -600,6 +639,41 @@ class DatabaseManager:
             # Caso a tabela 'alimentos' ainda não tenha sido criada
             return []
         
+    def salvar_refeicao(self, user_id, data_hora_str, tipo_refeicao, total_carbs, total_kcal, alimentos_selecionados_json, observacoes=None):
+        """
+        Salva um novo registro de refeição no banco de dados.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Garanta que a sua tabela tem os campos:
+            # id, user_id, data_hora, tipo_refeicao, carboidoidratos, calorias, alimentos_json, observacoes
+            cursor.execute("""
+                INSERT INTO registros (user_id, tipo, data_hora, observacoes) 
+                VALUES (?, ?, ?, ?)
+            """, (user_id, 'Refeição', data_hora_str, observacoes))
+
+            # Assumindo que você tem uma tabela 'refeicoes' ou 'detalhes_refeicao'
+            # para guardar os detalhes (carboidratos/calorias/alimentos)
+            # O ID do registro principal (registros.id) é pego aqui
+            registro_id = cursor.lastrowid
+            
+            cursor.execute("""
+                INSERT INTO detalhes_refeicao (registro_id, tipo_refeicao, carboidratos, calorias, alimentos_json)
+                VALUES (?, ?, ?, ?, ?)
+            """, (registro_id, tipo_refeicao, total_carbs, total_kcal, alimentos_selecionados_json))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            conn.rollback()
+            print(f"Erro ao salvar refeição: {e}")
+            return False
+        finally:
+            conn.close()
+   
     def salvar_alimento(self, alimento_data):
         """Salva um novo alimento no banco de dados. (Presumindo a tabela 'alimentos')"""
         try:
@@ -654,41 +728,56 @@ class DatabaseManager:
             except Exception as e:
                 print(f"Erro CRÍTICO na busca de alimentos: {e}")
                 return []
+
     def salvar_registro(self, registro_data):
         try:
             with self.get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO registros (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (registro_data['user_id'], registro_data['data_hora'], registro_data['tipo'], registro_data.get('valor'), registro_data.get('observacoes'), registro_data.get('alimentos_json'), registro_data.get('total_calorias'), registro_data.get('total_carbs')))
+                    INSERT INTO registros (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs, dose_aplicada)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (registro_data['user_id'], 
+                    registro_data['data_hora'], 
+                    registro_data['tipo'], 
+                    registro_data.get('valor'), 
+                    registro_data.get('observacoes'), 
+                    registro_data.get('alimentos_json'), 
+                    registro_data.get('total_calorias'), 
+                    registro_data.get('total_carbs'),
+                    registro_data.get('dose_aplicada'))) # <--- NOVO CAMPO
                 conn.commit()
                 return True
         except sqlite3.Error as e:
-            print(f"ERRO DE SQL NO SALVAMENTO: {e}") # <-- Adicione esta linha!
+            print(f"ERRO DE SQL NO SALVAMENTO: {e}") 
             return False
+
+
     def carregar_registros(self, user_id):
         """
-        Carrega todos os registros (glicemia e refeição) do usuário
-        a partir da tabela unificada 'registros'.
+        Carrega todos os registros (glicemia e refeição) do usuário,
+        unindo dados da tabela 'registros' com 'detalhes_refeicao' (assumindo que esta faz parte do seu modelo).
         """
-        # 🚨 CORREÇÃO: Buscar apenas na tabela 'registros'
         sql = """
             SELECT 
-            id, 
-            data_hora, 
-            tipo, 
-            valor, 
-            observacoes, 
-            alimentos_json,  /* 🚨 CORRIGIDO */
-            total_calorias,
-            total_carbs      /* 🚨 NOME CORRETO PARA CARBOIDRATOS */
-        FROM registros 
-        WHERE user_id = ?
-        ORDER BY data_hora DESC
-    """
+                r.id, 
+                r.data_hora, 
+                r.tipo, 
+                r.valor, 
+                r.observacoes, 
+                r.dose_aplicada, -- <--- NOVO CAMPO
+                -- Colunas da tabela detalhes_refeicao (dr)
+                dr.tipo_refeicao,
+                dr.alimentos_json, 
+                dr.calorias AS total_calorias,
+                dr.carboidratos AS total_carbs 
+            FROM registros r
+            LEFT JOIN detalhes_refeicao dr ON r.id = dr.registro_id
+            WHERE r.user_id = ?
+            ORDER BY r.data_hora DESC
+        """
         with self.get_db_connection() as conn:
-        # Nota: Você não precisa redefinir conn.row_factory aqui se já o fez em get_db_connection
+            # Garante que as colunas sejam acessíveis por nome
+            conn.row_factory = sqlite3.Row 
             cursor = conn.cursor() 
         try:
             cursor.execute(sql, (user_id,)) 
@@ -698,27 +787,24 @@ class DatabaseManager:
             return [dict(row) for row in registros]
             
         except sqlite3.OperationalError as e:
-            # Captura erros como 'no such column' se o esquema do DB estiver desatualizado
             print(f"Erro ao carregar registros: {e}")
             return []
         
-    # No database_manager.py, dentro da class DatabaseManager
-
-    def salvar_glicemia(self, user_id, valor, data_hora, tipo, observacao):
-        print(f"--- INICIANDO SALVAMENTO PARA USER ID: {user_id} ---") 
+   
+    def salvar_glicemia(self, user_id, valor, data_hora, tipo, observacao, dose_aplicada=None):
+        """Salva um registro de Glicemia, opcionalmente com a dose de insulina aplicada."""
+        print(f"--- INICIANDO SALVAMENTO GLICEMIA PARA USER ID: {user_id} ---") 
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
-        # DEBUG: Confirmação do ID do usuário.
-        print(f"DEBUG DB: user_id atual: {user_id}")
         if user_id is None:
             print("ALERTA: user_id é None.")
             return False
 
         sql = """
             INSERT INTO registros 
-            (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs, dose_aplicada)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
         try:
@@ -728,20 +814,19 @@ class DatabaseManager:
                 tipo, 
                 valor, 
                 observacao, 
-                None,        
-                None,        
-                None         
+                None, 
+                None, 
+                None,
+                dose_aplicada # <--- NOVO CAMPO AQUI
             ))
             
-            # 🚨 O PROBLEMA ESTÁ NESTE PONTO (commit falha)
             conn.commit() 
-            print(f"DEBUG DB: INSERT BEM-SUCEDIDO. User ID: {user_id}")
+            print(f"DEBUG DB: INSERT GLICEMIA BEM-SUCEDIDO. User ID: {user_id}")
             return True 
             
         except sqlite3.Error as e:
             conn.rollback()
-            # 🚨 Se o erro for capturado, ele nos dará a resposta
-            print(f"ERRO SQLITE REAL: {e}") 
+            print(f"ERRO SQLITE REAL (salvar_glicemia): {e}") 
             return False
         finally:
             conn.close()
@@ -856,12 +941,56 @@ class DatabaseManager:
             if conn:
                 conn.close() # Garante que a conexão seja fechada    
 
+# No seu arquivo database_manager.py
+
     def excluir_registro(self, registro_id):
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
+        """
+        Exclui um registro, tratando a ordem de deleção devido às chaves estrangeiras.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        # É fundamental que o PRAGMA foreign_keys = ON esteja na sua função get_db_connection
+        # para que o SQLite honre as FOREIGN KEYS. Se ele estiver lá, podemos confiar no CASCADE.
+
+        try:
+            # A ordem de exclusão é crítica: filhas -> principal
+            # Incluímos as 3 dependências mais prováveis:
+            cursor.execute("DELETE FROM detalhes_refeicao WHERE registro_id = ?", (registro_id,))
+            cursor.execute("DELETE FROM registros_glicemia WHERE registro_id = ?", (registro_id,))
+            cursor.execute("DELETE FROM registros_insulina WHERE registro_id = ?", (registro_id,))
+            
+            # Se você tiver uma tabela de 'detalhes_glicemia' ou outra, adicione-a aqui!
+            
+            # Excluir o registro principal
             cursor.execute("DELETE FROM registros WHERE id = ?", (registro_id,))
+            
             conn.commit()
-            return cursor.rowcount > 0
+            return True
+        
+        except Exception as e:
+            # Se o erro FOREIGN KEY persistir AQUI, significa que HÁ MAIS UMA TABELA FILHA
+            print(f"ERRO CRÍTICO NA EXCLUSÃO (FOREIGN KEY): {e}") 
+            conn.rollback()
+            
+            # --- SOLUÇÃO DE FORÇA BRUTA (APENAS SE O ERRO PERSISTIR) ---
+            # Tenta a exclusão ignorando temporariamente as chaves estrangeiras (último recurso)
+            try:
+                print("Tentando exclusão com Foreign Keys desabilitadas...")
+                conn.execute("PRAGMA foreign_keys = OFF")
+                conn.execute("DELETE FROM registros WHERE id = ?", (registro_id,))
+                conn.commit()
+                return True
+            except Exception as retry_e:
+                print(f"Falha total na exclusão: {retry_e}")
+                conn.rollback()
+                return False
+            # -----------------------------------------------------------
+            
+        finally:
+            # Garante que a conexão seja fechada e o PRAGMA volte ao normal
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.close()
 
     def medico_tem_acesso_a_paciente(self, medico_id, paciente_id):
         with self.get_db_connection() as conn:
@@ -1306,7 +1435,7 @@ class DatabaseManager:
             cursor.execute("""
                 SELECT valor, data_hora 
                 FROM registros 
-                WHERE paciente_id = ? 
+                WHERE user_id = ? 
                 ORDER BY data_hora DESC 
                 LIMIT 1
             """, (paciente_id,))
@@ -1369,6 +1498,152 @@ class DatabaseManager:
             conn.close()
             
         return resumo          
+    
+
+    def obter_parametros_clinicos(self, user_id):
+        """
+        Busca todos os parâmetros necessários para o cálculo do Bolus.
+        Se parâmetros específicos por horário (fsi/ric) não existirem, 
+        usa os valores gerais (razao_ic/fator_sensibilidade).
+        """
+        sql = """
+            SELECT 
+                meta_glicemia AS glicemia_alvo, 
+                
+                razao_ic AS ric_geral, 
+                fator_sensibilidade AS fsi_geral,
+                
+                ric_manha, ric_almoco, ric_jantar,
+                fsi_manha, fsi_almoco, fsi_jantar
+            FROM users 
+            WHERE id = ?
+        """
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, (user_id,))
+            parametros = cursor.fetchone()
+            
+            if not parametros:
+                return None
+
+            # Unificação: Usa o valor específico por horário, se existir. 
+            # Caso contrário, usa o valor geral (ric_geral ou fsi_geral).
+            # Garante que os valores necessários para o BolusService existam.
+            dados_calculo = {
+                'glicemia_alvo': parametros['glicemia_alvo'] or 120.0,
+                # RIC
+                'ric_manha': parametros['ric_manha'] or parametros['ric_geral'] or 10.0,
+                'ric_almoco': parametros['ric_almoco'] or parametros['ric_geral'] or 10.0,
+                'ric_jantar': parametros['ric_jantar'] or parametros['ric_geral'] or 10.0,
+                'ric': parametros['ric_geral'] or 10.0, # Valor padrão para o Bolus Nutricional (caso o serviço use apenas 1)
+                
+                # FSI
+                'fsi_manha': parametros['fsi_manha'] or parametros['fsi_geral'] or 50.0,
+                'fsi_almoco': parametros['fsi_almoco'] or parametros['fsi_geral'] or 50.0,
+                'fsi_jantar': parametros['fsi_jantar'] or parametros['fsi_geral'] or 50.0,
+            }
+            return dados_calculo
+
+        except sqlite3.Error as e:
+            print(f"Erro de DB ao obter parâmetros clínicos: {e}")
+            return None
+        finally:
+            conn.close()
+    def buscar_doses_insulina_recentes(self, user_id, horas_limite=5):
+            """
+            Busca todos os registros de doses de insulina aplicadas pelo paciente
+            dentro do limite de tempo (ex: últimas 5 horas).
+            
+            Retorna uma lista de dicionários: [{'dose': X, 'data_hora': Y}, ...]
+            """
+            # 1. Calcular o ponto de corte no tempo
+            hora_limite = datetime.now() - timedelta(hours=horas_limite)
+            
+            sql = """
+                SELECT 
+                    data_hora, 
+                    dose_insulina
+                FROM registros 
+                WHERE 
+                    user_id = ? 
+                    AND dose_insulina IS NOT NULL 
+                    AND data_hora >= ?
+                ORDER BY data_hora DESC
+            """
+            conn = self.get_db_connection()
+            try:
+                cursor = conn.cursor()
+                # O SQLite compara strings ISO 8601 corretamente
+                cursor.execute(sql, (user_id, hora_limite.isoformat()))
+                
+                # Retorna como dicionários
+                doses = [dict(row) for row in cursor.fetchall()]
+                return doses
+                
+            except sqlite3.Error as e:
+                print(f"Erro ao buscar doses de insulina recentes: {e}")
+                return []
+            finally:
+                conn.close()
+    def buscar_ultima_glicemia(self, user_id):
+            """
+            Busca a última Glicemia Capilar (GC) registrada pelo paciente.
+            Retorna o valor da glicemia (float) ou None se não encontrar.
+            """
+            sql = """
+                SELECT valor 
+                FROM registros 
+                WHERE user_id = ? 
+                -- Filtra registros que são glicemia ou que contêm um valor de glicemia
+                AND valor IS NOT NULL 
+                ORDER BY data_hora DESC 
+                LIMIT 1
+            """
+            conn = self.get_db_connection() # Use o seu método de conexão
+            try:
+                cursor = conn.cursor()
+                cursor.execute(sql, (user_id,))
+                resultado = cursor.fetchone()
+                
+                # Retorna o valor (índice 0) ou None
+                return float(resultado[0]) if resultado and resultado[0] is not None else None
+            
+            except sqlite3.Error as e:
+                print(f"Erro ao buscar última glicemia: {e}")
+                return None
+            finally:
+                conn.close()
+
+    def salvar_registro_insulina(self, user_id, dose_insulina, data_hora):
+        """
+        Salva uma dose de insulina Bolus aplicada pelo paciente na tabela de registros.
+        """
+        if dose_insulina <= 0:
+            # Não salva se a dose for zero ou negativa
+            return
+            
+        sql = """
+            INSERT INTO registros 
+                (user_id, tipo, dose_insulina, data_hora, observacao)
+            VALUES (?, ?, ?, ?, ?)
+        """
+        # Usamos 'Insulina Aplicada' como tipo para diferenciar claramente
+        # de uma Glicemia ou Refeição
+        tipo = 'Insulina Aplicada'
+        observacao = f"Bolus aplicado: {dose_insulina:.1f} UI"
+        
+        conn = self.get_db_connection() # Use o seu método de conexão
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, (user_id, tipo, dose_insulina, data_hora, observacao))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Erro ao salvar registro de insulina: {e}")
+            return False
+        finally:
+            conn.close()
 # ---------------------- NOVAS FUNÇÕES DE GRÁFICOS ----------------------
 
     def obter_dados_glicemia_para_grafico(self, paciente_id):
