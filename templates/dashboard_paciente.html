@@ -4,6 +4,7 @@
 
 {% block content %}
 <div class="container my-5">
+    {# HERO SECTION #}
     <div class="p-5 mb-4 bg-primary rounded-3 shadow-lg text-center text-white hero-dashboard">
         <h1 class="display-4 fw-bold">Bem-vindo, {{ current_user.username }}! <i class="fas fa-hand-peace ms-2"></i>
         </h1>
@@ -12,61 +13,86 @@
         <p>Acesse as ferramentas e calculadoras abaixo para um acompanhamento mais completo.</p>
     </div>
 
-    {% if resumo_dados.ultimo_registro %}
-    <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido (Últimos 7 Dias)</h2>
-    <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+    {# RESUMO RÁPIDO - 4 CARDS AGRUPADOS EM UMA LINHA #}
+    <h2 class="text-center mt-5 mb-4 text-secondary">Seu Resumo Rápido</h2>
 
-        {% set glicemia_valor = resumo_dados.ultimo_registro.valor | float %}
-        {% set status_class = 'text-danger' if glicemia_valor > 180 else ('text-warning' if glicemia_valor < 70
-            else 'text-success' ) %} {% set status_icon='fa-arrow-up' if glicemia_valor> 180 else ('fa-arrow-down' if
-            glicemia_valor < 70 else 'fa-check-circle' ) %} <div class="col">
+    {% if resumo_dados.ultimo_registro %}
+
+    {# LÓGICA DO JINJA #}
+    {% set glicemia_valor = resumo_dados.ultimo_registro.valor | float %}
+    {% set status_class = 'text-danger' if glicemia_valor > 180 else ('text-warning' if glicemia_valor < 70
+        else 'text-success' ) %} {% set status_icon='fa-arrow-up' if glicemia_valor> 180 else ('fa-arrow-down' if
+        glicemia_valor < 70 else 'fa-check-circle' ) %} <div class="row g-4 mb-4">
+
+            {# CARD 1: ÚLTIMA GLICEMIA #}
+            <div class="col-12 col-md-6 col-lg-3">
                 <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
                     <div class="card-body">
                         <i class="fas {{ status_icon }} fa-3x mb-3 {{ status_class }}"></i>
                         <h5 class="card-title text-secondary">Última Glicemia</h5>
-                        <h2 class="card-text display-6 fw-bold {{ status_class }}">{{ resumo_dados.ultimo_registro.valor
-                            }}
-                            mg/dL</h2>
+                        <h2 class="card-text display-6 fw-bold {{ status_class }}">
+                            {{ resumo_dados.ultimo_registro.valor }} mg/dL
+                        </h2>
                         <p class="card-text"><small>{{ resumo_dados.ultimo_registro.tempo_desde_ultimo }}</small></p>
                     </div>
                 </div>
-    </div>
-
-    <div class="col">
-        <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
-            <div class="card-body">
-                <i class="fas fa-chart-bar fa-3x mb-3 text-primary"></i>
-                <h5 class="card-title text-secondary">Média (Últimos 7 Dias)</h5>
-                <h2 class="card-text display-6 fw-bold text-dark">
-                    {% if resumo_dados.media_ultima_semana %}
-                    {{ resumo_dados.media_ultima_semana }} mg/dL
-                    {% else %}
-                    N/A
-                    {% endif %}
-                </h2>
-                <p class="card-text"><small class="text-muted">Mostra seu controle de longo prazo.</small></p>
             </div>
-        </div>
-    </div>
 
-    <div class="col">
-        <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
-            <div class="card-body">
-                <i class="fas fa-exclamation-triangle fa-3x mb-3 text-secondary"></i>
-                <h5 class="card-title text-secondary">Alertas de 7 Dias</h5>
-                <div class="d-flex justify-content-center align-items-center mt-3">
-                    <div class="p-2 me-4">
-                        <h3 class="fw-bolder text-danger">{{ resumo_dados.hiperglicemia_count }}</h3>
-                        <p class="mb-0 text-muted">Hiper</p>
-                    </div>
-                    <div class="p-2">
-                        <h3 class="fw-bolder text-warning">{{ resumo_dados.hipoglicemia_count }}</h3>
-                        <p class="mb-0 text-muted">Hipo</p>
+            {# CARD 2: MÉDIA (ÚLTIMOS 7 DIAS) #}
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
+                    <div class="card-body">
+                        <i class="fas fa-chart-bar fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title text-secondary">Média (Últimos 7 Dias)</h5>
+                        <h2 class="card-text display-6 fw-bold text-dark">
+                            {% if resumo_dados.media_ultima_semana %}
+                            {{ resumo_dados.media_ultima_semana }} mg/dL
+                            {% else %}
+                            N/A
+                            {% endif %}
+                        </h2>
+                        <p class="card-text"><small class="text-muted">Mostra seu controle de longo prazo.</small></p>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+
+            {# CARD 3: DOSE MÉDIA APLICADA (Sugestão de Dose) #}
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
+                    <div class="card-body">
+                        <i class="fas fa-syringe fa-3x mb-3 text-info"></i>
+                        <h5 class="card-title text-secondary">Dose Média Aplicada</h5>
+                        {% if dose_media_aplicada is not none and dose_media_aplicada > 0 %}
+                        <h2 class="card-text display-6 fw-bold text-dark">{{ dose_media_aplicada }} UI</h2>
+                        <p class="card-text"><small class="text-muted">Média das últimas 2 semanas (Sugestão).</small>
+                        </p>
+                        {% else %}
+                        <h2 class="card-text display-6 fw-bold text-muted">0.0 UI</h2>
+                        <p class="card-text"><small class="text-muted">Registre doses para obter a média.</small></p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# CARD 4: ALERTAS DE 7 DIAS #}
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="dashboard-card bg-white text-center shadow-sm h-100 p-3">
+                    <div class="card-body">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3 text-secondary"></i>
+                        <h5 class="card-title text-secondary">Alertas de 7 Dias</h5>
+                        <div class="d-flex justify-content-center align-items-center mt-3">
+                            <div class="p-2 me-4">
+                                <h3 class="fw-bolder text-danger">{{ resumo_dados.hiperglicemia_count }}</h3>
+                                <p class="mb-0 text-muted">Hiper</p>
+                            </div>
+                            <div class="p-2">
+                                <h3 class="fw-bolder text-warning">{{ resumo_dados.hipoglicemia_count }}</h3>
+                                <p class="mb-0 text-muted">Hipo</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 </div>
 {% else %}
 <div class="alert alert-info text-center mt-5" role="alert">
@@ -74,10 +100,14 @@
 </div>
 {% endif %}
 
-<h2 class="text-center mt-5 mb-4 text-secondary">Ferramentas Diárias</h2>
+
+<hr class="my-5">
+
+{# FERRAMENTAS DIÁRIAS #}
+<h2 class="text-center mb-4 text-secondary">Ferramentas Diárias</h2>
 <div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center">
 
-    {# NOVO CARD 1: REGISTRAR GLICEMIA #}
+    {# CARD: REGISTRAR GLICEMIA #}
     <div class="col">
         <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
             <div class="card-body d-flex flex-column align-items-center text-center">
@@ -91,7 +121,7 @@
         </div>
     </div>
 
-    {# NOVO CARD 2: REGISTRAR REFEIÇÃO #}
+    {# CARD: REGISTRAR REFEIÇÃO #}
     <div class="col">
         <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
             <div class="card-body d-flex flex-column align-items-center text-center">
@@ -105,7 +135,7 @@
         </div>
     </div>
 
-    {# CARD 3: VER HISTÓRICO (mantido) #}
+    {# CARD: VER HISTÓRICO #}
     <div class="col">
         <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
             <div class="card-body d-flex flex-column align-items-center text-center">
@@ -121,8 +151,11 @@
 </div>
 
 <hr class="my-5">
+
+{# CALCULADORAS #}
 <h2 class="text-center mb-4 text-secondary">Calculadoras</h2>
 <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
+    {# CARD: CALCULAR BOLUS #}
     <div class="col">
         <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
             <div class="card-body d-flex flex-column align-items-center text-center">
@@ -135,6 +168,7 @@
             </div>
         </div>
     </div>
+    {# CARD: CALCULAR FATOR DE SENSIBILIDADE #}
     <div class="col">
         <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
             <div class="card-body d-flex flex-column align-items-center text-center">
@@ -150,8 +184,11 @@
 </div>
 
 <hr class="my-5">
+
+{# RECURSOS E INFORMAÇÕES #}
 <h2 class="text-center mb-4 text-secondary">Recursos e Informações</h2>
 <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
+    {# CARD: MINHAS CONSULTAS #}
     <div class="col">
         <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
             <div class="card-body d-flex flex-column align-items-center text-center">
@@ -164,6 +201,7 @@
             </div>
         </div>
     </div>
+    {# CARD: GUIA COMPLETO #}
     <div class="col">
         <div class="dashboard-card h-100 shadow-sm border-0 tool-card bg-white">
             <div class="card-body d-flex flex-column align-items-center text-center">
@@ -179,7 +217,8 @@
     </div>
 </div>
 
-{% if current_user.is_admin %}
+{# ADMIN SECTION (CONDICIONAL) #}
+{% if current_user.role == 'admin' %}
 <hr class="my-5">
 <h2 class="text-center mb-4 text-secondary">Acesso Rápido Admin</h2>
 <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
@@ -200,6 +239,7 @@
 </div>
 {% endif %}
 
+{# Floating Action Button (FAB) #}
 <a href="{{ url_for('registrar_glicemia') }}" class="btn btn-success btn-lg rounded-circle shadow-lg fab-button"
     title="Novo Registro">
     <i class="fas fa-plus fa-2x"></i>
@@ -233,7 +273,8 @@
     }
 
     .hero-dashboard {
-        background: linear-gradient(135deg, #007bff, #0056b3);
+        background: var(--gradient-bg);
+        /* Usando variável CSS se estiver definida no base.html */
     }
 </style>
 {% endblock %}

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Configurar Parâmetros Clínicos{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card p-4 shadow-lg border-0">
+                <h1 class="card-title text-primary mb-3">
+                    <i class="fas fa-sliders-h me-2"></i>Configurar Parâmetros Clínicos
+                </h1>
+
+                {% if paciente %}
+                <h5 class="mb-4">
+                    <span class="badge bg-secondary me-2">Paciente:</span>
+                    <strong class="text-dark">{{ paciente.nome_completo or paciente.username }}</strong>
+                </h5>
+                {% else %}
+                <div class="alert alert-danger" role="alert">Erro: Paciente não identificado ou não vinculado.</div>
+                {% endif %}
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+
+                {% if paciente %}
+                <form action="{{ url_for('configurar_parametros', paciente_id=paciente.id) }}" method="post">
+
+                    <h5 class="mb-3 text-success"><i class="fas fa-bullseye me-2"></i>Metas Terapêuticas</h5>
+                    <div class="row mb-4 g-3">
+                        <div class="col-md-4">
+                            <label for="glicemia_alvo" class="form-label fw-bold">Glicemia Alvo (mg/dL)</label>
+                            <div class="input-group">
+                                <input type="number" step="1" class="form-control form-control-lg" id="glicemia_alvo"
+                                    name="glicemia_alvo" placeholder="Ex: 100" required
+                                    value="{{ parametros.glicemia_alvo if parametros and parametros.glicemia_alvo is not none else '100' }}">
+                                <span class="input-group-text">mg/dL</span>
+                            </div>
+                        </div>
+                        {# Você pode adicionar Glicemia Mínima e Máxima aqui se necessário #}
+                    </div>
+
+                    <h5 class="mb-3 text-warning"><i class="fas fa-bolt me-2"></i>Fatores por Turno (RIC e FSI)</h5>
+                    <p class="text-muted small">Defina o valor de Razão Insulina/Carboidrato (RIC) e Fator de
+                        Sensibilidade à Insulina (FSI) para cada período do dia.</p>
+
+                    <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+                        <li class="nav-item" role="presentation"><button class="nav-link active" id="pills-manha-tab"
+                                data-bs-toggle="pill" data-bs-target="#pills-manha" type="button" role="tab"
+                                aria-controls="pills-manha" aria-selected="true">Manhã (6h-12h)</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="pills-almoco-tab"
+                                data-bs-toggle="pill" data-bs-target="#pills-almoco" type="button" role="tab"
+                                aria-controls="pills-almoco" aria-selected="false">Almoço (12h-18h)</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="pills-jantar-tab"
+                                data-bs-toggle="pill" data-bs-target="#pills-jantar" type="button" role="tab"
+                                aria-controls="pills-jantar" aria-selected="false">Jantar/Noite (18h-6h)</button></li>
+                    </ul>
+
+                    <div class="tab-content" id="pills-tabContent">
+
+                        {# MANHÃ #}
+                        <div class="tab-pane fade show active" id="pills-manha" role="tabpanel"
+                            aria-labelledby="pills-manha-tab">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="ric_manha" class="form-label">RIC Manhã (1: X g Carb)</label>
+                                    <input type="number" step="0.1" class="form-control" id="ric_manha" name="ric_manha"
+                                        placeholder="Ex: 10" required
+                                        value="{{ parametros.ric_manha if parametros and parametros.ric_manha is not none else '10' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="fsi_manha" class="form-label">FSI Manhã (X mg/dL)</label>
+                                    <input type="number" step="1" class="form-control" id="fsi_manha" name="fsi_manha"
+                                        placeholder="Ex: 50" required
+                                        value="{{ parametros.fsi_manha if parametros and parametros.fsi_manha is not none else '50' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        {# ALMOÇO #}
+                        <div class="tab-pane fade" id="pills-almoco" role="tabpanel" aria-labelledby="pills-almoco-tab">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="ric_almoco" class="form-label">RIC Almoço (1: X g Carb)</label>
+                                    <input type="number" step="0.1" class="form-control" id="ric_almoco"
+                                        name="ric_almoco" placeholder="Ex: 12" required
+                                        value="{{ parametros.ric_almoco if parametros and parametros.ric_almoco is not none else '12' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="fsi_almoco" class="form-label">FSI Almoço (X mg/dL)</label>
+                                    <input type="number" step="1" class="form-control" id="fsi_almoco" name="fsi_almoco"
+                                        placeholder="Ex: 40" required
+                                        value="{{ parametros.fsi_almoco if parametros and parametros.fsi_almoco is not none else '40' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        {# JANTAR/NOITE #}
+                        <div class="tab-pane fade" id="pills-jantar" role="tabpanel" aria-labelledby="pills-jantar-tab">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="ric_jantar" class="form-label">RIC Jantar/Noite (1: X g Carb)</label>
+                                    <input type="number" step="0.1" class="form-control" id="ric_jantar"
+                                        name="ric_jantar" placeholder="Ex: 8" required
+                                        value="{{ parametros.ric_jantar if parametros and parametros.ric_jantar is not none else '8' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="fsi_jantar" class="form-label">FSI Jantar/Noite (X mg/dL)</label>
+                                    <input type="number" step="1" class="form-control" id="fsi_jantar" name="fsi_jantar"
+                                        placeholder="Ex: 60" required
+                                        value="{{ parametros.fsi_jantar if parametros and parametros.fsi_jantar is not none else '60' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-5">
+                        <a href="{{ url_for('configurar_parametros') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-undo me-2"></i>Voltar para Lista
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i>Salvar Parâmetros para {{ paciente.username }}
+                        </button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

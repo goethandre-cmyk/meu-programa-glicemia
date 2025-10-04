@@ -8,8 +8,7 @@ from datetime import datetime, timedelta
 
 def formatar_registros_para_exibicao(registros_brutos):
     """
-    Formata e enriquece a lista de registros, classificando Glicemia e Refeição
-    de forma INDEPENDENTE para permitir a exibição de detalhes combinados ou únicos.
+    Formata e enriquece a lista de registros.
     """
     registros_formatados = []
     
@@ -25,7 +24,7 @@ def formatar_registros_para_exibicao(registros_brutos):
             try:
                 # Tentativa de converter formatos comuns ('T' ou ' ')
                 if 'T' in data_hora_str:
-                    reg['data_hora'] = datetime.fromisoformat(data_hora_str)
+                    reg['data_hora'] = datetime.fromisoformat(data_hora_str.replace('Z', '+00:00')) # Suporta Zulu/ISO
                 elif len(data_hora_str) >= 19:
                     reg['data_hora'] = datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M:%S')
                 else: # Trata o formato sem segundos
@@ -40,18 +39,16 @@ def formatar_registros_para_exibicao(registros_brutos):
         reg['tipo_exibicao'] = tipo_bruto
         
         # A) CLASSIFICAÇÃO DE REFEIÇÃO: 
-        # É refeição se o tipo bruto for 'Refeição' OU se houver carboidratos OU o JSON de alimentos.
         if tipo_bruto == 'Refeição' or reg.get('total_carbs') is not None or reg.get('alimentos_json') is not None:
             reg['is_refeicao'] = True
             reg['tipo_exibicao'] = reg.get('tipo_refeicao') or 'Refeição'
             
         # B) CLASSIFICAÇÃO DE GLICEMIA: 
-        # É glicemia se houver um valor numérico de glicemia ('valor').
         if reg.get('valor') is not None: 
             try:
                 reg['valor'] = float(reg['valor'])
             except (TypeError, ValueError):
-                 reg['valor'] = None 
+                reg['valor'] = None 
             
             if reg.get('valor') is not None:
                 reg['is_glicemia'] = True
@@ -66,132 +63,94 @@ def formatar_registros_para_exibicao(registros_brutos):
     return registros_formatados
 
 class BolusService:
-     # Duração de Ação Máxima da insulina (4h para ultrarrápida)
+    # Duração de Ação Máxima da insulina (4h para ultrarrápida é um bom padrão)
     DOA_MAX_HORAS = 4.0 
+    
     def __init__(self, db_manager):
-        # A injeção do db_manager permite que o serviço acesse dados, se necessário
         self.db = db_manager 
 
-    # --- NOVO MÉTODO: OBTEM RIC POR HORÁRIO ---
+    # --- RIC POR HORÁRIO ---
     def obter_ric_por_horario(self, parametros):
-        """
-        Determina e retorna a RIC (Razão Insulina/Carboidrato) 
-        com base nos parâmetros do paciente e na hora atual.
-        """
-        # Define os horários de corte (iguais aos usados para o FSI)
         HORARIO_MANHA = 6
         HORARIO_ALMOCO = 12
         HORARIO_JANTAR = 18
-
         hora_atual = datetime.now().hour
         
-        # 1. Manhã: [06:00 - 11:59]
         if HORARIO_MANHA <= hora_atual < HORARIO_ALMOCO:
             return parametros.get('ric_manha')
-            
-        # 2. Almoço: [12:00 - 17:59]
         elif HORARIO_ALMOCO <= hora_atual < HORARIO_JANTAR:
             return parametros.get('ric_almoco')
-            
-        # 3. Jantar/Noite: [18:00 - 05:59]
         else:
             return parametros.get('ric_jantar')
 
-    # --- MÉTODO JÁ EXISTENTE (FSI) ---
+    # --- FSI POR HORÁRIO ---
     def obter_fsi_por_horario(self, parametros):
-        """
-        Determina e retorna o FSI (Fator de Sensibilidade à Insulina) 
-        com base nos parâmetros do paciente e na hora atual.
-        """
-        # Horários de corte mantidos, como no original...
         HORARIO_MANHA = 6
         HORARIO_ALMOCO = 12
         HORARIO_JANTAR = 18
-
         hora_atual = datetime.now().hour
         
-        # 1. Manhã: [06:00 - 11:59]
         if HORARIO_MANHA <= hora_atual < HORARIO_ALMOCO:
             return parametros.get('fsi_manha')
-            
-        # 2. Almoço: [12:00 - 17:59]
         elif HORARIO_ALMOCO <= hora_atual < HORARIO_JANTAR:
             return parametros.get('fsi_almoco')
-            
-        # 3. Jantar/Noite: [18:00 - 05:59]
         else:
             return parametros.get('fsi_jantar')
 
-
-    # --- MÉTODO PRINCIPAL (CORREÇÃO) ---
- 
+    # --- MÉTODO PRINCIPAL ---
     def calcular_bolus_total(self, gc_atual, carboidratos, paciente_id): 
-        """
-        Calcula a dose total de Bolus (Correção + Nutricional) para o paciente,
-        incluindo o cálculo interno da Insulina Ativa (IA).
-        """
-        # 1. Obter Parâmetros Clínicos
         parametros = self.db.obter_parametros_clinicos(paciente_id)
         
-        # 2. Validação Inicial
         if not parametros or not parametros.get('glicemia_alvo'):
             return None, "Parâmetros clínicos incompletos ou ausentes."
 
         glicemia_alvo = parametros['glicemia_alvo']
+        fsi = self.obter_fsi_por_horario(parametros) or 50.0 # Valor padrão se for None
+        ric = self.obter_ric_por_horario(parametros) or 10.0 # Valor padrão se for None
         
-        # 3. Determinar o FSI e o RIC do momento
-        fsi = self.obter_fsi_por_horario(parametros)
-        ric = self.obter_ric_por_horario(parametros)
+        if fsi <= 0:
+            return None, "FSI inválido (zero ou negativo)."
+        if ric <= 0:
+            return None, "RIC inválido (zero ou negativo)."
         
-        # 4. Validação de FSI e RIC
-        if not fsi or fsi == 0:
-            return None, "Fator de Sensibilidade à Insulina (FSI) para o horário atual não configurado ou é zero."
-        
-        if not ric or ric == 0:
-            return None, "Razão Insulina/Carboidrato (RIC) para o horário atual não configurada ou é zero."
-        
-        
-        # --- Lógica de Cálculo (DEFINE bolus_bruto) ---
-        
-        # Bolus Nutricional (BN): Carboidratos / RIC
+        # Bolus Nutricional (BN)
         bolus_nutricional = carboidratos / ric
         
-        # Bolus de Correção (BC): (GC - GA) / FSI
+        # Bolus de Correção (BC)
         diferenca_glicemia = gc_atual - glicemia_alvo
-        bolus_correcao = diferenca_glicemia / fsi
+        bolus_correcao_bruto = max(0, diferenca_glicemia / fsi) # Garante que a correção não é negativa
         
-        # Bolus Bruto (soma antes da IA)
-        bolus_bruto = bolus_nutricional + bolus_correcao  # <--- DEFINIÇÃO CRÍTICA AQUI
+        bolus_bruto = bolus_nutricional + bolus_correcao_bruto
         
-        # --- CÁLCULO DA INSULINA ATIVA (IA) ---
+        # CÁLCULO DA INSULINA ATIVA (IA)
         ia_ativa = self.calcular_insulina_ativa(paciente_id)
 
-        # Bolus Final (aplicando IA)
+        # Bolus Final
         bolus_final = bolus_bruto - ia_ativa
         
-        # Arredondamento (para o 0.5 UI mais próximo)
+        # Arredondamento (para o 0.5 UI mais próximo) e Garantir dose mínima é 0
         dose_arredondada = round(bolus_final * 2) / 2
-        
-        # Garantir dose mínima é 0
         bolus_total = max(0, dose_arredondada)
         
         # Retorna todos os componentes
         return {
             'bolus_refeicao': round(bolus_nutricional, 1),
-            'bolus_correcao': round(bolus_correcao, 1),
+            'bolus_correcao': round(bolus_correcao_bruto, 1),
             'insulina_ativa': round(ia_ativa, 1),
             'bolus_total': bolus_total,
             'fsi_usado': fsi,
             'ric_usado': ric
         }, None
 
+    # --- MÉTODO DE CÁLCULO DA INSULINA ATIVA CORRIGIDO ---
     def calcular_insulina_ativa(self, user_id):
         """
         Calcula a Insulina Ativa (IA) total baseada em doses recentes.
-        Usa um modelo linear simplificado para a curva de ação da insulina.
+        Usa um modelo linear simplificado.
         """
         
         # 1. Obter as doses do DB
+        # O db_manager deve buscar a dose_insulina e data_hora
         doses_recentes = self.db.buscar_doses_insulina_recentes(user_id, horas_limite=math.ceil(self.DOA_MAX_HORAS))
         
         ia_total = 0.0
@@ -206,29 +165,39 @@ class BolusService:
             if dose_ui <= 0.0 or not data_aplicacao_str:
                 continue
                 
+            # 2. Conversão e Cálculo
             try:
-                # 2. Conversão da Data
-                data_aplicacao = datetime.fromisoformat(data_aplicacao_str)
+                # Lógica de conversão de data/hora (copiada do seu código, mas agora identada)
+                data_aplicacao = None
+                if 'T' in data_aplicacao_str:
+                    data_aplicacao = datetime.fromisoformat(data_aplicacao_str.replace('Z', '+00:00'))
+                elif len(data_aplicacao_str) >= 19:
+                    data_aplicacao = datetime.strptime(data_aplicacao_str, '%Y-%m-%d %H:%M:%S')
+                else:
+                    data_aplicacao = datetime.strptime(data_aplicacao_str, '%Y-%m-%d %H:%M')
+
+                if not data_aplicacao:
+                    continue 
+
                 tempo_decorrido: timedelta = datetime.now() - data_aplicacao
                 
                 # Tempo decorrido em horas
-                tempo_decorrido_horas = tempo_decorrido.total_seconds() / 3600
+                horas_decorridas = tempo_decorrido.total_seconds() / 3600.0
                 
-                # 3. Cálculo da Insulina Ativa (Modelo Linear Simples)
+                # Se passou do tempo de ação, pule.
+                if horas_decorridas >= self.DOA_MAX_HORAS:
+                    continue
+                    
+                # Modelo Linear de Insulina Ativa (Simples):
+                # IA = Dose * (DOA_MAX - horas_decorridas) / DOA_MAX
+                fator_remanescente = (self.DOA_MAX_HORAS - horas_decorridas) / self.DOA_MAX_HORAS
                 
-                # Porcentagem de insulina remanescente (linear)
-                # Exemplo: Se DOA=4h e passou 1h, sobram 3/4 = 75%
-                porcentagem_restante = (self.DOA_MAX_HORAS - tempo_decorrido_horas) / self.DOA_MAX_HORAS
+                ia_dose_atual = dose_ui * fator_remanescente
+                ia_total += ia_dose_atual
                 
-                # Garante que a porcentagem está entre 0 e 1 (0% a 100%)
-                porcentagem_restante = max(0.0, min(1.0, porcentagem_restante))
-                
-                insulina_remanescente = dose_ui * porcentagem_restante
-                ia_total += insulina_remanescente
-                
-            except ValueError:
+            except (ValueError, TypeError):
                 # Ignora doses com data/hora inválida
                 continue
 
-        # Retorna o total de IA arredondado (ex: 0.5 UI)
-        return round(ia_total * 2) / 2 
+        # 3. Retorna o total de IA arredondado (fora do loop)
+        return round(ia_total, 1) # Arredondar para 1 casa decimal (ex: 0.5 UI)

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Parâmetros{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-primary mb-4">
+        <i class="fas fa-edit me-2"></i>Editar Parâmetros de Bolus: {{ paciente.username }}
+    </h2>
+    <p class="text-muted">
+        Insira os valores definidos para Razão I:C, FSI e Meta de Glicemia.
+    </p>
+
+    <div class="card p-4 shadow-lg">
+        <form method="POST" action="{{ url_for('editar_parametros', paciente_id=paciente.id) }}">
+
+            <h4 class="border-bottom pb-2 mb-3">Razão Insulina-Carboidrato (I:C)</h4>
+
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="ric_manha" class="form-label">RIC Manhã (Ex: 1:10)</label>
+                    <input type="number" step="0.01" class="form-control" id="ric_manha" name="ric_manha"
+                        value="{{ paciente.ric_manha or 0.0 }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="ric_almoco" class="form-label">RIC Almoço</label>
+                    <input type="number" step="0.01" class="form-control" id="ric_almoco" name="ric_almoco"
+                        value="{{ paciente.ric_almoco or 0.0 }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="ric_jantar" class="form-label">RIC Jantar</label>
+                    <input type="number" step="0.01" class="form-control" id="ric_jantar" name="ric_jantar"
+                        value="{{ paciente.ric_jantar or 0.0 }}" required>
+                </div>
+            </div>
+
+            <h4 class="border-bottom pb-2 my-4">Sensibilidade e Meta</h4>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <label for="fator_sensibilidade" class="form-label">Fator de Sensibilidade à Insulina (FSI)</label>
+                    <input type="number" step="0.1" class="form-control" id="fator_sensibilidade"
+                        name="fator_sensibilidade" value="{{ paciente.fator_sensibilidade or 0.0 }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="meta_glicemia" class="form-label">Meta de Glicemia (mg/dL)</label>
+                    <input type="number" class="form-control" id="meta_glicemia" name="meta_glicemia"
+                        value="{{ paciente.meta_glicemia or 0.0 }}" required>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('dashboard_medico') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Voltar
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i> Salvar Parâmetros
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

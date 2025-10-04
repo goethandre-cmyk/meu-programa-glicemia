@@ -340,6 +340,93 @@ class DatabaseManager:
         finally:
             conn.close()
 
+
+    def obter_usuario_por_id(self, user_id):
+        """
+        Busca um único usuário por ID, retornando todas as colunas necessárias para edição.
+        """
+        conn = self.get_db_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        try:
+            # Tabela 'users'
+            query = """
+                SELECT 
+                    id, username, email, nome_completo, 
+                    ric_manha, ric_almoco, ric_jantar,
+                    fator_sensibilidade, meta_glicemia, medico_id, role
+                FROM users 
+                WHERE id = ?;
+            """
+            cursor.execute(query, (user_id,))
+            user_row = cursor.fetchone()
+            
+            if user_row:
+                user_data = dict(user_row)
+                # Mapeamento para FSI, para consistência em toda a aplicação
+                user_data['fsi'] = user_data.pop('fator_sensibilidade', None)
+                return user_data
+            
+            return None
+            
+        except Exception as e:
+            print(f"Erro ao obter usuário por ID {user_id}: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def salvar_parametros_paciente(self, paciente_id, ric_manha, ric_almoco, ric_jantar, fator_sensibilidade, meta_glicemia):
+        """
+        Atualiza os parâmetros de Bolus para um paciente específico na tabela 'users'.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Tabela 'users'
+            query = """
+                UPDATE users
+                SET ric_manha = ?, ric_almoco = ?, ric_jantar = ?,
+                    fator_sensibilidade = ?, meta_glicemia = ?
+                WHERE id = ? AND role = 'paciente';
+            """
+            cursor.execute(query, (
+                ric_manha, ric_almoco, ric_jantar,
+                fator_sensibilidade, meta_glicemia,
+                paciente_id
+            ))
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            print(f"Erro ao salvar parâmetros para o paciente {paciente_id}: {e}")
+            return False
+        finally:
+            conn.close()
+    def verificar_vinculo_medico_paciente(self, medico_id, paciente_id):
+        """
+        Verifica se o paciente está vinculado ao médico (usando a coluna medico_id
+        na tabela users, que você já preencheu em criar_paciente_e_ficha_inicial).
+        """
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 1 
+                FROM users 
+                WHERE id = ? AND medico_id = ?
+            """, (paciente_id, medico_id))
+            
+            # Se fetchone() retornar um resultado, o vínculo existe (True).
+            vinculo_existe = cursor.fetchone() is not None
+            conn.close()
+            return vinculo_existe
+            
+        except Exception as e:
+            print(f"Erro ao verificar vínculo: {e}")
+            return False
+
     def carregar_usuario(self, username):
         with self.get_db_connection() as conn:
             cursor = conn.cursor()
@@ -392,6 +479,155 @@ class DatabaseManager:
         usuarios = cursor.fetchall()
         conn.close()
         return [{'id': row['id'], 'username': row['username'], 'role': row['role']} for row in usuarios]
+    
+    def contar_usuarios(self, role=None):
+        """
+        Conta o número total de usuários, opcionalmente filtrando por função (role).
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if role:
+                # Se a role for fornecida, conta apenas usuários com aquela role
+                query = "SELECT COUNT(*) FROM usuarios WHERE role = ?"
+                cursor.execute(query, (role,))
+            else:
+                # Se nenhuma role for fornecida, conta todos os usuários
+                query = "SELECT COUNT(*) FROM usuarios"
+                cursor.execute(query)
+            
+            # O fetchone retorna uma tupla, o COUNT é o primeiro elemento [0]
+            count = cursor.fetchone()[0]
+            return count
+            
+        except Exception as e:
+            print(f"Erro ao contar usuários: {e}")
+            return 0
+        finally:
+            conn.close()
+
+    def contar_pacientes_sem_parametros(self):
+            """
+            Conta o número de pacientes que ainda não tiveram seus parâmetros de Bolus (RIC e Meta) configurados.
+            Considera sem parâmetro se o RIC da manhã ou a Meta de Glicemia for NULL ou 0.
+            """
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            try:
+                # A consulta busca pacientes onde a role é 'paciente' E 
+                # pelo menos um dos campos essenciais está AUSENTE ou ZERO.
+                query = """
+                    SELECT COUNT(id) FROM usuarios 
+                    WHERE role = 'paciente' 
+                    AND (ric_manha IS NULL OR ric_manha = 0 
+                        OR meta_glicemia IS NULL OR meta_glicemia = 0);
+                """
+                cursor.execute(query)
+                
+                # O fetchone retorna uma tupla, o COUNT é o primeiro elemento [0]
+                count = cursor.fetchone()[0]
+                return count
+                
+            except Exception as e:
+                print(f"Erro ao contar pacientes sem parâmetros: {e}")
+                return 0
+            finally:
+                conn.close()
+
+    def contar_pacientes_em_alerta(self):
+            """
+            Conta o número de pacientes que tiveram uma glicemia fora da zona de segurança 
+            (Hiper ou Hipoglicemia) nas últimas 48 horas.
+            """
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+        
+            # 1. Definir o limite de tempo (48 horas atrás)
+            # O uso correto com 'from datetime import datetime, timedelta' é:
+            limite_tempo = datetime.now() - timedelta(hours=48) 
+            limite_tempo_str = limite_tempo.strftime('%Y-%m-%d %H:%M:%S')
+            # Definir limites de glicemia (em mg/dL)
+            HIPOGLICEMIA = 70
+            HIPERGLICEMIA = 250
+            
+            try:
+                # 2. Consultar registros de glicemia nos últimos 48h que estejam fora da zona segura
+                # Usamos DISTINCT para contar CADA PACIENTE apenas uma vez, mesmo que ele tenha múltiplos registros de alerta.
+                query = """
+                    SELECT COUNT(DISTINCT paciente_id) 
+                    FROM registros_glicemia
+                    WHERE timestamp >= ? 
+                    AND (glicemia < ? OR glicemia > ?);
+                """
+                cursor.execute(query, (limite_tempo_str, HIPOGLICEMIA, HIPERGLICEMIA))
+                
+                count = cursor.fetchone()[0]
+                return count
+                
+            except Exception as e:
+                print(f"Erro ao contar pacientes em alerta: {e}")
+                return 0
+            finally:
+                conn.close()
+
+    def contar_registros_24h(self):
+            """
+            Conta o número total de registros (glicemia, bolus, etc.) feitos nas últimas 24 horas.
+            """
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # 1. Definir o limite de tempo (24 horas atrás)
+            limite_tempo = datetime.now() - timedelta(hours=24)
+            limite_tempo_str = limite_tempo.strftime('%Y-%m-%d %H:%M:%S')
+            
+            try:
+                # 2. Consultar registros onde o timestamp é maior ou igual ao limite
+                query = """
+                    SELECT COUNT(*) 
+                    FROM registros_glicemia
+                    WHERE timestamp >= ?;
+                """
+                cursor.execute(query, (limite_tempo_str,))
+                
+                count = cursor.fetchone()[0]
+                return count
+                
+            except Exception as e:
+                print(f"Erro ao contar registros de 24h: {e}")
+                return 0
+            finally:
+                conn.close()
+
+    def obter_todos_pacientes_com_parametros(self):
+            """
+            Retorna a lista de pacientes (role='paciente') com seus parâmetros clínicos.
+            """
+            conn = self.get_db_connection()
+            # Usamos Row para retornar os dados como um dicionário (acessível por nome da coluna)
+            conn.row_factory = Row 
+            cursor = conn.cursor()
+            
+            try:
+                query = """
+                    SELECT id, username, nome_completo, medico_id, 
+                        ric_manha, ric_almoco, ric_jantar,
+                        fator_sesibilidade, meta_glicemia
+                    FROM users
+                    WHERE role = 'paciente'
+                    ORDER BY nome_completo ASC;
+                """
+                cursor.execute(query)
+                pacientes = [dict(row) for row in cursor.fetchall()]
+                return pacientes
+                
+            except Exception as e:
+                print(f"Erro ao obter pacientes com parâmetros: {e}")
+                return []
+            finally:
+                conn.close()
 
     def salvar_log_acao(self, acao, usuario):
         with self.get_db_connection() as conn:
@@ -1341,18 +1577,83 @@ class DatabaseManager:
             print(f"Erro ao buscar todos os agendamentos: {e}")
             return []
     
-    def obter_pacientes_por_medico(self, medico_id):
-            with self.get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT u.* FROM users u
-                    WHERE u.medico_id = ? OR u.id IN (
-                        SELECT paciente_id FROM vinculos_medico_paciente WHERE medico_id = ?
-                    )
-                """, (medico_id, medico_id))
-                pacientes = cursor.fetchall()
-                return [dict(row) for row in pacientes]
-            # database_manager.py (Dentro da sua classe DatabaseManager)
+    # db_manager.py
+
+   # No arquivo: database_manager.py
+
+    def obter_pacientes_do_medico(self, medico_id):
+        """
+        Retorna a lista de pacientes vinculados a um médico específico, 
+        usando a tabela de ligação 'vinculo_medico_paciente'.
+        """
+        conn = self.get_db_connection()
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
+        
+        try:
+            query = """
+                SELECT 
+                    u.id, u.username, u.email, u.nome_completo, 
+                    u.ric_manha, u.ric_almoco, u.ric_jantar,
+                    u.fator_sensibilidade, u.meta_glicemia 
+                FROM users u
+                JOIN vinculos_medico_paciente v 
+                    ON u.id = v.paciente_id
+                WHERE v.medico_id = ? AND u.role = 'paciente'
+                ORDER BY u.nome_completo ASC;
+            """
+            
+            # 1. Execução ÚNICA e Correta da Consulta
+            cursor.execute(query, (medico_id,))
+            
+            # 2. Obter e converter resultados
+            pacientes = [dict(row) for row in cursor.fetchall()]
+
+            # 3. Mapeamento de FSI para consistência no frontend
+            for p in pacientes:
+                # Renomeia a chave 'fator_sensibilidade' para 'fsi'
+                p['fsi'] = p.pop('fator_sensibilidade', None) 
+                
+            return pacientes
+                
+        # 4. Blocos de erro e finalização corretamente indentados
+        except Exception as e:
+            print(f"Erro ao obter pacientes do médico {medico_id} (usando tabela vinculo): {e}")
+            return []
+        finally:
+            conn.close()
+
+    def salvar_parametros_clinicos(self, paciente_id, parametros):
+        """
+        Insere ou atualiza os parâmetros clínicos (RIC/FSI por turno e Glicemia Alvo) 
+        em uma tabela dedicada (parametros_clinicos).
+        """
+        try:
+            conn = self.get_db_connection()
+            conn.execute("""
+                INSERT OR REPLACE INTO parametros_clinicos (
+                    paciente_id, glicemia_alvo, 
+                    ric_manha, fsi_manha, ric_almoco, fsi_almoco, ric_jantar, fsi_jantar
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                paciente_id,
+                parametros['glicemia_alvo'],
+                parametros['ric_manha'],
+                parametros['fsi_manha'],
+                parametros['ric_almoco'],
+                parametros['fsi_almoco'],
+                parametros['ric_jantar'],
+                parametros['fsi_jantar'],
+            ))
+            conn.commit()
+            return True
+        except Exception as e:
+            # É crucial ter a tabela 'parametros_clinicos' criada com 'paciente_id' como UNIQUE/PRIMARY KEY
+            print(f"Erro ao salvar parâmetros clínicos (Tabela parametros_clinicos): {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
 
     def carregar_registros_glicemia_nutricao(self, paciente_id, limit=20):
             """
@@ -1369,12 +1670,12 @@ class DatabaseManager:
                 SELECT 
                     data_hora, 
                     valor AS valor_glicemia, 
-                    carbos, 
-                    kcal
+                    total_carbs, 
+                    total_calorias
                 FROM 
                     registros
                 WHERE 
-                    paciente_id = ?
+                    user_id = ?
                 ORDER BY 
                     data_hora DESC
                 LIMIT ?
@@ -1397,24 +1698,121 @@ class DatabaseManager:
                 cursor.close()
                 conn.close()
                 
-    def obter_resumo_medico_filtrado(self, medico_id):
-        # ... (código para obter a conexão) ...
-        
-        # 1. Total de Pacientes (Você já tem essa lógica, mas é bom centralizar)
-        total_pacientes = self.contar_pacientes_por_medico(medico_id) 
+    # No arquivo: database_manager.py
 
-        # 2. Média de Glicemia (Fazendo JOIN com a tabela de registros)
+    def obter_resumo_medico_filtrado(self, medico_id):
+        """
+        Retorna o dicionário de resumo para o Dashboard do Médico.
+        """
+        
+        # 1. Total de Pacientes e Cálculo de Pendentes (Reaproveita o método que já funciona)
+        pacientes = self.obter_pacientes_do_medico(medico_id)
+        total_pacientes_vinculados = len(pacientes)
+        
+        pacientes_pendentes = sum(
+            1 for p in pacientes 
+            if not (p.get('ric_manha') and p.get('fator_sensibilidade') and p.get('meta_glicemia'))
+        )
+
+        # 2. Média de Glicemia (Chama o novo método)
         media_glicemia = self.calcular_media_glicemia_por_medico(medico_id)
         
-        # 3. Registros Hoje (Fazendo JOIN e filtrando por data)
+        # 3. Registros Hoje (Chama o novo método)
         registros_hoje = self.contar_registros_hoje_por_medico(medico_id)
         
         return {
-            'total_pacientes': total_pacientes,
+            'total_pacientes_vinculados': total_pacientes_vinculados, # CORRIGIDO: nome da chave para consistência
+            'pacientes_pendentes': pacientes_pendentes,              # NOVO: Chave essencial para o Jinja2
             'registros_hoje': registros_hoje,
             'media_glicemia': f"{media_glicemia:.1f}" if media_glicemia else 'N/A'
-    }  
-    # db_manager.py (Dentro de class DatabaseManager:)
+        }
+
+    def calcular_media_glicemia_por_medico(self, medico_id):
+        """
+        Calcula a média de todos os registros de glicemia (tipo='Glicemia' ou valor IS NOT NULL)
+        dos pacientes vinculados a um médico.
+        """
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # 1. Busca os IDs dos pacientes do médico
+            # Reutilizando a função que você já tem (obter_pacientes_por_medico)
+            pacientes = self.obter_pacientes_do_medico(medico_id)
+            if not pacientes:
+                return 0.0
+
+            paciente_ids = [p['id'] for p in pacientes]
+            
+            # Cria uma string de placeholders (?, ?, ?) para a cláusula IN do SQL
+            placeholders = ','.join('?' for _ in paciente_ids)
+            
+            # 2. Executa a média nos registros desses pacientes
+            sql = f"""
+                SELECT AVG(valor) 
+                FROM registros 
+                WHERE user_id IN ({placeholders}) 
+                AND valor IS NOT NULL 
+                AND tipo IN ('Glicemia', 'Pre_Refeicao', 'Pos_Refeicao') 
+            """
+            
+            cursor.execute(sql, paciente_ids)
+            media = cursor.fetchone()[0]
+            
+            # Retorna a média ou 0.0 se for None (sem registros)
+            return round(media, 1) if media is not None else 0.0
+            
+        except Exception as e:
+            print(f"Erro ao calcular média de glicemia por médico {medico_id}: {e}")
+            return 0.0
+        finally:
+            conn.close()
+
+
+    def contar_registros_hoje_por_medico(self, medico_id):
+        """
+        Conta o total de registros (glicemia, refeição, etc.) feitos HOJE 
+        por todos os pacientes vinculados a um médico.
+        """
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # 1. Busca os IDs dos pacientes do médico
+            pacientes = self.obter_pacientes_do_medico(medico_id)
+            if not pacientes:
+                return 0
+
+            paciente_ids = [p['id'] for p in pacientes]
+            
+            # 2. Define o início do dia de hoje (em formato string SQL)
+            hoje_str = datetime.now().strftime('%Y-%m-%d')
+            
+            # Cria uma string de placeholders (?, ?, ?) para a cláusula IN
+            placeholders = ','.join('?' for _ in paciente_ids)
+            
+            # 3. Executa a contagem
+            # Usamos GLOB para verificar se a data_hora começa com a data de hoje
+            sql = f"""
+                SELECT COUNT(*) 
+                FROM registros 
+                WHERE user_id IN ({placeholders}) 
+                AND data_hora LIKE ? || '%'
+            """
+            
+            # O último parâmetro é o filtro de data (hoje_str)
+            params = paciente_ids + [hoje_str]
+            
+            cursor.execute(sql, params)
+            contagem = cursor.fetchone()[0]
+            
+            return contagem
+            
+        except Exception as e:
+            print(f"Erro ao contar registros de hoje por médico {medico_id}: {e}")
+            return 0
+        finally:
+            conn.close()
 
     def obter_resumo_paciente(self, paciente_id):
         conn = self.get_db_connection()
@@ -1427,11 +1825,16 @@ class DatabaseManager:
             'hipoglicemia_count': 0
         }
         
+        # Importante: LIMITE_HIPO e LIMITE_HIPER devem estar definidos no arquivo!
+        # Se não estiverem, adicione:
+        # LIMITE_HIPO = 70
+        # LIMITE_HIPER = 180
+        
         hoje = datetime.now()
         data_semana_atras = hoje - timedelta(days=7)
 
         try:
-            # 1. Último Registro
+            # 1. Último Registro (CORRETO)
             cursor.execute("""
                 SELECT valor, data_hora 
                 FROM registros 
@@ -1443,10 +1846,9 @@ class DatabaseManager:
 
             if ultimo:
                 valor, data_hora_str = ultimo
-                # É crucial que o formato de data_hora_str corresponda ao que você salva no DB
-                data_hora_reg = datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M:%S') 
+                data_hora_reg = datetime.strptime(data_hora_str.replace('T', ' '), '%Y-%m-%d %H:%M:%S')
                 
-                # Calcula o status
+                # Cálculo de status (depende de LIMITE_HIPO e LIMITE_HIPER)
                 if valor < LIMITE_HIPO:
                     status = 'danger'
                 elif valor > LIMITE_HIPER:
@@ -1454,7 +1856,7 @@ class DatabaseManager:
                 else:
                     status = 'success'
                     
-                # Calcula o tempo desde o último registro
+                # Cálculo do tempo
                 delta = hoje - data_hora_reg
                 if delta.total_seconds() < 3600:
                     tempo_str = f"{int(delta.total_seconds() // 60)} min atrás"
@@ -1462,43 +1864,44 @@ class DatabaseManager:
                     tempo_str = f"{int(delta.total_seconds() // 3600)} horas atrás"
                 else:
                     tempo_str = f"{delta.days} dias atrás"
-                
-                resumo['ultimo_registro'] = {'valor': valor, 'status': status}
-                resumo['tempo_desde_ultimo'] = tempo_str
+                    
+                resumo['ultimo_registro'] = {'valor': valor, 'status': status, 'tempo_desde_ultimo': tempo_str}
+                # Removemos a atribuição duplicada de tempo_desde_ultimo
 
-            # 2. Média da Última Semana
+            # 2. Média da Última Semana (CORRIGIDO: 'paciente_id' mudou para 'user_id')
             cursor.execute("""
                 SELECT AVG(valor) 
                 FROM registros 
-                WHERE paciente_id = ? AND data_hora >= ?
+                WHERE user_id = ? AND data_hora >= ? 
             """, (paciente_id, data_semana_atras.strftime('%Y-%m-%d %H:%M:%S')))
             media = cursor.fetchone()[0]
             
             if media is not None:
                 resumo['media_ultima_semana'] = f"{media:.1f}"
 
-            # 3. Contagem de Eventos Extremos (Últimos 7 dias)
+            # 3. Contagem de Eventos Extremos (CORRIGIDO: 'paciente_id' mudou para 'user_id')
             cursor.execute("""
                 SELECT 
                     SUM(CASE WHEN valor < ? THEN 1 ELSE 0 END) as hipo,
                     SUM(CASE WHEN valor > ? THEN 1 ELSE 0 END) as hiper
                 FROM registros 
-                WHERE paciente_id = ? AND data_hora >= ?
+                WHERE user_id = ? AND data_hora >= ?
             """, (LIMITE_HIPO, LIMITE_HIPER, paciente_id, data_semana_atras.strftime('%Y-%m-%d %H:%M:%S')))
             
             contagens = cursor.fetchone()
             if contagens:
                 resumo['hipoglicemia_count'] = contagens[0]
                 resumo['hiperglicemia_count'] = contagens[1]
-
+                
         except Exception as e:
             print(f"Erro ao carregar resumo do paciente: {e}")
 
         finally:
             conn.close()
             
-        return resumo          
-    
+        # Adicionando o print de debug final para confirmar o retorno
+        print(f"DEBUG: Resumo Final Paciente {paciente_id}: {resumo}")
+        return resumo
 
     def obter_parametros_clinicos(self, user_id):
         """
@@ -1550,6 +1953,8 @@ class DatabaseManager:
             return None
         finally:
             conn.close()
+
+
     def buscar_doses_insulina_recentes(self, user_id, horas_limite=5):
             """
             Busca todos os registros de doses de insulina aplicadas pelo paciente
@@ -1586,6 +1991,7 @@ class DatabaseManager:
                 return []
             finally:
                 conn.close()
+                
     def buscar_ultima_glicemia(self, user_id):
             """
             Busca a última Glicemia Capilar (GC) registrada pelo paciente.
@@ -1643,6 +2049,49 @@ class DatabaseManager:
             print(f"Erro ao salvar registro de insulina: {e}")
             return False
         finally:
+            conn.close()
+
+
+    def calcular_dose_media_aplicada(self, user_id, dias=14):
+        """
+        Calcula a dose média de insulina aplicada pelo paciente nos últimos 'dias'.
+        Usamos o campo 'dose_aplicada' da tabela 'registros'.
+        """
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # Calcula a data de início do período (ex: 14 dias atrás)
+            data_inicio = (datetime.now() - timedelta(days=dias)).strftime('%Y-%m-%d %H:%M:%S')
+            
+            # A condição chave é que a dose_aplicada seja maior que zero
+            sql = """
+                SELECT AVG(dose_aplicada) 
+                FROM registros 
+                WHERE user_id = ?
+                AND data_hora >= ?
+                AND dose_aplicada IS NOT NULL 
+                AND dose_aplicada > 0
+            """
+            
+            cursor.execute(sql, (user_id, data_inicio))
+            media = cursor.fetchone()[0]
+            
+            # Linha de DEBUG (deve ser identada)
+            print(f"DEBUG: Dose Média Calculada para User {user_id}: {media}")
+            
+            # Retorna a média arredondada ou None se não houver registros
+            if media is None:
+                return None
+            
+            return round(media, 1) # <--- O retorno final do bloco TRY
+            
+        except Exception as e:
+            # Bloco EXCEPT: Tratamento de erro (identado)
+            print(f"Erro ao calcular dose média aplicada para o usuário {user_id}: {e}")
+            return None
+        finally:
+            # Bloco FINALLY: Sempre executa (identado)
             conn.close()
 # ---------------------- NOVAS FUNÇÕES DE GRÁFICOS ----------------------
 

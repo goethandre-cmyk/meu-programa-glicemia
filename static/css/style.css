@@ -46,17 +46,33 @@ body {
     min-height: 100vh;
 }
 
-/* Força o conteúdo a estar num container de contraste */
-#main-content .container {
+/* CORREÇÃO APLICADA AQUI: Movemos o padding e o fundo branco para o #main-content */
+#main-content {
     background-color: rgba(255, 255, 255, 0.95);
     /* Fundo branco semi-transparente */
-    padding: 30px;
     border-radius: 12px;
     box-shadow: var(--shadow-lg);
+
+    /* PADDING e CENTRALIZAÇÃO: Aplicados ao wrapper */
+    padding: 30px;
+    margin: 30px auto 50px auto;
+
+    /* Controle de Largura */
     max-width: 1200px;
+    width: 95%;
+    display: block;
+}
+
+/* O container do Bootstrap (dentro do main) deve ser limpo! */
+#main-content .container {
+    max-width: 100%;
+    /* Permite usar toda a largura do #main-content */
     width: 100%;
-    margin-top: 30px;
-    /* Garante que não cole na navbar */
+    margin-top: 0;
+    padding: 0;
+    /* CORREÇÃO FINAL: Zera o padding para o grid funcionar */
+    background-color: transparent;
+    /* Remove fundo duplicado, se houver */
 }
 
 /* -------------------------------------------------------------------------- */

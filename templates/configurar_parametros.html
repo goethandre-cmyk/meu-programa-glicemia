@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Configurar Parâmetros Clínicos{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h3 class="mb-0"><i class="fas fa-cog me-2"></i> Configuração de Bolus Inteligente</h3>
+                </div>
+
+                <div class="card-body p-4">
+                    <p class="text-muted text-center mb-4">Defina seus fatores de insulina para um cálculo de bolus
+                        preciso e personalizado.</p>
+
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+
+                        <div class="bg-light p-3 mb-4 rounded border-bottom border-primary">
+                            <h5 class="text-primary mb-3">1. Meta de Glicemia</h5>
+                            <div class="mb-3">
+                                {{ form.glicemia_alvo.label(class="form-label") }}
+                                {{ form.glicemia_alvo(class="form-control", placeholder="Ex: 100") }}
+                                {% for error in form.glicemia_alvo.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                                <small class="form-text text-muted">A glicemia que você deseja alcançar (geralmente
+                                    entre 80-130 mg/dL).</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="text-success mb-3">2. Razão Insulina/Carboidrato (I:C)</h5>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    {{ form.ric_manha.label(class="form-label") }}
+                                    {{ form.ric_manha(class="form-control", placeholder="Ex: 10") }}
+                                    <small class="form-text text-muted">Manhã (6h-12h)</small>
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.ric_almoco.label(class="form-label") }}
+                                    {{ form.ric_almoco(class="form-control", placeholder="Ex: 12") }}
+                                    <small class="form-text text-muted">Almoço (12h-18h)</small>
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.ric_jantar.label(class="form-label") }}
+                                    {{ form.ric_jantar(class="form-control", placeholder="Ex: 15") }}
+                                    <small class="form-text text-muted">Noite (18h-6h)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="text-danger mb-3">3. Fator de Sensibilidade (FSI)</h5>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    {{ form.fsi_manha.label(class="form-label") }}
+                                    {{ form.fsi_manha(class="form-control", placeholder="Ex: 50") }}
+                                    <small class="form-text text-muted">Manhã (6h-12h)</small>
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.fsi_almoco.label(class="form-label") }}
+                                    {{ form.fsi_almoco(class="form-control", placeholder="Ex: 40") }}
+                                    <small class="form-text text-muted">Almoço (12h-18h)</small>
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.fsi_jantar.label(class="form-label") }}
+                                    {{ form.fsi_jantar(class="form-control", placeholder="Ex: 60") }}
+                                    <small class="form-text text-muted">Noite (18h-6h)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            {{ form.submit(class="btn btn-primary btn-lg") }}
+                        </div>
+
+                        <p class="mt-3 text-center"><a href="{{ url_for('dashboard') }}" class="text-secondary"><i
+                                    class="fas fa-arrow-left me-1"></i> Voltar ao Dashboard</a></p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

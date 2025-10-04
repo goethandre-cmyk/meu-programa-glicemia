@@ -27,7 +27,8 @@
                         <td>{{ paciente.nome_completo or 'N/A' }}</td>
                         <td>{{ paciente.email or 'N/A' }}</td>
                         <td>
-                            <a href="{{ url_for('perfil_paciente', username=paciente.username) }}" class="btn btn-sm btn-info text-white">
+                            <a href="{{ url_for('perfil_paciente', paciente_id=paciente.id) }}"
+                                class="btn btn-sm btn-info text-white">
                                 <i class="fas fa-eye"></i> Ver Perfil
                             </a>
                         </td>

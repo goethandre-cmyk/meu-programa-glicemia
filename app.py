@@ -21,6 +21,11 @@ bolus_service = BolusService(db_manager)
 # --- Configuração da Aplicação ---
 app = Flask(__name__)
 
+# CONFIGURAÇÃO CRÍTICA PARA DESATIVAR O CACHE DE TEMPLATE EM DESENVOLVIMENTO
+# Isso garante que o Jinja2 não armazene o HTML antigo.
+app.jinja_env.cache = {} 
+
+
 # Após a inicialização do Flask e antes das rotas
 app.register_blueprint(relatorios_bp)
 # OU, se quiser um prefixo de URL:
@@ -383,14 +388,18 @@ def dashboard_cuidador(): # <--- O endpoint DEVE ser 'dashboard_cuidador'
 
 @app.route('/cadastro', methods=['GET', 'POST'])
 def cadastro():
+    # 1. Redireciona se o usuário já estiver logado
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
     if request.method == 'POST':
-        # 1. Coleta de dados básicos
+        # 2. Coleta de dados do formulário
         username = request.form['username']
         password = request.form['password']
         password_confirm = request.form['password_confirm']
         role = request.form.get('role', 'paciente').lower() 
 
-        # 2. Validação básica
+        # 3. Validações de Senha e Tamanho
         if len(username) < 3 or len(password) < 6:
             flash('Nome de usuário deve ter no mínimo 3 caracteres e senha no mínimo 6.', 'danger')
             return redirect(url_for('cadastro'))
@@ -401,7 +410,7 @@ def cadastro():
 
         hashed_password = generate_password_hash(password)
         
-        # 3. Coleta de dados gerais e específicos
+        # 4. Definição do Novo Usuário (Dados Pessoais + Autenticação)
         novo_usuario = {
             'username': username,
             'password_hash': hashed_password,
@@ -411,17 +420,19 @@ def cadastro():
             'telefone': request.form.get('telefone'),
             'data_nascimento': request.form.get('data_nascimento'),
             'sexo': request.form.get('sexo'),
-            'razao_ic': float(request.form.get('razao_ic', 1.0)), 
-            'fator_sensibilidade': float(request.form.get('fator_sensibilidade', 1.0)),
             
-            # Dados específicos de Médico (default None)
+            # Campos clínicos definidos como None (serão preenchidos em /configurar_parametros)
+            'razao_ic': None, 
+            'fator_sensibilidade': None,
+            
+            # Campos de Médico/Profissional (default None)
             'documento': None,
             'crm': None,
             'cns': None,
             'especialidade': None
         }
         
-        # 4. TRATAMENTO DE CAMPOS DE MÉDICO
+        # 5. Tratamento de campos de Médico/Profissional (se o papel for 'medico')
         if role == 'medico':
             novo_usuario['documento'] = request.form.get('documento')
             novo_usuario['crm'] = request.form.get('crm')
@@ -433,44 +444,47 @@ def cadastro():
                 flash('Todos os campos de registro profissional (Médico) são obrigatórios.', 'danger')
                 return redirect(url_for('cadastro'))
 
-    # 5. Salvar usuário no DB
-        if db_manager.salvar_usuario(novo_usuario):
-            
-            # 5.1. Carregar o usuário recém-criado do banco
-            # Assumindo que você tem um método para carregar o usuário por username
-            user = db_manager.carregar_usuario_por_username(username) 
-            
-            if user:
-                # 5.2. Fazer o login automático
-                # Certifique-se de que a variável 'user' é um objeto User do Flask-Login
-                login_user(user) 
-                flash('Cadastro realizado com sucesso! Bem-vindo(a) ao HealthLink.', 'success')
-                app.logger.info(f'Novo usuário cadastrado e logado: {username} ({role})')
+        # 6. Salvar usuário no DB
+        try:
+            # Assumindo que db_manager.salvar_usuario(novo_usuario) retorna True em caso de sucesso
+            if db_manager.salvar_usuario(novo_usuario): 
                 
-                # 5.3. Redirecionamento Condicional Imediato
-                if role == 'paciente':
-                    # Redireciona para o guia de glicemia (a página mais útil para começar)
-                    return redirect(url_for('guia_insulina')) 
-                elif role == 'medico':
-                    # Redireciona para o dashboard médico
-                    return redirect(url_for('dashboard_medico'))
-                else:
-                    # Redirecionamento padrão para outros papéis (secretario, admin)
-                    return redirect(url_for('dashboard')) 
-            else:
-                # Se o login automático falhar (usuário não encontrado após salvar)
-                flash('Cadastro realizado. Faça login para começar.', 'success')
-                return redirect(url_for('login'))
+                # 6.1. Carregar o usuário recém-criado do banco (necessário para login_user)
+                user = db_manager.carregar_usuario_por_username(username) 
+                
+                if user:
+                    # 6.2. Fazer o login automático
+                    login_user(user) 
+                    app.logger.info(f'Novo usuário cadastrado e logado: {username} ({role})')
+                    flash('Cadastro realizado com sucesso! Bem-vindo(a).', 'success')
 
-        else:
-            flash('Nome de usuário já existe. Tente outro.', 'danger')
+                    # 6.3. Redirecionamento Condicional Imediato
+                    if role == 'paciente':
+                        # Redireciona para a configuração de parâmetros
+                        flash('Por favor, defina seus Fatores Clínicos (RIC, FSI, Glicemia Alvo) para usar a calculadora de Bolus.', 'warning')
+                        return redirect(url_for('configurar_parametros')) 
+                    elif role == 'medico':
+                        return redirect(url_for('dashboard_medico'))
+                    else:
+                        return redirect(url_for('dashboard')) 
+                else:
+                    # Se o login automático falhar (usuário não encontrado após salvar)
+                    flash('Cadastro realizado. Faça login para começar.', 'success')
+                    return redirect(url_for('login'))
+            else:
+                # Caso db_manager.salvar_usuario retorne False (ex: nome de usuário duplicado)
+                flash('Nome de usuário já existe. Tente outro.', 'danger')
+                return redirect(url_for('cadastro'))
+                
+        except Exception as e:
+            app.logger.error(f'Erro fatal ao salvar usuário no DB: {e}')
+            flash(f'Erro interno ao cadastrar. Tente novamente. Detalhes: {e}', 'danger')
             return redirect(url_for('cadastro'))
-            
-    # Rota de Cadastro (GET) - Passa a lista para o template
+
+    # 7. Rota de Cadastro (GET) - Exibir formulário
+    # Passa a lista de especialidades para o template (se for usada para médicos)
     return render_template('cadastro.html', 
                              especialidades=ESPECIALIDADES_MEDICAS)
-
-
 # rota dashboard
 
 @app.route('/dashboard')
@@ -479,46 +493,64 @@ def dashboard():
     
     # 1. GESTORES (Admin/Secretario)
     if current_user.role in ['admin', 'secretario']:
+        # Esta rota deve renderizar o novo dashboard_gestao.html
         return redirect(url_for('dashboard_gestao'))
     
     # 2. MÉDICO
     elif current_user.role == 'medico':
+        # Esta rota deve levar à visão do médico (gerenciamento de pacientes)
         return redirect(url_for('dashboard_medico'))
         
-    # 3. CUIDADOR/CAREGIVER <--- ADICIONE ESTE CASO!
+    # 3. CUIDADOR/CAREGIVER
     elif current_user.role == 'cuidador':
+        # Esta rota deve levar à visão de acompanhamento dos pacientes vinculados
         return redirect(url_for('dashboard_cuidador'))
     
     # 4. PACIENTE
-    elif current_user.is_paciente:
-        # Lógica do paciente (renderiza template e não redireciona novamente)
+    elif current_user.role == 'paciente': 
         paciente_id = current_user.id
+        
+        # 4a. Busca dados de resumo do paciente (glicemia média, etc.)
+        # Depende da implementação de db_manager.obter_resumo_paciente
         resumo_dados = db_manager.obter_resumo_paciente(paciente_id) 
-        return render_template('dashboard.html', resumo_dados=resumo_dados) 
+        
+        # 4b. NOVO: Calcula a dose média de insulina aplicada nos últimos 14 dias
+        # Requer a função db_manager.calcular_dose_media_aplicada(id, dias)
+        dose_media = db_manager.calcular_dose_media_aplicada(paciente_id, dias=14)
+        
+        # 4c. Passa os dados para o template específico do paciente
+        return render_template('dashboard_paciente.html', # Renomeado para clareza
+                               resumo_dados=resumo_dados,
+                               dose_media_aplicada=dose_media) 
         
     # 5. Caso de segurança: se o papel não for reconhecido, desloga
     flash("Seu perfil não está configurado. Por favor, entre em contato com o suporte.", 'danger')
-    return redirect(url_for('logout')) 
-    
-# ROTA 1: DASHBOARD DE GESTÃO (para Médicos, Admins, etc.)
-# O ENDPOINT DEVE ser 'dashboard_gestao' para corresponder ao redirect
-@app.route('/dashboard-gestao') # Use uma URL clara
-@login_required 
-@gestao_required # <--- Use o decorador de segurança apropriado
-def dashboard_gestao(): # <-- O nome da função (endpoint) que o url_for espera
-    """Página de dashboard para usuários com perfil de Gestão/Administrador."""
+    return redirect(url_for('logout'))
 
-    # 🚨 Se a rota /dashboard-gestao for usada por MÉDICOS E ADMINS:
-    if current_user.role == 'medico':
-         # Lógica do médico (filtrada por paciente)
-        resumo = db_manager.obter_resumo_medico_filtrado(current_user.id)
-        pacientes = db_manager.obter_pacientes_por_medico(current_user.id) 
-        return render_template('dashboard_medico.html', pacientes=pacientes, resumo=resumo)
-    
-    else:
-        # Lógica de Admin/Secretário (resumo geral)
-        resumo_geral = db_manager.carregar_resumo_geral() # <--- Implemente esta função para dados gerais
-        return render_template('dash_gestao.html', resumo=resumo_geral)
+# ||||||| -----DASHBOARD DE GESTÃO (para Médicos, Admins, etc.)--------||||||
+
+# No seu app.py ou rotas.py
+
+@app.route('/dashboard_gestao')
+@login_required
+def dashboard_gestao():
+    # Garantimos que apenas Gestores/Admin tenham acesso direto a esta rota
+    if current_user.role not in ['admin', 'secretario']:
+        flash('Acesso restrito ao Painel de Gestão.', 'danger')
+        return redirect(url_for('dashboard'))
+        
+    # Estas funções precisam existir no seu db_manager.py
+    # Odb_manager deve contar usuários e dados, independente do ID do usuário logado.
+    resumo = {
+        'total_pacientes': db_manager.contar_usuarios(role='paciente'),
+        # CRUCIAL: Contar quem não tem os 2 campos essenciais (glicemia_alvo e ric_manha)
+        'pacientes_sem_parametros': db_manager.contar_pacientes_sem_parametros(),
+        # Novo KPI focado na saúde do paciente (ex: Glicemia fora da zona alvo nas últimas 48h)
+        'pacientes_em_alerta': db_manager.contar_pacientes_em_alerta(), 
+        'registros_hoje': db_manager.contar_registros_24h()
+    }
+
+    return render_template('dashboard_gestao.html', resumo=resumo)
 
 # --- ROTAS DA ÁREA ADMINISTRATIVA E DE GESTÃO ---
 
@@ -1131,10 +1163,78 @@ def refeicao():
 def relatorios():
     return render_template('relatorios.html')
 
-@app.route('/calculadora_bolus')
+# ||||||------- CAlculadora Bolus -----------|||||||#
+
+@app.route('/calculadora_bolus', methods=['GET', 'POST'])
 @login_required
 def calculadora_bolus():
-    return render_template('calculadora_bolus.html')
+    if current_user.role != 'paciente':
+        flash('A Calculadora de Bolus é exclusiva para o perfil de Paciente.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    user_id = current_user.id
+    
+    # 1. VERIFICAÇÃO DE SEGURANÇA: Parâmetros Clínicos
+    # Buscamos os parâmetros para verificação de alerta (mesmo que o Service busque novamente)
+    parametros_clinicos = db_manager.obter_parametros_clinicos(user_id)
+    
+    # Se glicemia_alvo ou ric_manha for nulo/faltar, redireciona para a configuração/alerta.
+    if not parametros_clinicos or not parametros_clinicos.get('glicemia_alvo') or not parametros_clinicos.get('ric_manha'):
+        flash("ATENÇÃO: Seus parâmetros clínicos estão incompletos. Por favor, solicite ao seu médico que os configure.", 'warning')
+        return redirect(url_for('configurar_parametros')) 
+
+    # 2. BUSCA DADOS INICIAIS
+    ultima_glicemia = db_manager.buscar_ultima_glicemia(user_id)
+    resultado_bolus = None
+    
+    # Instancia o serviço de cálculo, passando o db_manager
+    # (Movemos a instanciação para fora do POST, mas pode ser dentro se preferir)
+    bolus_service = BolusService(db_manager) 
+    
+    # 3. PROCESSAMENTO DO CÁLCULO (POST)
+    if request.method == 'POST':
+        try:
+            # Coleta de dados do formulário
+            glicemia_atual = float(request.form['glicemia_atual'])
+            carbos = float(request.form['carbos'])
+            
+            # Não é mais necessário buscar doses_recentes aqui, pois o BolusService fará isso.
+            
+            # Assumimos que 'hora_refeicao' pode vir do formulário, mas o BolusService
+            # que você criou usa a hora atual (datetime.now().hour) para RIC/FSI.
+            # Se for necessário passar a hora do formulário, ajuste a linha abaixo:
+            # hora_refeicao = request.form.get('hora_refeicao') 
+            
+            # EXECUTANDO O CÁLCULO
+            # Seu BolusService retorna um dicionário de resultados e um erro (None se sucesso)
+            resultado_bolus_dict, erro = bolus_service.calcular_bolus_total(
+                gc_atual=glicemia_atual,
+                carboidratos=carbos,
+                paciente_id=user_id # O BolusService busca Parâmetros e IA usando este ID
+            )
+            
+            if erro:
+                flash(f"Erro no cálculo: {erro}", 'danger')
+                resultado_bolus = None
+            else:
+                # Usa o dicionário de resultados retornado pelo BolusService
+                resultado_bolus = resultado_bolus_dict
+                flash(f"Bolus Calculado: {resultado_bolus['bolus_total']:.1f} Unidades.", 'success')
+
+        except ValueError:
+            flash("Erro de entrada: Glicemia e Carboidratos devem ser números válidos.", 'danger')
+        except Exception as e:
+            app.logger.error(f"Erro no cálculo do bolus: {e}")
+            flash(f"Ocorreu um erro no cálculo. Detalhe: {e}", 'danger')
+
+    # 4. RENDERIZAÇÃO DO FORMULÁRIO (GET ou após POST)
+    return render_template('calculadora_bolus.html',
+                           ultima_glicemia=ultima_glicemia,
+                           # Note que 'parametros_clinicos' é a versão que passamos no GET/Verificação
+                           parametros=parametros_clinicos, 
+                           resultado=resultado_bolus)
+
+# |||||| ---------Calcular FS --------- |||||||#
 
 @app.route('/calcular_fs')
 @login_required
@@ -1217,12 +1317,58 @@ def dashboard_paciente():
 def dashboard_medico():
     # Carrega dados filtrados pelo médico logado
     resumo = db_manager.obter_resumo_medico_filtrado(current_user.id)
-    pacientes = db_manager.obter_pacientes_por_medico(current_user.id) 
+    pacientes = db_manager.obter_pacientes_do_medico(current_user.id) 
     
     # Renderiza o template do médico
     return render_template('dashboard_medico.html', pacientes=pacientes, resumo=resumo)
 
+# No seu arquivo app.py
 
+@app.route('/editar_parametros/<int:paciente_id>', methods=['GET', 'POST'])
+@login_required
+def editar_parametros(paciente_id):
+    # 1. Checagem de segurança (Médico/Admin e paciente vinculado)
+    if current_user.role not in ['admin', 'medico']:
+        flash('Acesso negado. Apenas médicos e administradores podem editar parâmetros.', 'danger')
+        return redirect(url_for('dashboard_medico'))
+    
+    # Obter dados do paciente
+    paciente = db_manager.obter_usuario_por_id(paciente_id)
+
+    if not paciente or paciente['role'] != 'paciente':
+        flash('Paciente não encontrado ou acesso negado.', 'danger')
+        return redirect(url_for('dashboard_medico'))
+
+    # Se o paciente está vinculado a este médico, permite a edição
+    #if current_user.role == 'medico' and paciente['medico_id'] != current_user.id:
+        # Nota: Você pode precisar ajustar a busca por 'medico_id'
+        # se o vínculo não estiver salvo na tabela 'users'.
+       # flash('Você só pode editar os parâmetros de seus pacientes vinculados.', 'danger')
+        #return redirect(url_for('dashboard_medico'))
+
+
+    if request.method == 'POST':
+        # 2. Processar o formulário POST e salvar (usando o método salvo no db_manager)
+        try:
+            data = request.form
+            ric_manha = float(data.get('ric_manha'))
+            ric_almoco = float(data.get('ric_almoco'))
+            ric_jantar = float(data.get('ric_jantar'))
+            fator_sensibilidade = float(data.get('fator_sensibilidade'))
+            meta_glicemia = float(data.get('meta_glicemia'))
+
+            if db_manager.salvar_parametros_paciente(paciente_id, ric_manha, ric_almoco, ric_jantar, fator_sensibilidade, meta_glicemia):
+                flash(f"Parâmetros de Bolus do paciente {paciente['username']} atualizados com sucesso!", 'success')
+            else:
+                flash('Erro ao salvar os parâmetros no banco de dados.', 'danger')
+
+        except ValueError:
+            flash('Erro: Todos os campos devem ser preenchidos com números válidos.', 'danger')
+            
+        return redirect(url_for('dashboard_medico'))
+
+    # 3. Exibir o formulário GET
+    return render_template('editar_parametros.html', paciente=paciente)
 
 # Rota para o Cadastro de Novo Paciente
 @app.route('/medico/novo_paciente', methods=['GET', 'POST'])
@@ -1301,8 +1447,8 @@ def novo_paciente():
 
     # GET: Exibe o formulário
     return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
-    
-# Rota para a Lista de Pacientes do Médico
+ 
+# ||||||| ------Rota para a Lista de Pacientes do Médico (Adaptada para Configuração)---------|||||| #
 @app.route('/medico/pacientes')
 @login_required
 @medico_required
@@ -1310,6 +1456,7 @@ def lista_pacientes():
     medico_id = current_user.id
     
     try:
+        # Reutilizamos o método que você já tem
         pacientes = db_manager.obter_pacientes_por_medico(medico_id) 
         
     except Exception as e:
@@ -1317,9 +1464,10 @@ def lista_pacientes():
         flash('Erro ao carregar lista de pacientes.', 'danger')
         pacientes = []
         
-    return render_template('lista_pacientes.html', pacientes=pacientes)
+    # ATENÇÃO AQUI: Mudamos o template para o novo nome com o botão "Configurar Bolus"
+    # Salve o template anterior com o nome configurar_parametros_medico_lista.html
+    return render_template('configurar_parametros_medico_lista.html', pacientes=pacientes)
 
-# Rota de lista de pacientes (nome alternativo, redireciona para a lista principal)
 @app.route('/pacientes')
 @login_required
 def pacientes():
@@ -1581,6 +1729,115 @@ def agendar_consulta():
 
     medicos = db_manager.carregar_todos_os_usuarios(perfil='medico')
     return render_template('agendar_consulta.html', medicos=medicos)
+
+
+@app.route('/gerenciar_pacientes_parametros')
+@login_required
+def gerenciar_pacientes_parametros():
+    # 1. Checagem de segurança: Apenas Admin e Médicos devem acessar
+    if current_user.role not in ['admin', 'medico']:
+        flash('Acesso negado. Apenas médicos e administradores podem gerenciar parâmetros.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # 2. Lógica para buscar pacientes e seus parâmetros (Será desenvolvida depois)
+    
+    return render_template('gerenciar_pacientes_parametros.html')
+
+@app.route('/configurar_parametros', methods=['GET', 'POST'])
+@login_required
+def configurar_parametros():
+    user_id = current_user.id
+    paciente_alvo_id = None
+    
+    # 1. LÓGICA DE DEFINIÇÃO DE PACIENTE ALVO
+    
+    if current_user.role == 'paciente':
+        # Para pacientes, o paciente alvo é ele mesmo.
+        paciente_alvo_id = user_id
+        
+        # Pacientes não podem usar POST para salvar, mas podem visualizar.
+        if request.method == 'POST':
+            flash("Como paciente, você não tem permissão para alterar seus próprios parâmetros clínicos. Somente seu médico pode fazê-lo.", 'danger')
+            return redirect(url_for('configurar_parametros'))
+    
+    elif current_user.role == 'medico':
+        # Médicos podem escolher o paciente a configurar via query parameter
+        paciente_alvo_id = request.args.get('paciente_id', type=int)
+        
+        if not paciente_alvo_id:
+            # Se nenhum paciente_id foi passado, o médico vê a lista de pacientes (GET).
+            
+            # **1.1. MÉTODO NECESSÁRIO NO DB_MANAGER:**
+            # db_manager.obter_pacientes_do_medico(medico_id)
+            pacientes = db_manager.obter_pacientes_do_medico(user_id) 
+            
+            return render_template('configurar_parametros_medico_lista.html', 
+                                   pacientes=pacientes)
+            
+        # O médico só pode configurar pacientes vinculados a ele.
+        if not db_manager.verificar_vinculo_medico_paciente(user_id, paciente_alvo_id):
+            flash("Acesso negado. O paciente não está vinculado à sua conta.", 'danger')
+            return redirect(url_for('configurar_parametros'))
+
+    elif current_user.role == 'cuidador':
+        # Cuidadores (ou outros) não devem alterar, apenas visualizar ou serem bloqueados.
+        flash("Seu perfil de Cuidador não permite a configuração de parâmetros clínicos.", 'danger')
+        return redirect(url_for('dashboard')) # Redireciona para onde for adequado
+        
+    # Se chegamos até aqui, temos um paciente_alvo_id e permissão de visualização/edição.
+    
+    # --- LÓGICA DE PROCESSAMENTO DO FORMULÁRIO (POST) ---
+    if request.method == 'POST' and current_user.role == 'medico' and paciente_alvo_id:
+        try:
+            # 2. Coleta de dados (Exemplo: RIC e FSI por turno)
+            parametros_a_salvar = {
+                'glicemia_alvo': float(request.form.get('glicemia_alvo')),
+                'ric_manha': float(request.form.get('ric_manha')),
+                'fsi_manha': float(request.form.get('fsi_manha')),
+                'ric_almoco': float(request.form.get('ric_almoco')),
+                'fsi_almoco': float(request.form.get('fsi_almoco')),
+                'ric_jantar': float(request.form.get('ric_jantar')),
+                'fsi_jantar': float(request.form.get('fsi_jantar')),
+                # Adicione quaisquer outros parâmetros (ric_noite, fsi_noite, etc.)
+            }
+            
+            # **1.2. MÉTODO NECESSÁRIO NO DB_MANAGER:**
+            # db_manager.salvar_parametros_clinicos(paciente_alvo_id, parametros_a_salvar)
+            if db_manager.salvar_parametros_clinicos(paciente_alvo_id, parametros_a_salvar):
+                flash(f"Parâmetros clínicos para o paciente ID {paciente_alvo_id} salvos com sucesso!", 'success')
+                return redirect(url_for('configurar_parametros', paciente_id=paciente_alvo_id))
+            else:
+                raise Exception("Falha ao salvar no banco de dados.")
+                
+        except ValueError:
+            flash("Erro: Todos os campos devem ser números válidos. Use ponto (.) para decimais.", 'danger')
+        except Exception as e:
+            app.logger.error(f"Erro ao salvar parâmetros: {e}")
+            flash("Ocorreu um erro interno. Tente novamente.", 'danger')
+            
+            
+    # --- LÓGICA DE EXIBIÇÃO DO FORMULÁRIO (GET/PÓS-POST) ---
+    
+    # 3. Busca dos parâmetros atuais (para pré-preencher o formulário)
+    parametros_atuais = db_manager.obter_parametros_clinicos(paciente_alvo_id)
+    
+    # 4. Determina qual template renderizar
+    if current_user.role == 'medico' and paciente_alvo_id:
+        # Médico editando o paciente específico
+        paciente_alvo = db_manager.carregar_usuario_por_id(paciente_alvo_id) # Para mostrar o nome do paciente
+        
+        return render_template('configurar_parametros_medico_edicao.html',
+                               paciente=paciente_alvo,
+                               parametros=parametros_atuais)
+                               
+    elif current_user.role == 'paciente':
+        # Paciente vendo seu próprio status
+        return render_template('configurar_parametros_paciente.html', 
+                               parametros=parametros_atuais)
+                               
+    # Fallback caso a lógica de médico sem paciente_id não tenha redirecionado (caso 1.1)
+    return redirect(url_for('dashboard')) 
+
 
 if __name__ == '__main__':
     app.run(debug=True)

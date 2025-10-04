@@ -77,31 +77,31 @@
                     {% endfor %}
                 </select>
             </div>
+
             <div class="mb-3">
                 <label for="data_nascimento" class="form-label">Data de Nascimento</label>
                 <input type="date" class="form-control" id="data_nascimento" name="data_nascimento"
                     value="{{ usuario.get('data_nascimento', '') }}">
             </div>
-            <div class="mb-3">
-                <label for="sexo" class="form-label">Sexo</label>
-                <input type="text" class="form-control" id="sexo" name="sexo" value="{{ usuario.get('sexo', '') }}">
-            </div>
-            <div class="mb-3">
-                <label for="razao_ic" class="form-label">Razão Insulina/Carboidratos (Razão IC)</label>
-                <input type="number" step="any" class="form-control" id="razao_ic" name="razao_ic"
-                    value="{{ usuario.get('razao_ic') if usuario.get('razao_ic') is not none else '' }}">
-            </div>
-            <div class="mb-3">
-                <label for="fator_sensibilidade" class="form-label">Fator de Sensibilidade à Insulina</label>
-                <input type="number" step="any" class="form-control" id="fator_sensibilidade" name="fator_sensibilidade"
-                    value="{{ usuario.get('fator_sensibilidade') if usuario.get('fator_sensibilidade') is not none else '' }}">
-            </div>
-            <div class="mb-3">
-                <label for="meta_glicemia" class="form-label">Meta de Glicemia (mg/dL)</label>
-                <input type="number" step="1" class="form-control" id="meta_glicemia" name="meta_glicemia"
-                    value="{{ usuario.get('meta_glicemia') if usuario.get('meta_glicemia') is not none else '' }}">
-            </div>
 
+            <div class="mb-3">
+                <label for="sexo" class="form-label">Sexo/Gênero</label>
+                <select class="form-control" id="sexo" name="sexo">
+                    <option value="">Selecione...</option>
+
+                    <option value="Feminino" {% if usuario.get('sexo')=='Feminino' %}selected{% endif %}>
+                        Feminino
+                    </option>
+
+                    <option value="Masculino" {% if usuario.get('sexo')=='Masculino' %}selected{% endif %}>
+                        Masculino
+                    </option>
+
+                    <option value="Outro" {% if usuario.get('sexo')=='Outro' %}selected{% endif %}>
+                        Outro / Prefiro Não Informar
+                    </option>
+                </select>
+            </div>
             <div class="d-flex justify-content-end mt-4">
                 <button type="submit" class="btn btn-primary me-2">
                     <i class="bi bi-save me-1"></i>Salvar Alterações

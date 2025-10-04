@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Painel de Gestão{% endblock %}
+
+{% block content %}
+<h2 class="mb-4 text-center text-primary">Painel de Gestão e Acompanhamento Clínico</h2>
+
+<div class="row">
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-primary dashboard-card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title fw-bold">Total de Pacientes</h5>
+                    <h2 class="card-text mb-0 text-white">{{ resumo.total_pacientes }}</h2>
+                </div>
+                <i class="fas fa-users fa-3x opacity-50"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-danger dashboard-card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title fw-bold">Parâmetros Pendentes</h5>
+                    <h2 class="card-text mb-0 text-white">{{ resumo.pacientes_sem_parametros }}</h2>
+                </div>
+                <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-dark bg-warning dashboard-card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title fw-bold text-dark">Pacientes em Alerta</h5>
+                    <h2 class="card-text mb-0 text-dark">{{ resumo.pacientes_em_alerta }}</h2>
+                </div>
+                <i class="fas fa-heartbeat fa-3x opacity-50"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-success dashboard-card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="card-title fw-bold">Registros Últimas 24h</h5>
+                    <h2 class="card-text mb-0 text-white">{{ resumo.registros_hoje }}</h2>
+                </div>
+                <i class="fas fa-file-alt fa-3x opacity-50"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4 p-4 shadow-sm">
+    <h3 class="text-primary mb-3"><i class="fas fa-running me-2"></i>Ações Rápidas e Fluxo de Trabalho</h3>
+    <div class="row">
+
+        <div class="col-md-4 mb-3">
+            <a href="{{ url_for('gerenciar_pacientes_parametros') }}" class="btn btn-outline-danger btn-lg w-100">
+                <i class="fas fa-sliders-h me-2"></i> Gerenciar Parâmetros de Bolus
+            </a>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <a href="{{ url_for('gerenciar_usuarios') }}" class="btn btn-outline-secondary btn-lg w-100">
+                <i class="fas fa-user-friends me-2"></i> Gerenciar Usuários
+            </a>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <a href="{{ url_for('agendamentos_redirect') }}" class="btn btn-outline-primary btn-lg w-100">
+                <i class="fas fa-calendar-alt me-2"></i> Ver Agendamentos/Relatórios
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Parâmetros Clínicos - Atenção{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-5 shadow-lg border-danger border-3">
+
+                <h1 class="card-title text-danger text-center mb-4">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Ação Necessária
+                </h1>
+
+                {% if parametros %}
+
+                <div class="alert alert-success text-center">
+                    <p class="mb-0">✅ Seus **Parâmetros Clínicos (RIC, FSI, Glicemia Alvo)** foram definidos pelo seu
+                        médico e estão ativos.</p>
+                    <p class="mb-0">Você já pode usar a **Calculadora de Bolus**!</p>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('calculadora_bolus') }}" class="btn btn-success btn-lg">
+                        <i class="fas fa-calculator me-2"></i>Acessar Calculadora
+                    </a>
+                </div>
+
+                {% else %}
+
+                <div class="alert alert-warning text-center">
+                    <h4 class="alert-heading">Configuração Pendente!</h4>
+                    <p class="lead">Seus **Parâmetros Clínicos (RIC, FSI, Glicemia Alvo)** ainda não foram definidos.
+                    </p>
+                    <hr>
+                    <p class="mb-0">Na nossa plataforma, **apenas o seu médico vinculado** pode atribuir ou atualizar
+                        esses valores, garantindo a sua segurança e a precisão dos cálculos de Bolus.</p>
+                    <p class="mb-0 mt-2 fw-bold">Por favor, entre em contato com o seu médico para que ele finalize esta
+                        configuração.</p>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>Voltar ao Dashboard
+                    </a>
+                </div>
+
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

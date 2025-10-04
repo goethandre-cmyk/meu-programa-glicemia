@@ -57,6 +57,7 @@
             <div class="tab-content border border-top-0 p-3 bg-white shadow-sm rounded-bottom">
 
                 <div class="tab-pane fade show active" id="glicemia" role="tabpanel" aria-labelledby="glicemia-tab">
+                    {% include 'editar_parametros_snippet.html' %}
                     <h4 class="mb-3">Histórico de Registros</h4>
                     {% if registros_glicemia %}
                     <div class="mb-4">
@@ -107,9 +108,9 @@
                     return `${date.getDate()}/${date.getMonth() + 1} ${date.getHours()}:${date.getMinutes()}`;
                 });
 
-                const glicemiaData = registros.map(r => r.valor);
-                const carbosData = registros.map(r => r.carbos || 0); // Assumindo 'carbos' no seu registro
-                const kcalData = registros.map(r => r.kcal || 0); // Assumindo 'kcal' no seu registro
+                const glicemiaData = registros.map(r => r.valor_glicemia);
+                const carbosData = registros.map(r => r.total_carbs || 0); // Assumindo 'carbos' no seu registro
+                const kcalData = registros.map(r => r.total_calorias || 0); // Assumindo 'kcal' no seu registro
 
                 // Função de renderização do gráfico
                 function renderChart(ctxId, label, data, color) {
