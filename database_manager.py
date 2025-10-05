@@ -875,26 +875,29 @@ class DatabaseManager:
             # Caso a tabela 'alimentos' ainda não tenha sido criada
             return []
         
-    def salvar_refeicao(self, user_id, data_hora_str, tipo_refeicao, total_carbs, total_kcal, alimentos_selecionados_json, observacoes=None):
+    # No arquivo: database_manager.py
+
+ # No arquivo: database_manager.py
+
+    def salvar_refeicao(self, user_id, data_hora_str, tipo_refeicao, total_carbs, total_kcal, alimentos_selecionados_json, dose_aplicada=None, observacoes=None):
         """
-        Salva um novo registro de refeição no banco de dados.
+        Salva um novo registro de refeição, dividindo a informação entre 'registros' e 'detalhes_refeicao'.
         """
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
         try:
-            # Garanta que a sua tabela tem os campos:
-            # id, user_id, data_hora, tipo_refeicao, carboidoidratos, calorias, alimentos_json, observacoes
+            # 1. INSERT na tabela 'registros' (Armazena o link e a dose aplicada)
+            # Assumindo que a coluna 'dose_aplicada' existe em 'registros'
             cursor.execute("""
-                INSERT INTO registros (user_id, tipo, data_hora, observacoes) 
-                VALUES (?, ?, ?, ?)
-            """, (user_id, 'Refeição', data_hora_str, observacoes))
+                INSERT INTO registros (user_id, tipo, data_hora, observacoes, dose_aplicada) 
+                VALUES (?, ?, ?, ?, ?) 
+            """, (user_id, 'Refeição', data_hora_str, observacoes, dose_aplicada))
 
-            # Assumindo que você tem uma tabela 'refeicoes' ou 'detalhes_refeicao'
-            # para guardar os detalhes (carboidratos/calorias/alimentos)
-            # O ID do registro principal (registros.id) é pego aqui
+            # 2. Captura o ID do registro principal recém-criado
             registro_id = cursor.lastrowid
             
+            # 3. INSERT na tabela 'detalhes_refeicao' (Armazena carbos/kcal/JSON)
             cursor.execute("""
                 INSERT INTO detalhes_refeicao (registro_id, tipo_refeicao, carboidratos, calorias, alimentos_json)
                 VALUES (?, ?, ?, ?, ?)
@@ -902,10 +905,15 @@ class DatabaseManager:
             
             conn.commit()
             return True
-            
+        
+        except sqlite3.Error as e:
+            # LOG CRÍTICO: Se o erro for de SQL (coluna faltando, tipo errado), ele aparecerá aqui.
+            print(f"ERRO SQL CRÍTICO ao salvar refeição: {e}")
+            conn.rollback() 
+            return False
         except Exception as e:
+            print(f"ERRO DESCONHECIDO ao salvar refeição: {e}")
             conn.rollback()
-            print(f"Erro ao salvar refeição: {e}")
             return False
         finally:
             conn.close()
@@ -1026,70 +1034,70 @@ class DatabaseManager:
             print(f"Erro ao carregar registros: {e}")
             return []
         
-   
-    def salvar_glicemia(self, user_id, valor, data_hora, tipo, observacao, dose_aplicada=None):
-        """Salva um registro de Glicemia, opcionalmente com a dose de insulina aplicada."""
-        print(f"--- INICIANDO SALVAMENTO GLICEMIA PARA USER ID: {user_id} ---") 
+   # No arquivo: database_manager.py
+
+    def excluir_registro(self, registro_id):
+        """
+        Exclui um registro, incluindo todos os detalhes associados em outras tabelas.
+        A exclusão deve ser em cascata (CASCADE) no DB. Se não for, excluímos manualmente.
+        """
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
-        if user_id is None:
-            print("ALERTA: user_id é None.")
-            return False
-
-        sql = """
-            INSERT INTO registros 
-            (user_id, data_hora, tipo, valor, observacoes, alimentos_json, total_calorias, total_carbs, dose_aplicada)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        
         try:
-            cursor.execute(sql, (
-                user_id, 
-                data_hora, 
-                tipo, 
-                valor, 
-                observacao, 
-                None, 
-                None, 
-                None,
-                dose_aplicada # <--- NOVO CAMPO AQUI
-            ))
+            # A boa prática é usar FOREIGN KEY com ON DELETE CASCADE, mas se não tiver:
+            # 1. Excluir detalhes da refeição (para evitar erro de FK)
+            cursor.execute("DELETE FROM detalhes_refeicao WHERE registro_id = ?", (registro_id,))
             
-            conn.commit() 
-            print(f"DEBUG DB: INSERT GLICEMIA BEM-SUCEDIDO. User ID: {user_id}")
-            return True 
+            # 2. Excluir o registro principal
+            cursor.execute("DELETE FROM registros WHERE id = ?", (registro_id,))
             
+            conn.commit()
+            return True
+        
         except sqlite3.Error as e:
+            print(f"ERRO SQL ao excluir registro {registro_id}: {e}")
             conn.rollback()
-            print(f"ERRO SQLITE REAL (salvar_glicemia): {e}") 
             return False
         finally:
             conn.close()
-    def encontrar_registo(self, registo_id): # <-- Parâmetro: registo_id
-        """Busca um registro (glicemia/refeição) pelo seu ID."""
-        try:
-            # Usando 'with' para garantir que a conexão seja fechada automaticamente
-            with self.get_db_connection() as conn:
-                # Garante que os resultados possam ser acessados por nome da coluna
-                conn.row_factory = sqlite3.Row 
-                cursor = conn.cursor()
-                
-                # A tabela 'registros' está correta. A variável agora está corrigida.
-                sql = "SELECT * FROM registros WHERE id = ?"
-                
-                # 🚨 CORREÇÃO AQUI: Mudança de (registos_id,) para (registo_id,)
-                cursor.execute(sql, (registo_id,)) 
-                
-                registro = cursor.fetchone()
-                
-                return dict(registro) if registro else None
-        
-        except Exception as e:
-            # Use a variável de parâmetro aqui se precisar depurar, ou apenas uma string
-            print(f"ERRO DB ao encontrar registo: {e}") 
-            return None
-                
+        # No arquivo: database_manager.py
+
+    def salvar_glicemia(self, user_id, valor_glicemia, data_hora_str, tipo_medicao, observacoes=None, dose_aplicada=None):
+            """
+            Salva um registro de glicemia, incluindo a dose de insulina aplicada, se fornecida.
+            """
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+
+            # Assumindo que as colunas 'valor', 'tipo_medicao' e 'dose_aplicada' existem em 'registros'
+            query = """
+                INSERT INTO registros (user_id, tipo, valor, data_hora, tipo_medicao, observacoes, dose_aplicada) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            try:
+                cursor.execute(query, (
+                    user_id, 
+                    'Glicemia', 
+                    valor_glicemia, 
+                    data_hora_str, 
+                    tipo_medicao, 
+                    observacoes, 
+                    dose_aplicada 
+                ))
+                conn.commit()
+                return True
+            except sqlite3.Error as e:
+                # LOG CRÍTICO: Se o erro for de SQL (coluna faltando, tipo errado), ele aparecerá aqui.
+                print(f"ERRO SQL CRÍTICO ao salvar glicemia: {e}")
+                return False
+            except Exception as e:
+                print(f"ERRO DESCONHECIDO ao salvar glicemia: {e}")
+                return False
+            finally:
+                conn.close()
+                    
     def atualizar_registo(self, registro_data):
         with self.get_db_connection() as conn:
             cursor = conn.cursor()
@@ -1100,6 +1108,56 @@ class DatabaseManager:
             conn.commit()
             return True
     # NO database_manager.py, DENTRO da classe DatabaseManager
+    # No arquivo: database_manager.py
+
+    def encontrar_registo(self, registro_id):
+        """
+        Busca um registro principal pelo ID na tabela 'registros', incluindo 
+        detalhes de refeição. Inclui LOG de diagnóstico.
+        """
+        conn = self.get_db_connection()
+        # Garante que as colunas sejam retornadas como chaves de dicionário.
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
+        
+        try:
+            # 🚨 Removendo o filtro "r.tipo IN (...)" temporariamente para garantir a busca
+            query = """
+                SELECT 
+                    r.*, 
+                    d.tipo_refeicao, d.carboidratos, d.calorias, d.alimentos_json
+                FROM 
+                    registros r
+                LEFT JOIN 
+                    detalhes_refeicao d ON r.id = d.registro_id
+                WHERE 
+                    r.id = ?
+            """
+            
+            print(f"DEBUG DB: Buscando registro ID: {registro_id} para o SQL.")
+            cursor.execute(query, (registro_id,))
+            registro = cursor.fetchone()
+            
+            # Processamento e retorno dos dados
+            if registro:
+                resultado = dict(registro)
+                
+                # LOG CRÍTICO: Informa o ID do usuário retornado pelo banco e o tipo
+                print(f"DEBUG DB: Registro ENCONTRADO. user_id do DB: {resultado.get('user_id')}, tipo: {resultado.get('tipo')}")
+                
+                return resultado
+            else:
+                print(f"DEBUG DB: Registro ID {registro_id} NÃO ENCONTRADO no banco de dados.")
+                return None
+        
+        except sqlite3.Error as e:
+            print(f"ERRO SQL ao encontrar registro {registro_id}: {e}")
+            return None
+        except Exception as e:
+            print(f"ERRO GENÉRICO ao encontrar registro {registro_id}: {e}")
+            return None
+        finally:
+            conn.close()
 
     def atualizar_registro(self, registro_data):
         """

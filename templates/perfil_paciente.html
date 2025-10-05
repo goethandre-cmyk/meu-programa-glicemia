@@ -150,5 +150,24 @@
             }
         }
     });
+    const verFichaButton = document.querySelector('a[href="#fichaMedicaTab"][data-bs-toggle="tab"]');
+
+    if (verFichaButton) {
+        verFichaButton.addEventListener('click', function (e) {
+            e.preventDefault(); // Impede o comportamento padrão do link
+
+            // 1. Encontra o botão real da aba Ficha Médica no topo
+            const fichaTabButton = document.getElementById('ficha-tab');
+
+            if (fichaTabButton) {
+                // 2. Cria uma nova instância de Tab do Bootstrap
+                const fichaTab = new bootstrap.Tab(fichaTabButton);
+
+                // 3. Mostra a aba (troca o conteúdo)
+                fichaTab.show();
+            }
+        });
+    }
+
 </script>
 {% endblock %}
