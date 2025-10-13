@@ -18,10 +18,17 @@
                         <table class="table align-items-center mb-0">
                             <thead>
                                 <tr>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Médico</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Data e Hora</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</th>
-                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Observações</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+                                        Médico</th>
+                                    <th
+                                        class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                        Data e Hora</th>
+                                    <th
+                                        class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+                                        Status</th>
+                                    <th
+                                        class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+                                        Observações</th>
                                     <th class="text-secondary opacity-7"></th>
                                 </tr>
                             </thead>
@@ -36,31 +43,45 @@
                                         </div>
                                     </td>
                                     <td class="align-middle text-center text-sm">
-                                        <span class="text-secondary text-xs font-weight-bold">{{ agendamento.data_hora.strftime('%d/%m/%Y às %H:%M') }}</span>
+                                        {% if agendamento.data_hora %}
+                                        <span class="text-secondary text-xs font-weight-bold">{{
+                                            agendamento.data_hora.strftime('%d/%m/%Y às %H:%M') }}</span>
+                                        {% else %}
+                                        <span class="text-danger text-xs font-weight-bold">Data Inválida/Não
+                                            Configurada</span>
+                                        {% endif %}
                                     </td>
                                     <td class="align-middle text-center text-sm">
-                                        <span class="badge badge-sm bg-gradient-{{ get_status_class(agendamento.status) }}">{{ agendamento.status | capitalize }}</span>
+                                        <span
+                                            class="badge badge-sm bg-gradient-{{ get_status_class(agendamento.status) }}">{{
+                                            agendamento.status | capitalize }}</span>
                                     </td>
                                     <td>
-                                        <p class="text-xs font-weight-bold mb-0">{{ agendamento.observacoes or 'N/A' }}</p>
+                                        <p class="text-xs font-weight-bold mb-0">{{ agendamento.observacoes or 'N/A' }}
+                                        </p>
                                     </td>
                                     <td class="align-middle text-center">
                                         <div class="d-flex justify-content-center">
                                             {% if agendamento.status == 'agendado' %}
-                                            <form action="{{ url_for('atualizar_status_paciente', id=agendamento.id) }}" method="post" class="d-inline-block me-2">
+                                            <form action="{{ url_for('atualizar_status_paciente', id=agendamento.id) }}"
+                                                method="post" class="d-inline-block me-2">
                                                 <input type="hidden" name="novo_status" value="confirmado">
-                                                <button type="submit" class="btn btn-sm btn-success mb-0" title="Confirmar">
+                                                <button type="submit" class="btn btn-sm btn-success mb-0"
+                                                    title="Confirmar">
                                                     <i class="fas fa-check"></i>
                                                 </button>
                                             </form>
-                                            <form action="{{ url_for('atualizar_status_paciente', id=agendamento.id) }}" method="post" class="d-inline-block">
+                                            <form action="{{ url_for('atualizar_status_paciente', id=agendamento.id) }}"
+                                                method="post" class="d-inline-block">
                                                 <input type="hidden" name="novo_status" value="cancelado">
-                                                <button type="submit" class="btn btn-sm btn-danger mb-0" title="Cancelar">
+                                                <button type="submit" class="btn btn-sm btn-danger mb-0"
+                                                    title="Cancelar">
                                                     <i class="fas fa-times"></i>
                                                 </button>
                                             </form>
                                             {% else %}
-                                            <span class="text-secondary text-xs font-weight-bold">Ação não disponível</span>
+                                            <span class="text-secondary text-xs font-weight-bold">Ação não
+                                                disponível</span>
                                             {% endif %}
                                         </div>
                                     </td>

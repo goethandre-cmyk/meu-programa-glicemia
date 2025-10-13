@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Configuração de Insulinas</h2>
+
+<div class="card mb-4">
+    <div class="card-header">Adicionar Nova Insulina</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('configuracao_insulina') }}">
+
+            <div class="mb-3">
+                <label for="nome_insulina" class="form-label">Insulina:</label>
+                <select name="nome_insulina" id="nome_insulina" class="form-select" required>
+                    <option value="">Selecione a Insulina</option>
+                    {% for nome in nomes_insulina %}
+                    <option value="{{ nome }}">{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="concentracao" class="form-label">Concentração (Ex: 100 U/mL):</label>
+                <input type="text" name="concentracao" class="form-control" required>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="dose_manha" class="form-label">Dose Basal - Manhã (U):</label>
+                    <input type="number" step="0.1" name="dose_manha" class="form-control">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="dose_noite" class="form-label">Dose Basal - Noite (U):</label>
+                    <input type="number" step="0.1" name="dose_noite" class="form-control">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Salvar e Ativar</button>
+        </form>
+    </div>
+</div>
+
+<h3>Insulinas Ativas e Histórico</h3>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Tipo de Ação</th>
+            <th>Concentração</th>
+            <th>Dose Manhã</th>
+            <th>Dose Noite</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for insulina in insulinas_ativas %}
+        <tr class="{% if insulina.eh_ativa %}table-success{% endif %}">
+            <td>{{ insulina.nome_insulina }}</td>
+            <td>{{ insulina.tipo_acao }}</td>
+            <td>{{ insulina.concentracao }}</td>
+            <td>{{ insulina.dose_basal_manha or '—' }}</td>
+            <td>{{ insulina.dose_basal_noite or '—' }}</td>
+            <td>
+                {% if insulina.eh_ativa %}
+                <span class="badge bg-success">Ativa</span>
+                {% else %}
+                <span class="badge bg-secondary">Histórico</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

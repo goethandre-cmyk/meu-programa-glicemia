@@ -11,6 +11,19 @@
         </a>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="mb-3">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
     <div class="row">
         <div class="col-lg-4 mb-4">
             <div class="card shadow-sm h-100">
@@ -21,12 +34,21 @@
                     <p><strong>Nome de Usuário:</strong> {{ paciente.username }}</p>
                     <p><strong>Email:</strong> {{ paciente.email or 'N/A' }}</p>
                     <p><strong>Telefone:</strong> {{ paciente.telefone or 'N/A' }}</p>
-                    <p><strong>Último Acesso:</strong> {{ paciente.ultimo_acesso.strftime('%d/%m/%Y %H:%M') if
-                        paciente.ultimo_acesso else 'N/A' }}</p>
+                    <p>
+                        <strong>Último Acesso:</strong>
+                        {% if paciente.ultimo_acesso %}
+                        {{ paciente.ultimo_acesso.strftime('%d/%m/%Y %H:%M') }}
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="card-footer d-flex gap-2">
-                    <a href="#fichaMedicaTab" data-bs-toggle="tab" class="btn btn-sm btn-primary w-100">
-                        <i class="fas fa-file-medical me-2"></i>Ver Ficha Médica
+                    <a href="#fichaMedicaTab" data-bs-toggle="tab" class="btn btn-sm btn-primary w-50">
+                        <i class="fas fa-file-medical me-2"></i>Ficha Médica
+                    </a>
+                    <a href="#insulinaTab" data-bs-toggle="tab" class="btn btn-sm btn-info w-50 text-white">
+                        <i class="fas fa-syringe me-2"></i>Insulina
                     </a>
                 </div>
             </div>
@@ -44,6 +66,12 @@
                     <button class="nav-link" id="ficha-tab" data-bs-toggle="tab" data-bs-target="#fichaMedicaTab"
                         type="button" role="tab" aria-controls="fichaMedicaTab" aria-selected="false">
                         <i class="fas fa-notes-medical me-1"></i>Ficha Médica
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="insulina-tab" data-bs-toggle="tab" data-bs-target="#insulinaTab"
+                        type="button" role="tab" aria-controls="insulinaTab" aria-selected="false">
+                        <i class="fas fa-syringe me-1"></i>Insulina
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -84,14 +112,102 @@
                     {% include 'ficha_medica_snippet.html' %}
                 </div>
 
+                <div class="tab-pane fade" id="insulinaTab" role="tabpanel" aria-labelledby="insulina-tab">
+                    <h4 class="mb-4">Gestão de Terapia com Insulina</h4>
+
+                    {% if current_user.is_medico or current_user.is_admin %}
+                    <div class="card p-3 mb-4 bg-light shadow-sm">
+                        <h6 class="alert-heading">Indicar Nova Insulina</h6>
+                        <p class="small">A indicação de uma nova insulina do mesmo tipo de ação (Basal ou Rápida) irá
+                            **desativar** a anterior, mantendo o histórico.</p>
+                        <form method="POST"
+                            action="{{ url_for('configurar_insulina_paciente', paciente_id=paciente.id) }}">
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label for="nome_insulina" class="form-label text-dark">Insulina:</label>
+                                    <select name="nome_insulina" id="nome_insulina" class="form-select" required>
+                                        <option value="">Selecione a Insulina</option>
+                                        {% for nome in nomes_insulina %}
+                                        <option value="{{ nome }}">{{ nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="concentracao" class="form-label text-dark"></label>Concentração:</label>
+                                    <input type="text" name="concentracao" class="form-control" value="100 U/mL"
+                                        required>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label for="dose_manha" class="form-label text-dark"></label>Dose Basal - Manhã (U)
+                                    (Opcional):</label>
+                                    <input type="number" step="0.1" name="dose_manha" class="form-control"
+                                        placeholder="0.0">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="dose_noite" class="form-label text-dark"></label>Dose Basal - Noite (U)
+                                    (Opcional):</label>
+                                    <input type="number" step="0.1" name="dose_noite" class="form-control"
+                                        placeholder="0.0">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-info w-100 mt-2"><i class="fas fa-save me-1"></i>Salvar
+                                Nova Indicação</button>
+                        </form>
+                    </div>
+                    {% endif %}
+
+                    <h5 class="mt-4">Regime Ativo e Histórico</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Tipo de Ação</th>
+                                    <th>Concentração</th>
+                                    <th>Dose Manhã</th>
+                                    <th>Dose Noite</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for insulina in insulinas_configuradas %}
+                                <tr class="{% if insulina.eh_ativa %}table-success fw-bold{% endif %}">
+                                    <td>{{ insulina.nome_insulina }}</td>
+                                    <td>{{ insulina.tipo_acao }}</td>
+                                    <td>{{ insulina.concentracao }}</td>
+                                    <td>{{ insulina.dose_basal_manha | default('—', true) }}</td>
+                                    <td>{{ insulina.dose_basal_noite | default('—', true) }}</td>
+                                    <td>
+                                        {% if insulina.eh_ativa %}
+                                        <span class="badge bg-success">ATIVA</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Inativa</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Nenhuma insulina configurada para
+                                        este paciente.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 <div class="tab-pane fade" id="acompanhamentoExames" role="tabpanel" aria-labelledby="exames-tab">
-                    <h4 class="mb-3">Histórico e Agendamentos</h4>
+                    <h4 class="mb-3">Histórico de Exames Laboratoriais</h4>
                     {% include 'acompanhamento_snippet.html' %}
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -105,12 +221,14 @@
                 const labels = registros.map(r => {
                     // Formatação de data/hora
                     const date = new Date(r.data_hora);
-                    return `${date.getDate()}/${date.getMonth() + 1} ${date.getHours()}:${date.getMinutes()}`;
+                    // Garante que minutos e horas tenham dois dígitos
+                    const formatTime = (value) => value.toString().padStart(2, '0');
+                    return `${date.getDate()}/${date.getMonth() + 1} ${formatTime(date.getHours())}:${formatTime(date.getMinutes())}`;
                 });
 
                 const glicemiaData = registros.map(r => r.valor_glicemia);
-                const carbosData = registros.map(r => r.total_carbs || 0); // Assumindo 'carbos' no seu registro
-                const kcalData = registros.map(r => r.total_calorias || 0); // Assumindo 'kcal' no seu registro
+                const carbosData = registros.map(r => r.total_carbs || 0);
+                const kcalData = registros.map(r => r.total_calorias || 0);
 
                 // Função de renderização do gráfico
                 function renderChart(ctxId, label, data, color) {
@@ -150,24 +268,23 @@
             }
         }
     });
-    const verFichaButton = document.querySelector('a[href="#fichaMedicaTab"][data-bs-toggle="tab"]');
 
-    if (verFichaButton) {
-        verFichaButton.addEventListener('click', function (e) {
-            e.preventDefault(); // Impede o comportamento padrão do link
+    // Lógica para alternar abas via botões de acesso rápido
+    const setupTabSwitch = (buttonSelector, targetTabId) => {
+        const button = document.querySelector(buttonSelector);
+        if (button) {
+            button.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetTabButton = document.getElementById(targetTabId);
+                if (targetTabButton) {
+                    const targetTab = new bootstrap.Tab(targetTabButton);
+                    targetTab.show();
+                }
+            });
+        }
+    };
 
-            // 1. Encontra o botão real da aba Ficha Médica no topo
-            const fichaTabButton = document.getElementById('ficha-tab');
-
-            if (fichaTabButton) {
-                // 2. Cria uma nova instância de Tab do Bootstrap
-                const fichaTab = new bootstrap.Tab(fichaTabButton);
-
-                // 3. Mostra a aba (troca o conteúdo)
-                fichaTab.show();
-            }
-        });
-    }
-
+    setupTabSwitch('a[href="#fichaMedicaTab"][data-bs-toggle="tab"]', 'ficha-tab');
+    setupTabSwitch('a[href="#insulinaTab"][data-bs-toggle="tab"]', 'insulina-tab'); // Novo botão
 </script>
 {% endblock %}

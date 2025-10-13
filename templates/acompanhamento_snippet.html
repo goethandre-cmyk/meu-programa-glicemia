@@ -14,11 +14,19 @@
             <tbody>
                 {% for agendamento in agendamentos %}
                 <tr>
-                    <td>{{ agendamento.data_hora.strftime('%d/%m/%Y às %H:%M') }}</td>
+                    <td>
+                        {# Tratamento de data/hora (mantido) #}
+                        {% if agendamento.data_hora is string %}
+                        {{ agendamento.data_hora }}
+                        {% else %}
+                        {{ agendamento.data_hora.strftime('%d/%m/%Y às %H:%M') }}
+                        {% endif %}
+                    </td>
                     <td>{{ agendamento.medico_username }}</td>
                     <td>
-                        <span class="badge bg-{{ get_status_class(agendamento.status) }}">{{ agendamento.status |
-                            capitalize }}</span>
+                        <span class="badge bg-{{ get_status_class(agendamento.status) }}">
+                            {{ agendamento.status.capitalize() }}
+                        </span>
                     </td>
                     <td>{{ agendamento.observacoes or 'N/A' }}</td>
                 </tr>
@@ -31,7 +39,6 @@
     {% endif %}
 </div>
 
-
 <h5 class="mb-3 text-success"><i class="fas fa-microscope me-2"></i>Histórico de Exames Laboratoriais</h5>
 <div class="card p-3 border-0 shadow-sm">
     {% if exames_anteriores %}
@@ -40,22 +47,57 @@
             <thead class="table-light">
                 <tr>
                     <th>Data</th>
-                    <th>HbA1c (%)</th>
-                    <th>Glicose Jejum (mg/dL)</th>
-                    <th>LDL (mg/dL)</th>
-                    <th>Triglicerídeos (mg/dL)</th>
+                    <th class="text-center">HbA1c (%)</th>
+                    <th class="text-center">Glicose Jejum (mg/dL)</th>
+                    <th class="text-center">LDL (mg/dL)</th>
+                    <th class="text-center">Triglicerídeos (mg/dL)</th>
                     <th>Obs. Médico</th>
                     <th>Ações</th>
                 </tr>
             </thead>
             <tbody>
                 {% for exame in exames_anteriores %}
+
+                {# Obtém as classes CSS e o status para HbA1c #}
+                {% set hba1c_classes, hba1c_status = get_hba1c_class(exame.hb_a1c) %}
+                {# Obtém as classes CSS e o status para Glicose Jejum #}
+                {% set jejum_classes, jejum_status = get_jejum_class(exame.glicose_jejum) %}
+
                 <tr>
-                    <td>{{ exame.data_exame }}</td>
-                    <td>{{ exame.hb_a1c | default('N/A', True) }}</td>
-                    <td>{{ exame.glicose_jejum | default('N/A', True) }}</td>
-                    <td>{{ exame.ldl | default('N/A', True) }}</td>
-                    <td>{{ exame.triglicerides | default('N/A', True) }}</td>
+                    {# Tratamento da Data #}
+                    <td>
+                        {% if exame.data_exame and exame.data_exame is not string %}
+                        {{ exame.data_exame.strftime('%d/%m/%Y') }}
+                        {% else %}
+                        {{ exame.data_exame | default('N/A', True) }}
+                        {% endif %}
+                    </td>
+
+                    {# Coluna HbA1c - Com Alerta Visual #}
+                    <td class="text-center">
+                        {% if exame.hb_a1c is not none %}
+                        <span class="badge {{ hba1c_classes }} p-2" title="{{ hba1c_status }}">
+                            {{ exame.hb_a1c }}%
+                        </span>
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+
+                    {# Coluna Glicose Jejum - Com Alerta Visual #}
+                    <td class="text-center">
+                        {% if exame.glicose_jejum is not none %}
+                        <span class="badge {{ jejum_classes }} p-2" title="{{ jejum_status }}">
+                            {{ exame.glicose_jejum }}
+                        </span>
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+
+                    {# Demais Colunas (Mantidas) #}
+                    <td class="text-center">{{ exame.ldl | default('N/A', True) }}</td>
+                    <td class="text-center">{{ exame.triglicerides | default('N/A', True) }}</td>
                     <td>{{ exame.obs_medico or 'N/A' }}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-info" disabled><i class="fas fa-eye"></i></button>

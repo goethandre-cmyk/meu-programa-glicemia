@@ -1,3 +1,4 @@
+#===========DATABASE_MANAGE.PY==========#
 import os
 import sqlite3
 import json
@@ -37,13 +38,15 @@ class DatabaseManager:
                 return {}
         return {}
 
+
     def inicializar_db(self): 
-        """Cria as tabelas do banco de dados se elas não existirem."""
+        """Cria as tabelas do banco de dados se elas não existirem, incluindo o novo schema unificado."""
         
+        # IMPORTANTE: Garanta que self.db_path esteja definido no seu __init__
         with sqlite3.connect(self.db_path) as conn: 
             cursor = conn.cursor()
             
-            # --- 1. Tabela de Usuários (usuarios) ---
+            # --- 1. Tabela de Usuários (users) ---
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +60,25 @@ class DatabaseManager:
                     fator_sensibilidade REAL,
                     meta_glicemia REAL,
                     is_active INTEGER DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    nome_completo TEXT,
+                    telefone TEXT,
+                    medico_id INTEGER
+                );
+            """)
+            
+            # Tabela para Histórico de Parâmetros Clínicos
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS historico_parametros (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    paciente_id INTEGER NOT NULL,
+                    alterado_por_id INTEGER, 
+                    campo TEXT NOT NULL, 	
+                    valor_anterior REAL, 	
+                    novo_valor REAL NOT NULL, 
+                    data_registro DATETIME NOT NULL,
+                    FOREIGN KEY (paciente_id) REFERENCES users(id),
+                    FOREIGN KEY (alterado_por_id) REFERENCES users(id)
                 );
             """)
             
@@ -77,7 +98,7 @@ class DatabaseManager:
                 );
             """)
             
-            # --- 3. Outras Tabelas (log_acoes, fichas_medicas, agendamentos) ---
+            # --- 3. Outras Tabelas ---
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS log_acoes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,17 +107,28 @@ class DatabaseManager:
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+            
+            # 🚨 NOVO SCHEMA UNIFICADO (Tabela TEMPORÁRIA)
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS fichas_medicas (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    paciente_id INTEGER NOT NULL UNIQUE,
-                    condicao_atual TEXT,
+                CREATE TABLE IF NOT EXISTS ficha_medica_unificada (
+                    paciente_id INTEGER PRIMARY KEY,
+                    medico_id INTEGER,
+                    data_registro TEXT,
+                    tipo_diabetes TEXT,
+                    data_diagnostico TEXT,
+                    historico_clinico_familiar TEXT,
+                    observacoes_comorbidades TEXT,
+                    medicacoes_atuais TEXT,
                     alergias TEXT,
-                    historico_familiar TEXT,
-                    medicamentos_uso TEXT,
-                    FOREIGN KEY (paciente_id) REFERENCES users(id)
+                    insulina_basal TEXT,
+                    insulina_bolus TEXT,
+                    dose_basal_manha REAL,
+                    dose_basal_noite REAL,
+                    FOREIGN KEY (paciente_id) REFERENCES users (id),
+                    FOREIGN KEY (medico_id) REFERENCES users (id)
                 );
             """)
+            
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS detalhes_refeicao (
                     registro_id INTEGER PRIMARY KEY,
@@ -107,6 +139,7 @@ class DatabaseManager:
                     FOREIGN KEY (registro_id) REFERENCES registros (id)
                 );
             """)
+            
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS agendamentos (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,6 +154,31 @@ class DatabaseManager:
                 );
             """)
             
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS registros_glicemia (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    paciente_id INTEGER NOT NULL,
+                    valor_glicemia REAL NOT NULL,
+                    data_hora TEXT NOT NULL,
+                    tipo_medicao TEXT,
+                    observacoes TEXT,
+                    FOREIGN KEY (paciente_id) REFERENCES users (id)
+                );
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS insulinas_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    nome_insulina TEXT NOT NULL,         -- Ex: 'Tresiba', 'Humalog', 'Lantus'
+                    tipo_acao TEXT NOT NULL,             -- Ex: 'Basal Ultralonga', 'Rápida'
+                    concentracao TEXT,                   -- Ex: '100 U/mL', '200 U/mL'
+                    dose_basal_manha REAL,               -- Usada para insulinas Basais
+                    dose_basal_noite REAL,               -- Usada para insulinas Basais
+                    eh_ativa INTEGER DEFAULT 1,          -- 1 se a insulina está em uso
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
+            """)
+
             conn.commit()
             
 
@@ -178,6 +236,84 @@ class DatabaseManager:
                 else:
                     raise 
                     
+        conn.commit()
+        conn.close()
+
+
+
+    def migrar_fichas_medicas_antigas(self):
+        """
+        Migra dados da tabela obsoleta 'fichas_medicas' para a nova 'ficha_medica_unificada'.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 1. Seleciona os dados da tabela antiga (que tem menos campos)
+            cursor.execute("""
+                SELECT paciente_id, condicao_atual, alergias, historico_familiar, medicamentos_uso
+                FROM fichas_medicas
+            """)
+            dados_antigos = cursor.fetchall()
+
+            # 2. Insere na nova tabela unificada (preenchendo os campos específicos com NULL/N/A)
+            data_migracao = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            for row in dados_antigos:
+                paciente_id = row[0]
+                condicao_atual = row[1]
+                alergias = row[2]
+                historico_familiar = row[3]
+                medicamentos_uso = row[4]
+                
+                cursor.execute("""
+                    INSERT OR IGNORE INTO ficha_medica_unificada (
+                        paciente_id, historico_clinico_familiar, observacoes_comorbidades, 
+                        medicacoes_atuais, alergias, data_registro, 
+                        tipo_diabetes, data_diagnostico, insulina_basal, insulina_bolus
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    paciente_id,
+                    historico_familiar,
+                    condicao_atual,
+                    medicamentos_uso,
+                    alergias,
+                    data_migracao,
+                    'Migrado', # Valor temporário
+                    None,
+                    None,
+                    None
+                ))
+                
+            conn.commit()
+            print(f"Migração de {len(dados_antigos)} fichas médicas concluída para 'ficha_medica_unificada'.")
+            
+        except sqlite3.OperationalError as e:
+            print(f"Alerta de Migração: A tabela 'fichas_medicas' não pôde ser lida. {e}")
+        finally:
+            conn.close()
+
+    def finalizar_refatoramento_fichas(self):
+        """
+        Remove a tabela obsoleta e renomeia a tabela unificada para o nome definitivo ('ficha_medica').
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Exclui a tabela obsoleta
+        try:
+            cursor.execute("DROP TABLE IF EXISTS fichas_medicas")
+            print("Tabela obsoleta 'fichas_medicas' excluída.")
+        except Exception as e:
+            print(f"Erro ao excluir tabela 'fichas_medicas': {e}")
+            
+        # 2. Renomeia a tabela final unificada para o nome definitivo
+        try:
+            cursor.execute("ALTER TABLE ficha_medica_unificada RENAME TO ficha_medica")
+            print("Tabela 'ficha_medica_unificada' renomeada para 'ficha_medica'.")
+        except Exception as e:
+            print(f"Erro ao renomear tabela para 'ficha_medica': {e}")
+            
         conn.commit()
         conn.close()
 
@@ -376,34 +512,111 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def salvar_parametros_paciente(self, paciente_id, ric_manha, ric_almoco, ric_jantar, fator_sensibilidade, meta_glicemia):
+
+    def salvar_parametros_paciente(self, paciente_id, ric_manha, ric_almoco, ric_jantar, ric_noite, fsi_manha, fsi_almoco, fsi_jantar, fsi_noite, meta_glicemia, alterado_por_id):
         """
-        Atualiza os parâmetros de Bolus para um paciente específico na tabela 'users'.
+        Atualiza os parâmetros de Bolus por turno (RIC/FSI) para um paciente e registra as alterações no histórico.
+        
+        :param paciente_id: ID do paciente sendo atualizado.
+        :param alterado_por_id: ID do usuário logado que está realizando a alteração (médico, paciente, etc.).
         """
         conn = self.get_db_connection()
         cursor = conn.cursor()
+        historico_updates = []
         
+        # 1. Mapeamento dos novos valores (incluindo todos os turnos agora)
+        # ATENÇÃO: Verifique se esses 10 campos existem na sua tabela 'users'.
+        novos_valores = {
+            'ric_manha': ric_manha,
+            'ric_almoco': ric_almoco,
+            'ric_jantar': ric_jantar,
+            'ric_noite': ric_noite,         # Adicionado
+            'fsi_manha': fsi_manha,         # Adicionado
+            'fsi_almoco': fsi_almoco,       # Adicionado
+            'fsi_jantar': fsi_jantar,       # Adicionado
+            'fsi_noite': fsi_noite,         # Adicionado
+            'meta_glicemia': meta_glicemia,
+        }
+
         try:
-            # Tabela 'users'
-            query = """
-                UPDATE users
-                SET ric_manha = ?, ric_almoco = ?, ric_jantar = ?,
-                    fator_sensibilidade = ?, meta_glicemia = ?
-                WHERE id = ? AND role = 'paciente';
-            """
-            cursor.execute(query, (
-                ric_manha, ric_almoco, ric_jantar,
-                fator_sensibilidade, meta_glicemia,
-                paciente_id
-            ))
+            # 2. Obter os valores ATUAIS da tabela users
+            colunas = list(novos_valores.keys())
+            # Garante que 'fator_sensibilidade' não está na lista de colunas se você migrou para fsi_manha/fsi_almoco...
+            query_select = f"SELECT {', '.join(colunas)} FROM users WHERE id = ? AND role = 'paciente'"
+            cursor.execute(query_select, (paciente_id,))
+            valores_atuais_db = cursor.fetchone()
+            
+            # ... (O restante da lógica de comparação e histórico é a mesma) ...
+            # ... (A lógica de UPDATE precisa ser ajustada) ...
+
+            if not valores_atuais_db:
+                print(f"ERRO: Paciente {paciente_id} não encontrado ou não é paciente.")
+                return False
+                
+            valores_atuais = dict(zip(colunas, valores_atuais_db))
+            
+            # 3. Comparar valores e montar o histórico
+            data_registro = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Lógica de comparação idêntica, mas para mais campos
+            for campo, novo_valor in novos_valores.items():
+                valor_atual = valores_atuais.get(campo)
+                
+                valor_atual_num = float(valor_atual) if valor_atual is not None else 0
+                novo_valor_num = float(novo_valor) if novo_valor is not None and novo_valor != '' else 0
+                
+                if valor_atual_num != novo_valor_num:
+                    historico_updates.append((
+                        paciente_id,
+                        alterado_por_id,
+                        campo,
+                        valor_atual,    # Valor anterior
+                        novo_valor_num, # Novo valor
+                        data_registro
+                    ))
+            
+            # 4. Atualizar a tabela users (somente se houver alteração)
+            if historico_updates:
+                
+                # 🚨 NOVO SQL UPDATE com todos os 9 campos
+                query_update = """
+                    UPDATE users
+                    SET ric_manha = ?, ric_almoco = ?, ric_jantar = ?, ric_noite = ?, 
+                        fsi_manha = ?, fsi_almoco = ?, fsi_jantar = ?, fsi_noite = ?, 
+                        meta_glicemia = ?
+                    WHERE id = ? AND role = 'paciente';
+                """
+                
+                # Parâmetros: novos valores na ordem da query + paciente_id
+                params_update = (
+                    ric_manha, ric_almoco, ric_jantar, ric_noite, 
+                    fsi_manha, fsi_almoco, fsi_jantar, fsi_noite, 
+                    meta_glicemia,
+                    paciente_id
+                )
+                
+                cursor.execute(query_update, params_update)
+                
+                # 5. Salvar o Histórico (Lógica idêntica, mas com mais dados)
+                sql_historico = """
+                    INSERT INTO historico_parametros 
+                    (paciente_id, alterado_por_id, campo, valor_anterior, novo_valor, data_registro)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """
+                cursor.executemany(sql_historico, historico_updates)
+
             conn.commit()
             return True
             
         except Exception as e:
             print(f"Erro ao salvar parâmetros para o paciente {paciente_id}: {e}")
+            if conn:
+                conn.rollback() 
             return False
         finally:
-            conn.close()
+            if conn:
+                conn.close()
+
     def verificar_vinculo_medico_paciente(self, medico_id, paciente_id):
         """
         Verifica se o paciente está vinculado ao médico (usando a coluna medico_id
@@ -440,7 +653,7 @@ class DatabaseManager:
         cursor = conn.cursor()
         
         # 1. Busca o usuário pelo username
-        cursor.execute("SELECT id, username, password_hash, role FROM usuarios WHERE username = ?", (username,))
+        cursor.execute("SELECT id, username, password_hash, role FROM users WHERE username = ?", (username,))
         user_data = cursor.fetchone()
         conn.close()
         
@@ -490,11 +703,11 @@ class DatabaseManager:
         try:
             if role:
                 # Se a role for fornecida, conta apenas usuários com aquela role
-                query = "SELECT COUNT(*) FROM usuarios WHERE role = ?"
+                query = "SELECT COUNT(*) FROM users WHERE role = ?"
                 cursor.execute(query, (role,))
             else:
                 # Se nenhuma role for fornecida, conta todos os usuários
-                query = "SELECT COUNT(*) FROM usuarios"
+                query = "SELECT COUNT(*) FROM users"
                 cursor.execute(query)
             
             # O fetchone retorna uma tupla, o COUNT é o primeiro elemento [0]
@@ -519,7 +732,7 @@ class DatabaseManager:
                 # A consulta busca pacientes onde a role é 'paciente' E 
                 # pelo menos um dos campos essenciais está AUSENTE ou ZERO.
                 query = """
-                    SELECT COUNT(id) FROM usuarios 
+                    SELECT COUNT(id) FROM users 
                     WHERE role = 'paciente' 
                     AND (ric_manha IS NULL OR ric_manha = 0 
                         OR meta_glicemia IS NULL OR meta_glicemia = 0);
@@ -600,7 +813,37 @@ class DatabaseManager:
                 return 0
             finally:
                 conn.close()
+# NO ARQUIVO: database_manager.py (dentro da classe DatabaseManager)
 
+    def obter_todos_pacientes(self):
+        """
+        Retorna todos os usuários com o role 'paciente', usado para o Painel de Gestão/Admin.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        # 🚨 USANDO TABELA 'users' E COLUNA 'nome_completo' 🚨
+        query = """
+        SELECT 
+            id, 
+            username, 
+            nome_completo, 
+            razao_ic, 
+            fator_sensibilidade,
+            meta_glicemia 
+        FROM 
+            users
+        WHERE 
+            role = 'paciente';
+        """
+        
+        cursor.execute(query)
+        colunas = [col[0] for col in cursor.description]
+        pacientes = [dict(zip(colunas, row)) for row in cursor.fetchall()]
+        
+        conn.close()
+        return pacientes
+    
     def obter_todos_pacientes_com_parametros(self):
             """
             Retorna a lista de pacientes (role='paciente') com seus parâmetros clínicos.
@@ -834,10 +1077,10 @@ class DatabaseManager:
 
         try:
             # 1. Total de Pacientes e Médicos
-            cursor.execute("SELECT COUNT(id) FROM usuarios WHERE role = 'paciente'")
+            cursor.execute("SELECT COUNT(id) FROM users WHERE role = 'paciente'")
             resumo['total_pacientes'] = cursor.fetchone()[0]
             
-            cursor.execute("SELECT COUNT(id) FROM usuarios WHERE role = 'medico'")
+            cursor.execute("SELECT COUNT(id) FROM users WHERE role = 'medico'")
             resumo['total_medicos'] = cursor.fetchone()[0]
 
             # 2. Registros de Glicemia Hoje
@@ -1266,9 +1509,6 @@ class DatabaseManager:
             # Se o erro FOREIGN KEY persistir AQUI, significa que HÁ MAIS UMA TABELA FILHA
             print(f"ERRO CRÍTICO NA EXCLUSÃO (FOREIGN KEY): {e}") 
             conn.rollback()
-            
-            # --- SOLUÇÃO DE FORÇA BRUTA (APENAS SE O ERRO PERSISTIR) ---
-            # Tenta a exclusão ignorando temporariamente as chaves estrangeiras (último recurso)
             try:
                 print("Tentando exclusão com Foreign Keys desabilitadas...")
                 conn.execute("PRAGMA foreign_keys = OFF")
@@ -1279,8 +1519,6 @@ class DatabaseManager:
                 print(f"Falha total na exclusão: {retry_e}")
                 conn.rollback()
                 return False
-            # -----------------------------------------------------------
-            
         finally:
             # Garante que a conexão seja fechada e o PRAGMA volte ao normal
             conn.execute("PRAGMA foreign_keys = ON")
@@ -1296,10 +1534,11 @@ class DatabaseManager:
                 SELECT 1 FROM vinculos_medico_paciente WHERE medico_id = ? AND paciente_id = ?
             """, (paciente_id, medico_id, medico_id, paciente_id))
             return cursor.fetchone() is not None
-        
+
     def salvar_exame_laboratorial(self, ficha_exame: dict) -> bool:
         conn = self.get_db_connection()
-        try:
+        try: 
+
             hb_a1c = float(ficha_exame.get('hb_a1c')) if ficha_exame.get('hb_a1c') else None
             glicose_jejum = int(ficha_exame.get('glicose_jejum')) if ficha_exame.get('glicose_jejum') else None
             colesterol_total = int(ficha_exame.get('colesterol_total')) if ficha_exame.get('colesterol_total') else None
@@ -1307,23 +1546,27 @@ class DatabaseManager:
             ldl = int(ficha_exame.get('ldl')) if ficha_exame.get('ldl') else None
             triglicerides = int(ficha_exame.get('triglicerides')) if ficha_exame.get('triglicerides') else None
             tsh = float(ficha_exame.get('tsh')) if ficha_exame.get('tsh') else None
-            
+
             conn.execute("""
                 INSERT INTO exames_laboratoriais (
-                    paciente_id, data_exame, hb_a1c, glicose_jejum, colesterol_total, 
+                    paciente_id, medico_id, data_exame, hb_a1c, glicose_jejum, colesterol_total, 
                     hdl, ldl, triglicerides, tsh, obs_medico
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 ficha_exame.get('paciente_id'),
+                ficha_exame.get('medico_id'), 
                 ficha_exame.get('data_exame'), 
                 hb_a1c, glicose_jejum, colesterol_total, hdl, ldl, triglicerides, tsh,
                 ficha_exame.get('obs_medico')
             ))
             conn.commit()
             return True
+
         except Exception as e:
             print(f"Erro SQLite ao salvar exame laboratorial: {e}")
+            conn.rollback()
             return False
+
         finally:
             conn.close()
 
@@ -1348,13 +1591,13 @@ class DatabaseManager:
     
     # Esta função está depreciada pela ficha_medica, mas mantida por compatibilidade
     # db_manager.py
-
+    
     def salvar_ficha_medica(self, ficha_data):
         with self.get_db_connection() as conn:
             cursor = conn.cursor()
             
             # Mapeamento: Formulário HTML (ficha_data.get()) -> Coluna SQL
-            historico_clinico = ficha_data.get('condicao_atual')
+            historico_clinico_familiar = ficha_data.get('condicao_atual')
             medicacoes_atuais = ficha_data.get('medicamentos_uso')
             alergias = ficha_data.get('alergias')
             observacoes_medicas = ficha_data.get('historico_familiar')
@@ -1362,19 +1605,19 @@ class DatabaseManager:
 
             # UPDATE:
             cursor.execute("""
-                UPDATE fichas_medicas 
-                SET historico_clinico = ?, medicacoes_atuais = ?, alergias = ?, observacoes_medicas = ? 
+                UPDATE ficha_medica 
+                SET historico_clinico_familiar = ?, medicacoes_atuais = ?, alergias = ?, observacoes_medicas = ? 
                 WHERE paciente_id = ?
                 """,
-                (historico_clinico, medicacoes_atuais, alergias, observacoes_medicas, paciente_id))
+                (historico_clinico_familiar, medicacoes_atuais, alergias, observacoes_medicas, paciente_id))
             
             # INSERT (se a linha não existir):
             if cursor.rowcount == 0:
                 cursor.execute("""
-                    INSERT INTO fichas_medicas (paciente_id, historico_clinico, medicacoes_atuais, alergias, observacoes_medicas) 
+                    INSERT INTO fichas_medicas (paciente_id, historico_clinico_familiar, medicacoes_atuais, alergias, observacoes_medicas) 
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (paciente_id, historico_clinico, medicacoes_atuais, alergias, observacoes_medicas))
+                    (paciente_id, historico_clinico_familiar, medicacoes_atuais, alergias, observacoes_medicas))
             
             conn.commit()
             return True
@@ -1385,8 +1628,8 @@ class DatabaseManager:
             
             # 1. Seleciona as colunas na ordem correta
             cursor.execute("""
-                SELECT historico_clinico, medicacoes_atuais, alergias, observacoes_medicas 
-                FROM fichas_medicas 
+                SELECT historico_clinico_familiar, medicacoes_atuais, alergias, observacoes_comorbidades 
+                FROM ficha_medica
                 WHERE paciente_id = ?
             """, (paciente_id,))
             
@@ -1424,15 +1667,27 @@ class DatabaseManager:
             medicos = cursor.fetchall()
             return [dict(row) for row in medicos]
 
+    # NO SEU ARQUIVO database_manager.py (Definição ideal)
+
     def salvar_agendamento(self, agendamento_data):
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO agendamentos (paciente_id, medico_id, data_hora, status)
-                VALUES (?, ?, ?, ?)
-            """, (agendamento_data['paciente_id'], agendamento_data['medico_id'], agendamento_data['data_hora'], agendamento_data['status']))
-            conn.commit()
-            return True
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO agendamentos (paciente_id, medico_id, data_hora, observacoes, status)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    agendamento_data['paciente_id'], 
+                    agendamento_data['medico_id'], 
+                    agendamento_data['data_hora'], 
+                    agendamento_data['observacoes'], # NOVO CAMPO
+                    'Agendada' # Status
+                ))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Erro ao salvar agendamento: {e}")
+            return False
 
     def carregar_cuidadores(self):
         with self.get_db_connection() as conn:
@@ -1472,7 +1727,7 @@ class DatabaseManager:
                     u.nome_completo, 
                     u.email, 
                     u.data_nascimento 
-                FROM usuarios u
+                FROM users u
                 INNER JOIN vinculos_cuidador_paciente v ON u.id = v.paciente_id
                 WHERE v.cuidador_id = ?
             """, (cuidador_id,))
@@ -1522,29 +1777,60 @@ class DatabaseManager:
                 return False
 
     def buscar_agendamentos_paciente(self, user_id):
+        """
+        Busca os agendamentos de um paciente, convertendo a data/hora do DB (string) 
+        para um objeto datetime do Python.
+        """
         conn = self.get_db_connection()
+        # Usar row_factory para acessar colunas por nome é mais seguro
+        conn.row_factory = sqlite3.Row 
         cursor = conn.cursor()
         
-        cursor.execute("""
+        # Formato padrão do SQLite para DATETIME. Verifique se é este o formato.
+        DB_FORMAT = '%Y-%m-%dT%H:%M'
+        
+        query = """
             SELECT a.id, a.data_hora, a.status, a.observacoes, m.username as medico_username
             FROM agendamentos a
             JOIN users m ON a.medico_id = m.id
             WHERE a.paciente_id = ?
             ORDER BY a.data_hora DESC
-        """, (user_id,))
+        """
         
-        agendamentos = [
-            {'id': row[0], 
-             'data_hora': row[1], 
-             'status': row[2], 
-             'observacoes': row[3], 
-             'medico_username': row[4]} 
-            for row in cursor.fetchall()
-        ]
-        conn.close()
-        return agendamentos
-    
-# No seu database_manager.py, adicione:
+        try:
+            cursor.execute(query, (user_id,))
+            agendamentos = []
+            
+            for row in cursor.fetchall():
+                agendamento = dict(row) # Cria um dicionário a partir da linha
+                data_hora_str = agendamento.get('data_hora') # Acessando o valor como string
+                
+                # 1. Assume que não há objeto datetime
+                data_hora_obj = None 
+                
+                # 2. Tenta converter APENAS se houver string
+                if data_hora_str:
+                    try:
+                        # Tenta converter a string do DB em objeto datetime
+                        data_hora_obj = datetime.strptime(data_hora_str, DB_FORMAT)
+                    except ValueError:
+                        # 3. Se houver erro, loga e mantém data_hora_obj como None
+                        print(f"DEBUG: Falha na conversão de data/hora (Paciente ID {user_id}). Valor DB: '{data_hora_str}'.")
+                
+                # 4. Atualiza o dicionário com o objeto datetime ou None
+                agendamento['data_hora'] = data_hora_obj
+                
+                agendamentos.append(agendamento)
+                
+            return agendamentos
+            
+        except Exception as e:
+            print(f"Erro fatal ao buscar agendamentos para o paciente {user_id}: {e}")
+            return []
+            
+        finally:
+            if conn:
+                conn.close()
 
     def buscar_agendamentos_por_medico(self, medico_id):
         """
@@ -1681,37 +1967,89 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def salvar_parametros_clinicos(self, paciente_id, parametros):
+
+
+    def salvar_parametros_clinicos(self, paciente_id, novos_parametros: dict, alterado_por_id):
         """
-        Insere ou atualiza os parâmetros clínicos (RIC/FSI por turno e Glicemia Alvo) 
-        em uma tabela dedicada (parametros_clinicos).
+        Atualiza múltiplos parâmetros clínicos para um paciente e registra as alterações no histórico.
+        
+        :param paciente_id: ID do paciente.
+        :param novos_parametros: Dicionário {campo: novo_valor} dos parâmetros a serem atualizados.
+        :param alterado_por_id: ID do usuário que fez a alteração.
         """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        historico_updates = []
+        
+        # Prepara listas de colunas para SELECT
+        campos_a_verificar = list(novos_parametros.keys())
+
         try:
-            conn = self.get_db_connection()
-            conn.execute("""
-                INSERT OR REPLACE INTO parametros_clinicos (
-                    paciente_id, glicemia_alvo, 
-                    ric_manha, fsi_manha, ric_almoco, fsi_almoco, ric_jantar, fsi_jantar
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                paciente_id,
-                parametros['glicemia_alvo'],
-                parametros['ric_manha'],
-                parametros['fsi_manha'],
-                parametros['ric_almoco'],
-                parametros['fsi_almoco'],
-                parametros['ric_jantar'],
-                parametros['fsi_jantar'],
-            ))
+            # 1. Obter os valores ATUAIS da tabela users
+            query_select = f"SELECT {', '.join(campos_a_verificar)} FROM users WHERE id = ? AND role = 'paciente'"
+            cursor.execute(query_select, (paciente_id,))
+            valores_atuais_db = cursor.fetchone()
+            
+            if not valores_atuais_db:
+                print(f"ERRO: Paciente {paciente_id} não encontrado ou não é paciente.")
+                return False
+                
+            valores_atuais = dict(zip(campos_a_verificar, valores_atuais_db))
+            
+            # 2. Comparar valores e montar o histórico
+            data_registro = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            update_parts = []
+            update_params = []
+            
+            for campo, novo_valor in novos_parametros.items():
+                valor_atual = valores_atuais.get(campo)
+                
+                # Sanitização e comparação de valores numéricos
+                valor_atual_num = float(valor_atual) if valor_atual is not None else 0
+                novo_valor_num = float(novo_valor) if novo_valor is not None else 0
+                
+                if valor_atual_num != novo_valor_num:
+                    
+                    # Adiciona ao histórico
+                    historico_updates.append((
+                        paciente_id,
+                        alterado_por_id,
+                        campo,
+                        valor_atual,    # Valor anterior
+                        novo_valor_num, # Novo valor
+                        data_registro
+                    ))
+                    
+                    # Prepara o UPDATE para a tabela users
+                    update_parts.append(f"{campo} = ?")
+                    update_params.append(novo_valor_num)
+
+            # 3. Atualizar a tabela users (somente se houver alteração)
+            if update_params:
+                update_params.append(paciente_id) # O ID do paciente vai por último
+                
+                query_update = "UPDATE users SET " + ", ".join(update_parts) + " WHERE id = ? AND role = 'paciente';"
+                cursor.execute(query_update, tuple(update_params))
+                
+                # 4. Salvar o Histórico
+                sql_historico = """
+                    INSERT INTO historico_parametros 
+                    (paciente_id, alterado_por_id, campo, valor_anterior, novo_valor, data_registro)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """
+                cursor.executemany(sql_historico, historico_updates)
+
             conn.commit()
             return True
+            
         except Exception as e:
-            # É crucial ter a tabela 'parametros_clinicos' criada com 'paciente_id' como UNIQUE/PRIMARY KEY
-            print(f"Erro ao salvar parâmetros clínicos (Tabela parametros_clinicos): {e}")
-            conn.rollback()
+            print(f"Erro ao salvar parâmetros para o paciente {paciente_id}: {e}")
+            if conn:
+                conn.rollback() 
             return False
         finally:
-            conn.close()
+            if conn:
+                conn.close()
 
     def carregar_registros_glicemia_nutricao(self, paciente_id, limit=20):
             """
@@ -1756,7 +2094,7 @@ class DatabaseManager:
                 cursor.close()
                 conn.close()
                 
-    # No arquivo: database_manager.py
+
 
     def obter_resumo_medico_filtrado(self, medico_id):
         """
@@ -1871,10 +2209,11 @@ class DatabaseManager:
             return 0
         finally:
             conn.close()
-
+   
     def obter_resumo_paciente(self, paciente_id):
         conn = self.get_db_connection()
         cursor = conn.cursor()
+        
         resumo = {
             'ultimo_registro': None,
             'tempo_desde_ultimo': 'Nunca registrado',
@@ -1883,81 +2222,116 @@ class DatabaseManager:
             'hipoglicemia_count': 0
         }
         
-        # Importante: LIMITE_HIPO e LIMITE_HIPER devem estar definidos no arquivo!
-        # Se não estiverem, adicione:
-        # LIMITE_HIPO = 70
-        # LIMITE_HIPER = 180
-        
         hoje = datetime.now()
-        data_semana_atras = hoje - timedelta(days=7)
+        # Para o filtro SQL, usamos o formato YYYY-MM-DD HH:MM:SS
+        data_semana_atras_str = (hoje - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
 
         try:
-            # 1. Último Registro (CORRETO)
+            # 1. Último Registro
+            # Nota: A consulta está na tabela 'registros', se você moveu os dados, atualize a tabela!
             cursor.execute("""
                 SELECT valor, data_hora 
                 FROM registros 
-                WHERE user_id = ? 
+                WHERE user_id = ?
+                AND valor IS NOT NULL
                 ORDER BY data_hora DESC 
                 LIMIT 1
             """, (paciente_id,))
             ultimo = cursor.fetchone()
 
             if ultimo:
-                valor, data_hora_str = ultimo
-                data_hora_reg = datetime.strptime(data_hora_str.replace('T', ' '), '%Y-%m-%d %H:%M:%S')
+                valor_raw, data_hora_str = ultimo
                 
-                # Cálculo de status (depende de LIMITE_HIPO e LIMITE_HIPER)
-                if valor < LIMITE_HIPO:
-                    status = 'danger'
-                elif valor > LIMITE_HIPER:
-                    status = 'warning' 
-                else:
-                    status = 'success'
-                    
-                # Cálculo do tempo
-                delta = hoje - data_hora_reg
-                if delta.total_seconds() < 3600:
-                    tempo_str = f"{int(delta.total_seconds() // 60)} min atrás"
-                elif delta.days < 1:
-                    tempo_str = f"{int(delta.total_seconds() // 3600)} horas atrás"
-                else:
-                    tempo_str = f"{delta.days} dias atrás"
-                    
-                resumo['ultimo_registro'] = {'valor': valor, 'status': status, 'tempo_desde_ultimo': tempo_str}
-                # Removemos a atribuição duplicada de tempo_desde_ultimo
+                valor_glicemia = None
+                data_hora_reg = None
+                tempo_str = 'Erro de Data/Hora'
+                status = 'secondary'
 
-            # 2. Média da Última Semana (CORRIGIDO: 'paciente_id' mudou para 'user_id')
+                # Tenta converter o valor
+                try:
+                    valor_glicemia = float(valor_raw) 
+                except (TypeError, ValueError):
+                    valor_glicemia = None # Se falhar, o valor não é usado
+                
+                # Tenta converter a data, sendo robusto contra diferentes formatos (o foco da correção)
+                if valor_glicemia is not None:
+                    data_hora_str_limpa = data_hora_str.replace('T', ' ')
+                    
+                    # Tenta formatos em ordem decrescente de precisão
+                    formatos_data = [
+                        '%Y-%m-%d %H:%M:%S.%f',  # Com microsssegundos (o que estava falhando: ':00')
+                        '%Y-%m-%d %H:%M:%S',    # Com segundos
+                        '%Y-%m-%d %H:%M'        # Sem segundos
+                    ]
+                    
+                    for fmt in formatos_data:
+                        try:
+                            data_hora_reg = datetime.strptime(data_hora_str_limpa, fmt)
+                            break # Se for bem-sucedido, sai do loop de formatos
+                        except ValueError:
+                            continue # Tenta o próximo formato
+
+                    # Cálculo de tempo e status SÓ se a data foi convertida
+                    if data_hora_reg:
+                        # Cálculo de status
+                        if valor_glicemia < LIMITE_HIPO:
+                            status = 'warning' # Use 'warning' para hipo, como no seu template
+                        elif valor_glicemia > LIMITE_HIPER:
+                            status = 'danger' # Use 'danger' para hiper
+                        else:
+                            status = 'success'
+                            
+                        # Cálculo do tempo decorrido
+                        delta = hoje - data_hora_reg
+                        if delta.total_seconds() < 60:
+                            tempo_str = "Agora mesmo"
+                        elif delta.total_seconds() < 3600:
+                            tempo_str = f"{int(delta.total_seconds() // 60)} min atrás"
+                        elif delta.days < 1:
+                            tempo_str = f"{int(delta.total_seconds() // 3600)} horas atrás"
+                        else:
+                            tempo_str = f"{delta.days} dias atrás"
+                        
+                        # Atribuição final ao resumo
+                        resumo['ultimo_registro'] = {
+                            'valor': valor_glicemia, 
+                            'status': status, 
+                            'tempo_desde_ultimo': tempo_str
+                        }
+
+            # 2. Média da Última Semana (Consulta de 7 dias)
             cursor.execute("""
                 SELECT AVG(valor) 
                 FROM registros 
                 WHERE user_id = ? AND data_hora >= ? 
-            """, (paciente_id, data_semana_atras.strftime('%Y-%m-%d %H:%M:%S')))
+                AND valor IS NOT NULL
+            """, (paciente_id, data_semana_atras_str))
             media = cursor.fetchone()[0]
             
             if media is not None:
                 resumo['media_ultima_semana'] = f"{media:.1f}"
 
-            # 3. Contagem de Eventos Extremos (CORRIGIDO: 'paciente_id' mudou para 'user_id')
+            # 3. Contagem de Eventos Extremos (Consulta de 7 dias)
             cursor.execute("""
                 SELECT 
                     SUM(CASE WHEN valor < ? THEN 1 ELSE 0 END) as hipo,
                     SUM(CASE WHEN valor > ? THEN 1 ELSE 0 END) as hiper
                 FROM registros 
                 WHERE user_id = ? AND data_hora >= ?
-            """, (LIMITE_HIPO, LIMITE_HIPER, paciente_id, data_semana_atras.strftime('%Y-%m-%d %H:%M:%S')))
+            """, (LIMITE_HIPO, LIMITE_HIPER, paciente_id, data_semana_atras_str))
             
             contagens = cursor.fetchone()
             if contagens:
-                resumo['hipoglicemia_count'] = contagens[0]
-                resumo['hiperglicemia_count'] = contagens[1]
-                
+                resumo['hipoglicemia_count'] = contagens[0] if contagens[0] is not None else 0
+                resumo['hiperglicemia_count'] = contagens[1] if contagens[1] is not None else 0
+                            
         except Exception as e:
-            print(f"Erro ao carregar resumo do paciente: {e}")
-
+            print(f"Erro CRÍTICO ao carregar resumo do paciente: {e}")
+            # Em caso de erro crítico (p. ex., falha na conexão DB), retorna o resumo vazio.
+            
         finally:
             conn.close()
             
-        # Adicionando o print de debug final para confirmar o retorno
         print(f"DEBUG: Resumo Final Paciente {paciente_id}: {resumo}")
         return resumo
 
@@ -2151,6 +2525,149 @@ class DatabaseManager:
         finally:
             # Bloco FINALLY: Sempre executa (identado)
             conn.close()
+
+    def obter_pacientes_vinculados(self, medico_id):
+        """
+        Busca pacientes vinculados a um médico específico.
+        Assume que a tabela 'usuarios' armazena os parâmetros clínicos.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        # Esta query une usuários com a tabela 'vinculos' para filtrar por medico_id.
+        query = """
+        SELECT 
+            u.id, 
+            u.username, 
+            u.nome_completo, 
+            u.razao_ic, 
+            u.fator_sensibilidade,
+            u.meta_glicemia 
+        FROM 
+            users u
+        JOIN 
+            vinculos_medico_paciente v ON u.id = v.paciente_id
+        WHERE 
+            v.medico_id = ? AND u.role = 'paciente';
+        """
+        
+        cursor.execute(query, (medico_id,))
+        colunas = [col[0] for col in cursor.description]
+        pacientes = [dict(zip(colunas, row)) for row in cursor.fetchall()]
+        
+        conn.close()
+        return pacientes
+    
+    def obter_pacientes_em_alerta_detalhado(self):
+        """
+        Busca pacientes que tiveram registros de glicemia fora do alvo nas últimas 48 horas.
+        Retorna uma lista de dicionários com dados básicos do paciente.
+        """
+        conn = self.get_db_connection()
+        conn.row_factory = sqlite3.Row  # Garante que os resultados venham como dicionário
+        cursor = conn.cursor()
+        
+        # 1. Encontrar o último registro e os parâmetros de meta do paciente
+        # Esta query é complexa e depende da sua estrutura, mas o princípio é:
+        # 2. Filtrar os pacientes cuja última glicemia ou qualquer uma nas últimas 48h
+        #    está abaixo/acima da 'meta_glicemia' definida em 'users'.
+        
+        query = """
+            SELECT DISTINCT
+                u.id, u.username, u.nome_completo, u.meta_glicemia, u.medico_id
+            FROM users u
+            JOIN registros r ON u.id = r.user_id
+            WHERE u.role = 'paciente'
+            AND r.tipo_registro = 'glicemia'
+            AND r.data_hora >= DATETIME('now', '-48 hours')
+            AND (
+                    r.valor < u.meta_glicemia - 30 OR  -- Exemplo: Hipoglicemia (ajuste o delta)
+                    r.valor > u.meta_glicemia + 60    -- Exemplo: Hiperglicemia (ajuste o delta)
+                )
+            ORDER BY u.nome_completo;
+        """
+        
+        # NOTA: Ajuste os deltas (30 e 60) conforme sua definição clínica de alerta.
+        
+        try:
+            cursor.execute(query)
+            pacientes = [dict(row) for row in cursor.fetchall()]
+            return pacientes
+        except Exception as e:
+            print(f"Erro ao buscar pacientes em alerta: {e}")
+            return []
+        finally:
+            conn.close()
+
+         # database_manager.py (Adicione estas novas funções)
+
+    def adicionar_insulina_config(self, user_id, nome, tipo_acao, concentracao, dose_manha=None, dose_noite=None):
+        """Insere uma nova configuração de insulina para o usuário."""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        # Primeiro, desativa qualquer insulina ATIVA do mesmo tipo de ação (Basal ou Bolus/Rápida)
+        # Isso simplifica o gerenciamento: apenas uma Basal e uma Rápida podem estar ativas por vez.
+        if tipo_acao in ['Basal Ultralonga', 'Basal Longa', 'Basal Intermediária']:
+            cursor.execute("""
+                UPDATE insulinas_config 
+                SET eh_ativa = 0 
+                WHERE user_id = ? AND tipo_acao LIKE 'Basal%' AND eh_ativa = 1
+            """, (user_id,))
+        elif tipo_acao in ['Rápida', 'Ultrarrápida', 'Regular']:
+            cursor.execute("""
+                UPDATE insulinas_config 
+                SET eh_ativa = 0 
+                WHERE user_id = ? AND tipo_acao NOT LIKE 'Basal%' AND eh_ativa = 1
+            """, (user_id,))
+
+
+        cursor.execute("""
+            INSERT INTO insulinas_config 
+            (user_id, nome_insulina, tipo_acao, concentracao, dose_basal_manha, dose_basal_noite, eh_ativa)
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+        """, (user_id, nome, tipo_acao, concentracao, dose_manha, dose_noite))
+        
+        conn.commit()
+        conn.close()
+        return cursor.lastrowid
+
+
+    def carregar_insulinas_user(self, user_id):
+        """Carrega todas as insulinas configuradas para um usuário."""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM insulinas_config WHERE user_id = ? ORDER BY eh_ativa DESC, id DESC
+        """, (user_id,))
+        insulinas = cursor.fetchall()
+        conn.close()
+        
+        # Converte para um dicionário de dicionários (mais fácil para usar no Flask)
+        return [dict(row) for row in insulinas]
+
+    def carregar_insulina_ativa_por_acao(self, user_id, tipo_acao):
+        """Carrega a insulina ativa para um determinado tipo (ex: 'Basal')."""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        # Usa LIKE para cobrir todos os tipos de basal (Basal Ultralonga, etc.)
+        if 'Basal' in tipo_acao:
+            query = "tipo_acao LIKE 'Basal%'"
+        else:
+            # Simplifica para encontrar Rápida/Bolus (que não são 'Basal')
+            query = "tipo_acao NOT LIKE 'Basal%'"
+
+        cursor.execute(f"""
+            SELECT * FROM insulinas_config 
+            WHERE user_id = ? AND eh_ativa = 1 AND {query}
+            ORDER BY id DESC LIMIT 1
+        """, (user_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
 # ---------------------- NOVAS FUNÇÕES DE GRÁFICOS ----------------------
 
     def obter_dados_glicemia_para_grafico(self, paciente_id):

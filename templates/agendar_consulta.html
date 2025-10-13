@@ -12,22 +12,42 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('agendar_consulta') }}">
+
+                        {% if current_user.role in ['admin', 'secretario'] %}
                         <div class="mb-3">
-                            <label for="medico" class="form-label">Selecione o Médico:</label>
-                            <select class="form-select" id="medico" name="medico_id" required>
-                                {% for medico in medicos %}
-                                <option value="{{ medico.id }}">{{ medico.nome_completo }}</option>
+                            <label for="paciente_id" class="form-label">Paciente Alvo:</label>
+                            <select class="form-select" id="paciente_id" name="paciente_id" required>
+                                <option value="">Selecione o Paciente...</option>
+                                {% for paciente in pacientes %}
+                                <option value="{{ paciente.id }}">{{ paciente.nome_completo or paciente.username }}
+                                </option>
                                 {% endfor %}
                             </select>
                         </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="medico" class="form-label">Selecione o Médico:</label>
+                            <select class="form-select" id="medico" name="medico_id" required>
+                                <option value="">Selecione o Médico...</option>
+                                {% for medico in medicos %}
+                                <option value="{{ medico.id }}">{{ medico.nome_completo or medico.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
                         <div class="mb-3">
                             <label for="data_agendamento" class="form-label">Data e Hora:</label>
-                            <input type="datetime-local" class="form-control" id="data_agendamento" name="data_agendamento" required>
+                            <input type="datetime-local" class="form-control" id="data_agendamento"
+                                name="data_agendamento" required>
                         </div>
+
                         <div class="mb-3">
                             <label for="observacoes" class="form-label">Observações:</label>
-                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3" placeholder="Detalhes sobre a consulta..."></textarea>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3"
+                                placeholder="Detalhes sobre a consulta..."></textarea>
                         </div>
+
                         <button type="submit" class="btn btn-primary w-100">Confirmar Agendamento</button>
                     </form>
                 </div>

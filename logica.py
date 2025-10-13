@@ -1,4 +1,4 @@
-# Mantenha o restante do seu código intacto
+#========LOGICA.PY==========#
 import sqlite3
 from datetime import datetime, timedelta
 import bcrypt
@@ -19,7 +19,7 @@ class DatabaseManager:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO usuarios (username, password_hash, email, role, data_nascimento, sexo, razao_ic, fator_sensibilidade, meta_glicemia)
+                    INSERT INTO users (username, password_hash, email, role, data_nascimento, sexo, razao_ic, fator_sensibilidade, meta_glicemia)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """, (username, password_hash, email, role, data_nascimento, sexo, razao_ic, fator_sensibilidade, meta_glicemia))
                 conn.commit()
@@ -32,7 +32,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM usuarios WHERE username = ?", (username,))
+            cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
             usuario = cursor.fetchone()
             return dict(usuario) if usuario else None
 
@@ -41,7 +41,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM usuarios WHERE id = ?", (user_id,))
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
             usuario = cursor.fetchone()
             return dict(usuario) if usuario else None
 
@@ -57,7 +57,7 @@ class DatabaseManager:
                     values.append(value)
 
             if updates:
-                sql = f"UPDATE usuarios SET {', '.join(updates)} WHERE username = ?"
+                sql = f"UPDATE users SET {', '.join(updates)} WHERE username = ?"
                 values.append(username)
                 cursor.execute(sql, values)
                 conn.commit()
@@ -79,7 +79,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT id, username, email, role, is_active FROM usuarios")
+            cursor.execute("SELECT id, username, email, role, is_active FROM users")
             usuarios = cursor.fetchall()
             return [dict(usuario) for usuario in usuarios]
 
@@ -90,7 +90,7 @@ class DatabaseManager:
                 cursor = conn.cursor()
                 
                 # Obtém o ID do usuário para exclusão em cascata
-                cursor.execute("SELECT id FROM usuarios WHERE username = ?", (username,))
+                cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
                 user_id = cursor.fetchone()
                 
                 if user_id:
@@ -102,7 +102,7 @@ class DatabaseManager:
                     cursor.execute("DELETE FROM agendamentos WHERE paciente_id = ?", (user_id,))
                     
                     # Exclui o usuário principal
-                    cursor.execute("DELETE FROM usuarios WHERE username = ?", (username,))
+                    cursor.execute("DELETE FROM users WHERE username = ?", (username,))
                     conn.commit()
                     return True
             return False
@@ -154,7 +154,7 @@ class DatabaseManager:
                     r.*, 
                     u.username 
                 FROM registros r
-                JOIN usuarios u ON r.user_id = u.id
+                JOIN users u ON r.user_id = u.id
                 WHERE u.username = ?
                 ORDER BY r.data_hora DESC;
             """, (username,))
@@ -182,7 +182,7 @@ class DatabaseManager:
             query = """
             SELECT r.*, u.username
             FROM registros r
-            JOIN usuarios u ON r.user_id = u.id
+            JOIN users u ON r.user_id = u.id
             WHERE r.id = ?
             """
             
@@ -218,7 +218,7 @@ class DatabaseManager:
             
             # TODO: Implementar a lógica de associação de pacientes a médicos, 
             # por enquanto, retorna todos os pacientes
-            cursor.execute("SELECT id, username, email FROM usuarios WHERE role = 'paciente'")
+            cursor.execute("SELECT id, username, email FROM users WHERE role = 'paciente'")
             pacientes = cursor.fetchall()
             return [dict(pac) for pac in pacientes]
 
@@ -227,7 +227,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM usuarios WHERE role = 'paciente'")
+            cursor.execute("SELECT id, username FROM users WHERE role = 'paciente'")
             return cursor.fetchall()
 
     def carregar_medicos(self):
@@ -235,7 +235,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM usuarios WHERE role = 'medico'")
+            cursor.execute("SELECT id, username FROM users WHERE role = 'medico'")
             return cursor.fetchall()
 
     def carregar_ficha_medica(self, paciente_id):
@@ -295,8 +295,8 @@ class DatabaseManager:
                     p.username as paciente_username,
                     m.username as medico_username
                 FROM agendamentos a
-                JOIN usuarios p ON a.paciente_id = p.id
-                JOIN usuarios m ON a.medico_id = m.id
+                JOIN users p ON a.paciente_id = p.id
+                JOIN users m ON a.medico_id = m.id
             """
             
             if role == 'medico' and medico_id:
@@ -318,8 +318,8 @@ class DatabaseManager:
                     a.id, a.data_hora, a.observacoes, a.status,
                     m.username as medico_username
                 FROM agendamentos a
-                JOIN usuarios p ON a.paciente_id = p.id
-                JOIN usuarios m ON a.medico_id = m.id
+                JOIN users p ON a.paciente_id = p.id
+                JOIN users m ON a.medico_id = m.id
                 WHERE p.username = ?
                 ORDER BY a.data_hora DESC;
             """, (paciente_username,))

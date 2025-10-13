@@ -61,6 +61,55 @@ def formatar_registros_para_exibicao(registros_brutos):
         registros_formatados.append(reg)
             
     return registros_formatados
+# --- NOVAS FUNÇÕES DE CLASSIFICAÇÃO VISUAL DE RISCO ---
+
+def get_hba1c_class(hba1c_value):
+    """
+    Retorna as classes CSS e o status para o valor de HbA1c, 
+    baseado nas referências clínicas.
+    """
+    try:
+        # Tenta converter o valor para float, se não for None
+        valor = float(hba1c_value) if hba1c_value is not None else None
+    except (ValueError, TypeError):
+        valor = None # Força None em caso de erro de conversão
+
+    if valor is None:
+        return 'bg-secondary text-white', 'N/A' # Valor ausente/inválido
+
+    if valor >= 6.5:
+        # HbA1c >= 6.5: Risco/Diabetes, controle ruim.
+        return 'bg-danger text-white', 'Risco/Diabetes'
+    elif 5.7 <= valor < 6.5:
+        # 5.7 <= HbA1c < 6.5: Pré-diabetes/Atenção.
+        return 'bg-warning text-dark', 'Atenção/Pré-diabetes'
+    else: # valor < 5.7
+        # HbA1c < 5.7: Meta atingida/Normal.
+        return 'bg-success text-white', 'Meta Atingida'
+
+def get_jejum_class(jejum_value):
+    """
+    Retorna as classes CSS e o status para o valor de Glicose Jejum,
+    baseado nas referências clínicas.
+    """
+    try:
+        # Tenta converter o valor para int/float, se não for None
+        valor = float(jejum_value) if jejum_value is not None else None
+    except (ValueError, TypeError):
+        valor = None # Força None em caso de erro de conversão
+
+    if valor is None:
+        return 'bg-secondary text-white', 'N/A' # Valor ausente/inválido
+
+    if valor > 99:
+        # Glicose Jejum > 99: Risco.
+        return 'bg-danger text-white', 'Risco'
+    elif 70 <= valor <= 99:
+        # 70 <= Glicose Jejum <= 99: Meta atingida/Normal.
+        return 'bg-success text-white', 'Meta Atingida'
+    else: # valor < 70 (Hipoglicemia ou muito baixo)
+        # Glicose Jejum < 70: Atenção/Hipoglicemia
+        return 'bg-warning text-dark', 'Atenção/Baixo'
 
 class BolusService:
     # Duração de Ação Máxima da insulina (4h para ultrarrápida é um bom padrão)
