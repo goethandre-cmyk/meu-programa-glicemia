@@ -1,0 +1,10 @@
+# Python Bytecode (Cache)
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+.venv/
+
+# Database Files
+data/glicemia.db
