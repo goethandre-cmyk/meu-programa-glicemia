@@ -811,19 +811,17 @@ def registros():
 @login_required
 def registrar_glicemia():
     
+    URL_FAIL = 'registrar_glicemia' 
+    URL_SUCCESS = 'registros' 
+
     # Lógica para processar o formulário (POST)
     if request.method == 'POST':
         
-        URL_FAIL = 'registrar_glicemia' 
-        URL_SUCCESS = 'registros' 
-
         # 1. Leitura e Validação de Formato
         valor = request.form.get('valor')
         data_hora_str = request.form.get('data_hora')
         tipo = request.form.get('tipo') 
         observacao = request.form.get('observacao', '')
-        
-        # 🚨 CORREÇÃO: Capturar dose_aplicada
         dose_aplicada_str = request.form.get('dose_aplicada')
 
         if not valor or not data_hora_str or not tipo:
@@ -833,26 +831,42 @@ def registrar_glicemia():
         try:
             data_hora = datetime.fromisoformat(data_hora_str)
             valor_glicemia = float(valor.replace(',', '.')) 
-            
-            # 🚨 CORREÇÃO: Converter dose_aplicada
             dose_aplicada = float(dose_aplicada_str) if dose_aplicada_str else None
         except (ValueError, TypeError):
             flash('Valores inválidos para glicemia, dose aplicada ou data/hora.', 'danger')
             return redirect(url_for(URL_FAIL))
+        
+        # 🚨 NOVO CÓDIGO: RECÁLCULO DO BÓLUS SUGERIDO NO POST 🚨
+        # Assumindo que você tem acesso ao 'calcular_bolus_correcao'
+        # Você deve definir esta função ou importá-la corretamente.
+        try:
+            bolus_sugerido = calcular_bolus_correcao(current_user.id, valor_glicemia)
+        except Exception:
+             # Em caso de erro (ex: parâmetros não definidos), trata como 0
+            bolus_sugerido = 0 
+        
+        # 🚨 NOVO CÓDIGO: INSERIR O BÓLUS SUGERIDO NA OBSERVAÇÃO 🚨
+        if bolus_sugerido is not None and bolus_sugerido > 0:
+            info_bolus = f"Bólus Sugerido: {bolus_sugerido:.1f}U."
+            if observacao:
+                # Adiciona no início da observação do usuário
+                observacao = f"{info_bolus} {observacao}"
+            else:
+                # Se o campo estava vazio, usa o sugerido
+                observacao = info_bolus
+        # -------------------------------------------------------------
+
         print(f"DEBUG: Tentando salvar para o user_id: {current_user.id}")
 
-        # 2. Chamada da Função de Salvamento (Assumindo que salvar_glicemia salva no campo correto)
+        # 2. Chamada da Função de Salvamento (A variável 'observacao' agora tem a dose sugerida)
         try:
-            # Tenta salvar no DB
-            # 🚨 CORREÇÃO: Incluindo dose_aplicada na chamada.
-            # Você precisará atualizar a assinatura de db_manager.salvar_glicemia
             sucesso = db_manager.salvar_glicemia(
                 current_user.id, 
                 valor_glicemia, 
                 data_hora.isoformat(), 
                 tipo, 
-                observacao,
-                dose_aplicada=dose_aplicada # NOVO ARGUMENTO AQUI
+                observacao, # AGORA ESTA VARIÁVEL TEM A DOSE SUGERIDA
+                dose_aplicada=dose_aplicada
             )
             
         except Exception as e:
@@ -860,7 +874,7 @@ def registrar_glicemia():
             flash(f'Erro crítico no servidor: Verifique o log. (Código: {e.__class__.__name__})', 'danger')
             return redirect(url_for(URL_FAIL))
         
-        # 3. Processamento do Resultado do DB (Garante o Retorno)
+        # 3. Processamento do Resultado do DB
         if sucesso:
             flash('Registro de glicemia salvo com sucesso!', 'success')
             return redirect(url_for(URL_SUCCESS))
@@ -869,11 +883,30 @@ def registrar_glicemia():
             flash('Erro ao salvar no banco de dados. Verifique a integridade dos dados.', 'danger')
             return redirect(url_for(URL_FAIL))
 
-    # Fora do if request.method == 'POST':
-    return render_template('registrar_glicemia.html')
+    # Lógica GET (Renderização do Formulário)
+    # -------------------------------------------------------------------------------------
+    # Aqui, a variável 'bolus_calculado' é gerada para o atributo 'value' do input 'dose_aplicada'.
+    # Isso está correto, e não precisa ser alterado.
+    # Exemplo:
+    # bolus_calculado = calcular_bolus_correcao(current_user.id, valor_glicemia_atual) 
+    # return render_template('registrar_glicemia.html', bolus_calculado=bolus_calculado)
+    # -------------------------------------------------------------------------------------
     
-# No seu arquivo app.py
+    # Se você não tem o cálculo aqui no bloco GET, o bolus_calculado no template será vazio, 
+    # mas o POST funcionará. Para ser completo:
 
+    bolus_calculado = None # Inicializa
+    
+    # 💡 Se você quiser que o bolus_calculado continue aparecendo no campo de dose ao carregar a página:
+    try:
+        # Você precisaria de um valor inicial de glicemia ou um padrão
+        glicemia_inicial = 150 # Exemplo de valor inicial, ou você obtém de um sensor
+        bolus_calculado = calcular_bolus_correcao(current_user.id, glicemia_inicial)
+    except Exception:
+        bolus_calculado = None
+    
+    return render_template('registrar_glicemia.html', bolus_calculado=bolus_calculado)
+    
 @app.route('/registrar_refeicao', methods=['GET', 'POST'])
 @login_required
 def registrar_refeicao():
