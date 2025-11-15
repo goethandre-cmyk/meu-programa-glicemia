@@ -969,10 +969,10 @@ def registrar_refeicao():
     
     return render_template('registrar_refeicao.html', alimentos=alimentos, tipos_refeicao=app_core.obter_tipos_refeicao())
     
-@app.route('/excluir_registo/<int:id>', methods=['POST'])
+@app.route('/excluir_registro/<int:id>', methods=['POST'])
 @login_required
-def excluir_registo(id):
-    registro_para_excluir = db_manager.encontrar_registo(id)
+def excluir_registro(id):
+    registro_para_excluir = db_manager.encontrar_registro(id)
     
     if not registro_para_excluir or registro_para_excluir['user_id'] != current_user.id:
         flash('Registro não encontrado ou você não tem permissão para excluí-lo.', 'danger')
@@ -990,20 +990,18 @@ def excluir_registo(id):
     
 # NO SEU ARQUIVO app.py
 
-@app.route('/editar_registo/<int:id>', methods=['GET', 'POST'])
+@app.route('/editar_registro/<int:id>', methods=['GET', 'POST'])
 @login_required
-def editar_registo(id):
+def editar_registro(id):
     # O DEBUG é importante para confirmar o contexto
     print(f"DEBUG APP: User logado ID: {current_user.id}") 
     
     # 1. Carregar o registro do banco de dados
-    registro = db_manager.encontrar_registo(id)
+    registro = db_manager.encontrar_registro(id)
     
     # 2. Verificação de segurança (Tipo Casting aplicado e aprimorado)
     registro_user_id = registro.get('user_id') if registro else None
     
-    # Esta condição falhou anteriormente devido a tipos de dados, 
-    # mas o log sugere que ela está funcionando agora se o usuário logado for ID 2.
     if not registro or int(registro_user_id) != int(current_user.id):
         flash('Registro não encontrado ou você não tem permissão para editá-lo.', 'danger')
         return redirect(url_for('registros'))
@@ -1021,24 +1019,39 @@ def editar_registo(id):
         # =========================================================
         if tipo_principal in TIPOS_DE_GLICEMIA:
             # Captura todos os campos relevantes do formulário 'editar_glicemia.html'
-            valor_glicemia = request.form.get('valor_glicemia')
+            valor_glicemia_str = request.form.get('valor_glicemia')
             data_hora_str = request.form.get('data_hora')
             observacoes = request.form.get('observacoes')
             tipo_medicao = request.form.get('tipo_medicao') 
             
-            # [ ... Seu código de Try/Except para Validação de Dados permanece o mesmo ... ]
+            # Captura o campo dose_aplicada (pode vir como string vazia ou None)
+            dose_aplicada_str = request.form.get('dose_aplicada')
+            
             try:
+                # 1. Validação e Conversão de Data/Hora
                 data_hora = datetime.fromisoformat(data_hora_str)
-                valor_glicemia = float(valor_glicemia.replace(',', '.')) 
+                
+                # 2. Conversão da Glicemia (tratando vírgula)
+                valor_glicemia = float(valor_glicemia_str.replace(',', '.'))
+                
+                # 3. Conversão da Dose Aplicada (tratando vírgula e vazio)
+                if dose_aplicada_str:
+                    dose_aplicada = float(dose_aplicada_str.replace(',', '.'))
+                else:
+                    dose_aplicada = None # Salva como NULL no DB se estiver vazio
+                    
             except (ValueError, TypeError):
-                flash('Valores de glicemia ou data/hora inválidos.', 'danger')
-                return redirect(url_for('editar_registo', id=id))
+                flash('Valores de glicemia, dose de insulina ou data/hora inválidos.', 'danger')
+                return redirect(url_for('editar_registro', id=id))
 
             # Atualiza o dicionário com os novos valores
             registro['valor'] = valor_glicemia
             registro['data_hora'] = data_hora.isoformat()
             registro['observacoes'] = observacoes
-            registro['tipo_medicao'] = tipo_medicao # Usado para salvar o valor atualizado
+            registro['tipo_medicao'] = tipo_medicao
+            
+            # 🚨 ATRIBUIÇÃO GLICEMIA: Adiciona a dose aplicada ao dicionário
+            registro['dose_aplicada'] = dose_aplicada
             
             # Tentar salvar no banco de dados
             if db_manager.atualizar_registro(registro):
@@ -1053,31 +1066,48 @@ def editar_registo(id):
         # EDICÃO DE REFEIÇÃO
         # =========================================================
         elif tipo_principal == 'Refeição':
-            # [ ... O bloco de edição de Refeição (POST) permanece o mesmo ... ]
             data_hora_str = request.form.get('data_hora')
             observacoes = request.form.get('observacoes')
             tipo_refeicao_especifica = request.form.get('tipo_refeicao') 
-            alimentos_json_str = registro.get('alimentos_json', '[]') 
+            
+            # Nota: Alimentos JSON geralmente são atualizados via JS e enviados ocultos, 
+            # mas vamos garantir a coleta dos campos
+            alimentos_json_str = request.form.get('alimentos_json_str', registro.get('alimentos_json', '[]'))
+            
+            # Captura o campo dose_aplicada (pode vir como string vazia ou None)
+            dose_aplicada_str = request.form.get('dose_aplicada')
             
             if not data_hora_str or not tipo_refeicao_especifica:
                 flash('Por favor, preencha a Data/Hora e o Tipo de Refeição.', 'danger')
-                return redirect(url_for('editar_registo', id=id))
+                return redirect(url_for('editar_registro', id=id))
             
             try:
                 data_hora = datetime.fromisoformat(data_hora_str)
+                
                 alimentos_list = json.loads(alimentos_json_str)
                 total_carbs = sum(item.get('carbs', 0) for item in alimentos_list)
                 total_calorias = sum(item.get('kcal', 0) for item in alimentos_list)
+                
+                # Conversão da Dose Aplicada (tratando vírgula e vazio)
+                if dose_aplicada_str:
+                    dose_aplicada = float(dose_aplicada_str.replace(',', '.'))
+                else:
+                    dose_aplicada = None
+                    
             except (ValueError, TypeError, json.JSONDecodeError) as e:
                 flash(f'Dados de refeição inválidos: {e}', 'danger')
-                return redirect(url_for('editar_registo', id=id))
+                return redirect(url_for('editar_registro', id=id))
 
+            # Atualiza o dicionário com os novos valores
             registro['data_hora'] = data_hora.isoformat()
             registro['observacoes'] = observacoes
             registro['alimentos_json'] = alimentos_json_str
             registro['total_carbs'] = total_carbs
             registro['total_calorias'] = total_calorias
             registro['tipo_refeicao'] = tipo_refeicao_especifica
+            
+            # 🚨 ATRIBUIÇÃO REFEIÇÃO: Adiciona a dose aplicada ao dicionário
+            registro['dose_aplicada'] = dose_aplicada
 
             if db_manager.atualizar_registro(registro):
                 flash('Registro de refeição atualizado com sucesso!', 'success')
@@ -1110,8 +1140,8 @@ def editar_registo(id):
             # Passa a lista completa de tipos de medição para o template
             tipos_medicao = app_core.obter_tipos_medicao() # Assumindo que você tem esta função
             return render_template('editar_glicemia.html', 
-                                   registro=registro, 
-                                   tipos_medicao=tipos_medicao)
+                                    registro=registro, 
+                                    tipos_medicao=tipos_medicao)
             
         elif tipo_principal == 'Refeição':
             # Lógica de Refeição

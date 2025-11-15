@@ -770,7 +770,7 @@ class DatabaseManager:
                 # Usamos DISTINCT para contar CADA PACIENTE apenas uma vez, mesmo que ele tenha múltiplos registros de alerta.
                 query = """
                     SELECT COUNT(DISTINCT paciente_id) 
-                    FROM registros_glicemia
+                    FROM registros
                     WHERE timestamp >= ? 
                     AND (glicemia < ? OR glicemia > ?);
                 """
@@ -800,7 +800,7 @@ class DatabaseManager:
                 # 2. Consultar registros onde o timestamp é maior ou igual ao limite
                 query = """
                     SELECT COUNT(*) 
-                    FROM registros_glicemia
+                    FROM registros
                     WHERE timestamp >= ?;
                 """
                 cursor.execute(query, (limite_tempo_str,))
@@ -1341,19 +1341,8 @@ class DatabaseManager:
             finally:
                 conn.close()
                     
-    def atualizar_registo(self, registro_data):
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE registros SET data_hora = ?, tipo = ?, valor = ?, observacoes = ?, alimentos_json = ?, total_calorias = ?, total_carbs = ?
-                WHERE id = ?
-            """, (registro_data['data_hora'], registro_data['tipo'], registro_data.get('valor'), registro_data.get('observacoes'), registro_data.get('alimentos_json'), registro_data.get('total_calorias'), registro_data.get('total_carbs'), registro_data['id']))
-            conn.commit()
-            return True
-    # NO database_manager.py, DENTRO da classe DatabaseManager
-    # No arquivo: database_manager.py
 
-    def encontrar_registo(self, registro_id):
+    def encontrar_registro(self, registro_id):
         """
         Busca um registro principal pelo ID na tabela 'registros', incluindo 
         detalhes de refeição. Inclui LOG de diagnóstico.
@@ -1402,10 +1391,13 @@ class DatabaseManager:
         finally:
             conn.close()
 
+# NO database_manager.py, DENTRO da classe DatabaseManager
+
     def atualizar_registro(self, registro_data):
         """
         Atualiza um registro existente no banco de dados com base no seu tipo (Glicemia ou Refeição).
         O parâmetro registro_data é um dicionário contendo 'id' e 'tipo'.
+        Inclui o campo 'dose_aplicada' para Glicemia e Refeição.
         """
         conn = None
         try:
@@ -1418,28 +1410,30 @@ class DatabaseManager:
                 print("ERRO DB: ID ou Tipo principal ausente para atualização.")
                 return False
 
-            if tipo_principal == 'Glicemia':
-                # Atualiza APENAS os campos de Glicemia + Comuns
+            if tipo_principal in ['Glicemia', 'Pre_Refeicao', 'Pos_Refeicao', 'Jejum', 'Antes_Dormir']:
+                # Atualiza campos de Glicemia + Comuns + DOSE DE INSULINA
                 sql = """
                     UPDATE registros SET 
                         data_hora = ?, 
                         observacoes = ?, 
                         valor = ?,
                         tipo = ?,
-                        tipo_medicao = ? 
+                        tipo_medicao = ?,
+                        dose_aplicada = ?  -- <-- CAMPO ADICIONADO
                     WHERE id = ?
                 """
                 params = (
                     registro_data.get('data_hora'),
                     registro_data.get('observacoes'),
                     registro_data.get('valor'),
-                    registro_data.get('tipo'),        # 'Glicemia'
-                    registro_data.get('tipo_medicao'),# Adicione se for um campo que você usa
+                    registro_data.get('tipo'),      # 'Glicemia' ou subtipo
+                    registro_data.get('tipo_medicao'),
+                    registro_data.get('dose_aplicada'), # <-- VALOR ADICIONADO
                     registro_id
                 )
             
             elif tipo_principal == 'Refeição':
-                # Atualiza APENAS os campos de Refeição + Comuns
+                # Atualiza campos de Refeição + Comuns + DOSE DE INSULINA
                 sql = """
                     UPDATE registros SET 
                         data_hora = ?, 
@@ -1448,17 +1442,19 @@ class DatabaseManager:
                         alimentos_json = ?, 
                         total_carbs = ?, 
                         total_calorias = ?,
-                        tipo_refeicao = ? 
+                        tipo_refeicao = ?,
+                        dose_aplicada = ?  -- <-- CAMPO ADICIONADO
                     WHERE id = ?
                 """
                 params = (
                     registro_data.get('data_hora'),
                     registro_data.get('observacoes'),
-                    registro_data.get('tipo'),        # 'Refeição'
+                    registro_data.get('tipo'),      # 'Refeição'
                     registro_data.get('alimentos_json'),
                     registro_data.get('total_carbs'),
                     registro_data.get('total_calorias'),
-                    registro_data.get('tipo_refeicao'), # O campo de dropdown
+                    registro_data.get('tipo_refeicao'),
+                    registro_data.get('dose_aplicada'), # <-- VALOR ADICIONADO
                     registro_id
                 )
             else:
@@ -1476,9 +1472,8 @@ class DatabaseManager:
             return False
         finally:
             if conn:
-                conn.close() # Garante que a conexão seja fechada    
+                conn.close() # Garante que a conexão seja fechada
 
-# No seu arquivo database_manager.py
 
     def excluir_registro(self, registro_id):
         """

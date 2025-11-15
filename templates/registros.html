@@ -96,13 +96,13 @@
 
                         {# COLUNA AÇÕES #}
                         <td class="action-buttons text-center">
-                            <a href="{{ url_for('editar_registo', id=registro.id) }}"
+                            <a href="{{ url_for('editar_registro', id=registro.id) }}"
                                 class="btn btn-sm btn-link text-warning p-0 me-2" data-bs-toggle="tooltip"
                                 data-bs-placement="top" title="Editar Registro">
                                 <i class="fas fa-edit fa-lg"></i>
                             </a>
 
-                            <form action="{{ url_for('excluir_registo', id=registro.id) }}" method="post"
+                            <form action="{{ url_for('excluir_registro', id=registro.id) }}" method="post"
                                 onsubmit="return confirm('Tem certeza que deseja excluir este registro?');"
                                 style="display: inline;">
                                 <button type="submit" class="btn btn-sm btn-link text-danger p-0"
