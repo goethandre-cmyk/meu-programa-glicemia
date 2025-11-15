@@ -1,5 +1,7 @@
 #========||||||APP.PY ANTIGO||||||======== """""
-
+from flask_wtf import FlaskForm
+from wtforms import StringField, FloatField, SubmitField
+from wtforms.validators import DataRequired, NumberRange
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -64,6 +66,16 @@ app.logger.setLevel(logging.INFO)
 
 # --- Inicialização das Classes ---
 db_path = os.path.join('data', 'glicemia.db')
+class AlimentoForm(FlaskForm):
+    # Os nomes dos campos devem corresponder aos nomes dos inputs no HTML original
+    nome = StringField('Alimento', validators=[DataRequired()])
+    medida_caseira = StringField('Medida Caseira', validators=[DataRequired()])
+    # Campos numéricos
+    peso_g = FloatField('Peso (g) por porção', validators=[DataRequired(), NumberRange(min=0.1)])
+    kcal = FloatField('Kcal por porção', validators=[DataRequired(), NumberRange(min=0)])
+    carbs_100g = FloatField('Carboidratos (g) por porção', validators=[DataRequired(), NumberRange(min=0)])
+    
+    submit = SubmitField('Salvar Alterações')
 
 # AVISO: Esta linha assume a existência da classe DatabaseManager. 
 # Se esta classe não estiver definida no seu ambiente, ocorrerá um erro de NameError.
@@ -1274,42 +1286,53 @@ def registrar_alimento_redirect():
 # registrar_alimento_redirect estava chamando o endpoint dela.
 # app.py (Adicione esta nova rota)
 
+
 @app.route('/editar_alimento/<int:id>', methods=['GET', 'POST'])
 @admin_only # Garante que apenas Admin ou Gestão possa editar
 def editar_alimento(id):
-    # 1. Obter os dados do alimento
-    alimento = db_manager.carregar_alimento_por_id(id) # Você precisará criar este método no db_manager
+    # 1. Instancia o formulário e carrega o alimento
+    form = AlimentoForm()
+    alimento = db_manager.carregar_alimento_por_id(id)
+
     if not alimento:
         flash('Alimento não encontrado.', 'danger')
         return redirect(url_for('alimentos'))
 
-    # 2. Lógica para POST (Salvar alterações)
-    if request.method == 'POST':
+    # 2. Lógica para POST (Salvamento) - WTForms Validation
+    if form.validate_on_submit():
         try:
-            # Coleta de dados do request.form (como você fez no adicionar_alimento)
+            # Os dados vêm diretamente do form.data (já validados e convertidos para float!)
             dados_atualizados = {
                 'id': id,
-                'alimento': request.form['nome'],
-                'medida_caseira': request.form['medida_caseira'],
-                'peso': float(request.form['peso_g'].replace(',', '.')),
-                'kcal': float(request.form['kcal'].replace(',', '.')),
-                'carbs': float(request.form['carbs_100g'].replace(',', '.'))
+                'alimento': form.nome.data,
+                'medida_caseira': form.medida_caseira.data,
+                'peso': form.peso_g.data,
+                'kcal': form.kcal.data,
+                'carbs': form.carbs_100g.data
             }
             
-            if db_manager.atualizar_alimento(dados_atualizados): # Você precisará criar este método
+            if db_manager.atualizar_alimento(dados_atualizados):
                 flash('Alimento atualizado com sucesso!', 'success')
                 return redirect(url_for('alimentos'))
             else:
-                flash('Erro ao atualizar o alimento.', 'danger')
-        except (ValueError, TypeError) as e:
-            flash('Dados do alimento inválidos. Verifique os valores numéricos.', 'danger')
-            
-        # Se houve erro no POST, recarrega o formulário com os dados originais
-        alimento = db_manager.carregar_alimento_por_id(id) 
+                flash('Erro ao atualizar o alimento no banco de dados.', 'danger')
 
-    # 3. Renderizar o formulário (GET ou erro no POST)
-    # Nota: Assumindo que você tem um template chamado 'editar_alimento.html'
-    return render_template('editar_alimento.html', alimento=alimento)
+        except Exception as e:
+            # Em caso de erro de conversão, validação ou DB
+            print(f"Erro ao salvar: {e}")
+            flash('Erro ao processar os dados do formulário.', 'danger')
+
+    # 3. Lógica para GET (Ou se a validação falhou)
+    elif request.method == 'GET':
+        # Preencher o formulário com os dados atuais do DB
+        form.nome.data = alimento['alimento']
+        form.medida_caseira.data = alimento['medida_caseira']
+        form.peso_g.data = alimento['peso']
+        form.kcal.data = alimento['kcal']
+        form.carbs_100g.data = alimento['carbs']
+
+    # 4. Renderizar o formulário (AGORA PASSANDO O FORM)
+    return render_template('editar_alimento.html', alimento=alimento, form=form)
 # --- ROTAS DE UTILIDADE ---
 
 @app.route('/refeicao')

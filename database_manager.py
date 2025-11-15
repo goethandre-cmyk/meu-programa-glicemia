@@ -1277,7 +1277,6 @@ class DatabaseManager:
             print(f"Erro ao carregar registros: {e}")
             return []
         
-   # No arquivo: database_manager.py
 
     def excluir_registro(self, registro_id):
         """
@@ -1473,7 +1472,162 @@ class DatabaseManager:
         finally:
             if conn:
                 conn.close() # Garante que a conexão seja fechada
+# --- Métodos de CRUD para ALIMENTOS (Novos e Requeridos) ---
 
+    def carregar_alimento_por_id(self, alimento_id):
+        """
+        Carrega os dados de um alimento específico usando seu ID para edição.
+        Retorna um dicionário (sqlite3.Row) ou None.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('SELECT * FROM alimentos WHERE id = ?', (alimento_id,))
+            alimento = cursor.fetchone()
+            return dict(alimento) if alimento else None
+        except sqlite3.Error as e:
+            print(f"ERRO SQL ao carregar alimento por ID: {e}")
+            return None
+        finally:
+            conn.close()
+
+    def atualizar_alimento(self, dados):
+        """
+        Atualiza um registro de alimento existente.
+        O dicionário 'dados' deve conter a chave 'id'.
+        """
+        query = """
+            UPDATE alimentos SET 
+                alimento = ?,
+                medida_caseira = ?,
+                peso = ?,
+                kcal = ?,
+                carbs = ?
+            WHERE id = ?
+        """
+        params = (
+            dados['alimento'],
+            dados['medida_caseira'],
+            dados['peso'],
+            dados['kcal'],
+            dados['carbs'],
+            dados['id']
+        )
+        
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute(query, params)
+            conn.commit()
+            return cursor.rowcount > 0 # Retorna True se alguma linha foi alterada
+        except sqlite3.Error as e:
+            print(f"ERRO SQL ao atualizar alimento {dados.get('id')}: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+            
+    def carregar_alimentos(self):
+        """
+        Carrega todos os alimentos do catálogo.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('SELECT * FROM alimentos ORDER BY alimento')
+            alimentos = cursor.fetchall()
+            return [dict(alimento) for alimento in alimentos]
+        except sqlite3.Error as e:
+            print(f"ERRO SQL ao carregar alimentos: {e}")
+            return []
+        finally:
+            conn.close()
+
+    def adicionar_alimento(self, nome, medida_caseira, peso_g, kcal, carbs_100g):
+        """ Adiciona um novo alimento ao catálogo. """
+        query = """
+            INSERT INTO alimentos (alimento, medida_caseira, peso, kcal, carbs) 
+            VALUES (?, ?, ?, ?, ?)
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute(query, (nome, medida_caseira, peso_g, kcal, carbs_100g))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"ERRO SQL ao adicionar alimento: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
+    # --- Métodos de Registros (Revisados e Mantidos) ---
+
+    # Inclua aqui os outros métodos como 'salvar_glicemia', 'excluir_registro', etc.
+    # Certifique-se de importar o 'sqlite3' no topo, se ainda não o fez.
+
+    def salvar_glicemia(self, user_id, valor_glicemia, data_hora_str, tipo_medicao, observacoes=None, dose_aplicada=None):
+        """
+        Salva um registro de glicemia, incluindo a dose de insulina aplicada, se fornecida.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+
+        query = """
+            INSERT INTO registros (user_id, tipo, valor, data_hora, tipo_medicao, observacoes, dose_aplicada) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        
+        try:
+            cursor.execute(query, (
+                user_id, 
+                'Glicemia', 
+                valor_glicemia, 
+                data_hora_str, 
+                tipo_medicao, 
+                observacoes, 
+                dose_aplicada 
+            ))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"ERRO SQL CRÍTICO ao salvar glicemia: {e}")
+            conn.rollback()
+            return False
+        except Exception as e:
+            print(f"ERRO DESCONHECIDO ao salvar glicemia: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def excluir_registro(self, registro_id):
+        """
+        Exclui um registro, incluindo todos os detalhes associados em outras tabelas.
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 1. Excluir detalhes da refeição (para evitar erro de FK)
+            cursor.execute("DELETE FROM detalhes_refeicao WHERE registro_id = ?", (registro_id,))
+            
+            # 2. Excluir o registro principal
+            cursor.execute("DELETE FROM registros WHERE id = ?", (registro_id,))
+            
+            conn.commit()
+            return True
+        
+        except sqlite3.Error as e:
+            print(f"ERRO SQL ao excluir registro {registro_id}: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
 
     def excluir_registro(self, registro_id):
         """
