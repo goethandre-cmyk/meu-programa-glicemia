@@ -117,14 +117,29 @@ class BolusService:
     
     def __init__(self, db_manager):
         self.db = db_manager 
+        # now_fn é uma função que retorna o datetime atual. Permite injeção de tempo para testes.
+        # Por compatibilidade com código existente, aceitamos que a instância possa fornecer
+        # um atributo `_now_fn` antes da criação, mas o mais simples é passar uma função
+        # via setter externo se desejado. Aqui apenas definimos o default.
+        self._now_fn = None
+
+    def set_now_fn(self, now_fn):
+        """Define uma função now_fn que retorna o datetime atual (usado em testes)."""
+        self._now_fn = now_fn
+
+    def _now(self):
+        """Retorna o datetime atual usando a função injetada ou datetime.now() por padrão."""
+        if callable(self._now_fn):
+            return self._now_fn()
+        return datetime.now()
 
     # --- RIC POR HORÁRIO ---
     def obter_ric_por_horario(self, parametros):
         HORARIO_MANHA = 6
         HORARIO_ALMOCO = 12
         HORARIO_JANTAR = 18
-        hora_atual = datetime.now().hour
-        
+        hora_atual = self._now().hour
+
         if HORARIO_MANHA <= hora_atual < HORARIO_ALMOCO:
             return parametros.get('ric_manha')
         elif HORARIO_ALMOCO <= hora_atual < HORARIO_JANTAR:
@@ -137,8 +152,8 @@ class BolusService:
         HORARIO_MANHA = 6
         HORARIO_ALMOCO = 12
         HORARIO_JANTAR = 18
-        hora_atual = datetime.now().hour
-        
+        hora_atual = self._now().hour
+
         if HORARIO_MANHA <= hora_atual < HORARIO_ALMOCO:
             return parametros.get('fsi_manha')
         elif HORARIO_ALMOCO <= hora_atual < HORARIO_JANTAR:
@@ -149,38 +164,44 @@ class BolusService:
     # --- MÉTODO PRINCIPAL ---
     def calcular_bolus_total(self, gc_atual, carboidratos, paciente_id): 
         parametros = self.db.obter_parametros_clinicos(paciente_id)
-        
+
         if not parametros or not parametros.get('glicemia_alvo'):
             return None, "Parâmetros clínicos incompletos ou ausentes."
 
         glicemia_alvo = parametros['glicemia_alvo']
-        fsi = self.obter_fsi_por_horario(parametros) or 50.0 # Valor padrão se for None
-        ric = self.obter_ric_por_horario(parametros) or 10.0 # Valor padrão se for None
-        
+
+        # Obtém FSI/RIC explicitamente; só usa valor padrão quando o retorno for None
+        fsi = self.obter_fsi_por_horario(parametros)
+        if fsi is None:
+            fsi = 50.0  # Valor padrão
+        ric = self.obter_ric_por_horario(parametros)
+        if ric is None:
+            ric = 10.0  # Valor padrão
+
         if fsi <= 0:
             return None, "FSI inválido (zero ou negativo)."
         if ric <= 0:
             return None, "RIC inválido (zero ou negativo)."
-        
+
         # Bolus Nutricional (BN)
         bolus_nutricional = carboidratos / ric
-        
+
         # Bolus de Correção (BC)
         diferenca_glicemia = gc_atual - glicemia_alvo
-        bolus_correcao_bruto = max(0, diferenca_glicemia / fsi) # Garante que a correção não é negativa
-        
+        bolus_correcao_bruto = max(0, diferenca_glicemia / fsi)  # Garante que a correção não é negativa
+
         bolus_bruto = bolus_nutricional + bolus_correcao_bruto
-        
+
         # CÁLCULO DA INSULINA ATIVA (IA)
         ia_ativa = self.calcular_insulina_ativa(paciente_id)
 
         # Bolus Final
         bolus_final = bolus_bruto - ia_ativa
-        
+
         # Arredondamento (para o 0.5 UI mais próximo) e Garantir dose mínima é 0
         dose_arredondada = round(bolus_final * 2) / 2
         bolus_total = max(0, dose_arredondada)
-        
+
         # Retorna todos os componentes
         return {
             'bolus_refeicao': round(bolus_nutricional, 1),
@@ -228,7 +249,7 @@ class BolusService:
                 if not data_aplicacao:
                     continue 
 
-                tempo_decorrido: timedelta = datetime.now() - data_aplicacao
+                tempo_decorrido: timedelta = self._now() - data_aplicacao
                 
                 # Tempo decorrido em horas
                 horas_decorridas = tempo_decorrido.total_seconds() / 3600.0

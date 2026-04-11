@@ -180,7 +180,25 @@ class DatabaseManager:
             """)
 
             conn.commit()
-            
+ # Exemplo de como você adicionaria a coluna dose_aplicada
+    def adicionar_colunas_ausentes(self):
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            # Tenta adicionar a coluna 'dose_aplicada' à tabela 'registros'
+            cursor.execute("ALTER TABLE registros ADD COLUMN dose_aplicada REAL;")
+            conn.commit()
+            print("Coluna 'dose_aplicada' adicionada com sucesso.")
+        except sqlite3.OperationalError as e:
+            # Se a coluna já existir, o SQLite lançará este erro, que pode ser ignorado
+            if "duplicate column name" in str(e):
+                pass 
+            else:
+                print(f"Erro ao tentar adicionar coluna: {e}")
+                
+        finally:
+            if conn:
+                conn.close()        
 
     def adicionar_colunas_calculo(self):
             """Adiciona colunas de cálculo de Bolus se elas não existirem."""
@@ -1117,10 +1135,23 @@ class DatabaseManager:
         except sqlite3.OperationalError:
             # Caso a tabela 'alimentos' ainda não tenha sido criada
             return []
-        
-    # No arquivo: database_manager.py
-
- # No arquivo: database_manager.py
+    
+    def carregar_alimento_por_id(self, alimento_id):
+        """Carrega um único alimento pelo ID para a rota de edição."""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # Ajuste o nome da tabela e das colunas conforme seu esquema
+            cursor.execute("SELECT * FROM alimentos WHERE id = ?", (alimento_id,))
+            alimento = cursor.fetchone() 
+            conn.close()
+            
+            # Retorna o alimento encontrado (ou None)
+            return alimento
+        except Exception as e:
+            print(f"Erro ao carregar alimento por ID: {e}")
+            return None
 
     def salvar_refeicao(self, user_id, data_hora_str, tipo_refeicao, total_carbs, total_kcal, alimentos_selecionados_json, dose_aplicada=None, observacoes=None):
         """
@@ -1215,6 +1246,33 @@ class DatabaseManager:
             except Exception as e:
                 print(f"Erro CRÍTICO na busca de alimentos: {e}")
                 return []
+
+    def atualizar_alimento(self, id, alimento, medida_caseira, peso, carbs, kcal):
+        """Atualiza um registro de alimento existente no banco de dados."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # A query UPDATE é usada para alterar dados existentes
+            cursor.execute("""
+                UPDATE alimentos
+                SET 
+                    alimento = ?, 
+                    medida_caseira = ?, 
+                    peso= ?, 
+                    carbs = ?, 
+                    kcal= ?
+                WHERE id = ?
+            """, (alimento, medida_caseira, peso, carbs, kcal, id))
+            
+            conn.commit()
+            return True # Indica sucesso na operação
+            
+        except Exception as e:
+            print(f"Erro ao atualizar alimento: {e}")
+            return False # Indica falha na operação
+        finally:
+            self.close_connection(conn)
 
     def salvar_registro(self, registro_data):
         try:

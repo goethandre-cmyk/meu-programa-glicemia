@@ -349,6 +349,21 @@ class DatabaseManager:
             cursor.execute("INSERT OR IGNORE INTO fichas_medicas (paciente_id) VALUES (?)", (paciente_id,))
             conn.commit()
 
+
+# ------------------------------------------------------
+# Compat layer: usar a implementação canônica de DatabaseManager
+# (evita divergência entre versões e permite migração incremental)
+# ------------------------------------------------------
+try:
+    from database_manager import DatabaseManager as CanonicalDatabaseManager
+    # Substitui o símbolo DatabaseManager local pela implementação canônica
+    DatabaseManager = CanonicalDatabaseManager
+    # Indica via comentário que a versão local permanece apenas por referência
+    # (as implementações antigas continuam no arquivo para auditoria).
+except Exception:
+    # Se a importação falhar, mantemos a classe local existente.
+    pass
+
 class AuthManager:
     # ... (o restante da sua classe AuthManager) ...
     def __init__(self, db_manager):

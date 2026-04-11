@@ -15,10 +15,16 @@ import numpy as np
 import os
 from relatorios import relatorios_bp
 from service_manager import formatar_registros_para_exibicao 
-from db_instance import db_manager # <--- Use esta instância!
+from db_adapter import db as db_adapter_db
+# Compat: manter a variável `db_manager` para evitar que milhares de referências que
+# usam esse nome quebrem ao mesmo tempo. O adaptador delega para a instância canônica.
+db_manager = db_adapter_db
 from models import User 
 from service_manager import BolusService
 from service_manager import get_hba1c_class, get_jejum_class
+from flask_wtf import FlaskForm
+from wtforms import StringField, FloatField, SubmitField, HiddenField
+from wtforms.validators import DataRequired, NumberRange
 # A LINHA 'from db_manager import DatabaseManager' foi removida se você usa 'db_instance'
 
 bolus_service = BolusService(db_manager) 
@@ -77,47 +83,10 @@ class AlimentoForm(FlaskForm):
     
     submit = SubmitField('Salvar Alterações')
 
-# AVISO: Esta linha assume a existência da classe DatabaseManager. 
-# Se esta classe não estiver definida no seu ambiente, ocorrerá um erro de NameError.
-try:
-    from database_manager import DatabaseManager
-    db_manager = DatabaseManager()
-except ImportError:
-    app.logger.error("A classe DatabaseManager não foi encontrada. Substitua com sua implementação real.")
-    # Adicionar um mock para evitar quebra total, mas o código não funcionará corretamente sem o DB
-    class MockDatabaseManager:
-        def carregar_usuario(self, username): return None
-        def carregar_usuario_por_id(self, user_id): return None
-        def salvar_log_acao(self, acao, usuario): pass
-        def carregar_registros(self, user_id): return []
-        def carregar_alimentos(self): return []
-        def encontrar_registro(self, id): return None
-        def excluir_registro(self, id): return False
-        def atualizar_registro(self, registro): return False
-        def carregar_todos_os_usuarios(self, perfil=None): return []
-        def carregar_medicos(self): return []
-        def atualizar_usuario(self, usuario): return False
-        def excluir_usuario(self, username): return False
-        def salvar_usuario(self, novo_usuario): return True
-        def obter_pacientes_por_medico(self, medico_id): return []
-        def medico_tem_acesso_a_paciente(self, medico_id, paciente_id): return True
-        def carregar_ficha_medica(self, paciente_id): return {}
-        def salvar_ficha_medica(self, ficha_data): return True
-        def buscar_agendamentos_paciente(self, paciente_id): return []
-        def atualizar_status_agendamento(self, agendamento_id, status): return True
-        def buscar_todos_agendamentos(self): return []
-        def get_user_id_by_username(self, username): return 1
-        def salvar_agendamento(self, paciente_id, medico_id, data_hora, obs): return True
-        def carregar_todos_os_usuarios(self, perfil=None): return []
-        def carregar_cuidadores(self): return []
-        def vincular_paciente_medico(self, paciente_id, medico_id): return True
-        def salvar_alimento(self, alimento_data): return True
-        def excluir_alimento(self, id): return True
-        def buscar_exames_paciente(self, paciente_id): return []
-        def salvar_exame_laboratorial(self, exame_data): return True
-        def vincular_cuidador_paciente(self, cuidador_username, paciente_username): return True
-
-    db_manager = MockDatabaseManager()
+# Usamos o adaptador `db_adapter.db` como fonte canônica de acesso ao DB.
+# Se for necessário instanciar diretamente a implementação canônica, faça em um
+# local de inicialização controlado (scripts/deploy). Manter o adaptador evita
+# duplicação de mocks embutidos aqui.
 
 
 login_manager = LoginManager()
@@ -128,6 +97,16 @@ login_manager.login_view = 'login'
 # Adiciona a função ao ambiente Jinja2 (para usar em templates)
 app.jinja_env.globals['from_json'] = json.loads
 
+class AlimentoForm(FlaskForm):
+    # Você pode adicionar os campos que deseja editar
+    alimento = StringField('Nome do Alimento', validators=[DataRequired()])
+    medida_caseira = StringField('Medida Caseira', validators=[DataRequired()])
+    peso = FloatField('Peso (g)', validators=[DataRequired(), NumberRange(min=0.1)])
+    carbs = FloatField('Carboidratos (g)', validators=[DataRequired(), NumberRange(min=0)])
+    kcal = FloatField('Calorias (kcal)', validators=[DataRequired(), NumberRange(min=0)])
+    
+    submit = SubmitField('Salvar Alterações')
+    
 # Adiciona o filtro para JSON
 def from_json_filter(json_string):
     if json_string:
@@ -208,7 +187,9 @@ class AppCore:
 
     def carregar_dados_analise(self, user_id):
         # Implementação da função de análise
-        pass
+        # Método obsoleto/placeholder: removido o corpo para limpeza. Se precisar
+        # reimplementar, favor mover para um serviço dedicado (AppCoreAnalysis).
+        raise NotImplementedError("carregar_dados_analise foi removido; implemente em um serviço separado se necessário.")
 
     def obter_tipos_medicao(self):
             """
@@ -782,6 +763,7 @@ def vincular_cuidador_paciente():
         
     return redirect(url_for('gerenciar_usuarios'))
 
+# ~~~~ | ROTAS VINCULAR CUIDADOR | ~~~~
 @app.route('/vincular_cuidador/<username>')
 @login_required
 def vincular_cuidador(username):
@@ -798,27 +780,20 @@ def vincular_cuidador(username):
     
     return render_template('vincular_cuidador.html', paciente=paciente, cuidadores=cuidadores)
 
-
-# --- ROTAS DE REGISTRO DO PACIENTE ---
-
+# ~~~~ | ROTAS DE REGISTRO DO PACIENTE | ~~~~
 @app.route('/registros')
 @login_required
 def registros():
-    # 1. Busca os dados brutos (usando a função correta: carregar_registros)
     registros_brutos = db_manager.carregar_registros(current_user.id) 
-    
-    # 2. CHAMADA AO SERVIÇO: Formata os dados
     registros_prontos = formatar_registros_para_exibicao(registros_brutos)
     
-    # 3. Envia os dados LIMPOS e PRONTOS para o template
-    # ✅ CORRIGIDO: get_status_class agora é um argumento da função render_template.
     return render_template(
         'registros.html', 
         registros=registros_prontos,
         get_status_class=get_status_class 
     )
 
-
+# ~~~~| Rota Registrar Glicemia |~~~
 @app.route('/registrar_glicemia', methods=['GET', 'POST'])
 @login_required
 def registrar_glicemia():
@@ -826,10 +801,8 @@ def registrar_glicemia():
     URL_FAIL = 'registrar_glicemia' 
     URL_SUCCESS = 'registros' 
 
-    # Lógica para processar o formulário (POST)
     if request.method == 'POST':
         
-        # 1. Leitura e Validação de Formato
         valor = request.form.get('valor')
         data_hora_str = request.form.get('data_hora')
         tipo = request.form.get('tipo') 
@@ -847,17 +820,13 @@ def registrar_glicemia():
         except (ValueError, TypeError):
             flash('Valores inválidos para glicemia, dose aplicada ou data/hora.', 'danger')
             return redirect(url_for(URL_FAIL))
-        
-        # 🚨 NOVO CÓDIGO: RECÁLCULO DO BÓLUS SUGERIDO NO POST 🚨
-        # Assumindo que você tem acesso ao 'calcular_bolus_correcao'
-        # Você deve definir esta função ou importá-la corretamente.
+                
         try:
             bolus_sugerido = calcular_bolus_correcao(current_user.id, valor_glicemia)
         except Exception:
-             # Em caso de erro (ex: parâmetros não definidos), trata como 0
+             
             bolus_sugerido = 0 
         
-        # 🚨 NOVO CÓDIGO: INSERIR O BÓLUS SUGERIDO NA OBSERVAÇÃO 🚨
         if bolus_sugerido is not None and bolus_sugerido > 0:
             info_bolus = f"Bólus Sugerido: {bolus_sugerido:.1f}U."
             if observacao:
@@ -866,18 +835,16 @@ def registrar_glicemia():
             else:
                 # Se o campo estava vazio, usa o sugerido
                 observacao = info_bolus
-        # -------------------------------------------------------------
-
+       
         print(f"DEBUG: Tentando salvar para o user_id: {current_user.id}")
 
-        # 2. Chamada da Função de Salvamento (A variável 'observacao' agora tem a dose sugerida)
         try:
             sucesso = db_manager.salvar_glicemia(
                 current_user.id, 
                 valor_glicemia, 
                 data_hora.isoformat(), 
                 tipo, 
-                observacao, # AGORA ESTA VARIÁVEL TEM A DOSE SUGERIDA
+                observacao,
                 dose_aplicada=dose_aplicada
             )
             
@@ -895,21 +862,9 @@ def registrar_glicemia():
             flash('Erro ao salvar no banco de dados. Verifique a integridade dos dados.', 'danger')
             return redirect(url_for(URL_FAIL))
 
-    # Lógica GET (Renderização do Formulário)
-    # -------------------------------------------------------------------------------------
-    # Aqui, a variável 'bolus_calculado' é gerada para o atributo 'value' do input 'dose_aplicada'.
-    # Isso está correto, e não precisa ser alterado.
-    # Exemplo:
-    # bolus_calculado = calcular_bolus_correcao(current_user.id, valor_glicemia_atual) 
-    # return render_template('registrar_glicemia.html', bolus_calculado=bolus_calculado)
-    # -------------------------------------------------------------------------------------
-    
-    # Se você não tem o cálculo aqui no bloco GET, o bolus_calculado no template será vazio, 
-    # mas o POST funcionará. Para ser completo:
-
+#~~~~~~~|Calcular Bolus |~~~~~~~~
     bolus_calculado = None # Inicializa
-    
-    # 💡 Se você quiser que o bolus_calculado continue aparecendo no campo de dose ao carregar a página:
+
     try:
         # Você precisaria de um valor inicial de glicemia ou um padrão
         glicemia_inicial = 150 # Exemplo de valor inicial, ou você obtém de um sensor
@@ -918,7 +873,8 @@ def registrar_glicemia():
         bolus_calculado = None
     
     return render_template('registrar_glicemia.html', bolus_calculado=bolus_calculado)
-    
+
+#~~~~~~~| Registrar Reifeição |~~~~~~~~
 @app.route('/registrar_refeicao', methods=['GET', 'POST'])
 @login_required
 def registrar_refeicao():
@@ -1210,7 +1166,7 @@ def editar_registro(id):
 
 @app.route('/alimentos')
 @login_required
-@admin_only # Use o decorador que criamos para restringir acesso
+@admin_only# Use o decorador que criamos para restringir acesso
 def alimentos():
     # Lógica para carregar todos os alimentos do DB para a tabela de edição
     alimentos = db_manager.carregar_alimentos() # Exemplo
@@ -1252,11 +1208,11 @@ def adicionar_alimento():
             
             # Novo alimento usa o nome das colunas do DB
             novo_alimento = {
-                'alimento': nome,
+                'alimento': alimento,
                 'medida_caseira': medida_caseira,
-                'peso': peso_g, # Peso da porção em g
+                'peso': peso, # Peso da porção em g
                 'kcal': kcal, # Kcal na porção
-                'carbs': carbs_100g # Carbs na porção (assumindo que o frontend envia o valor final)
+                'carbs': carbs # Carbs na porção (assumindo que o frontend envia o valor final)
             }
             
             if db_manager.salvar_alimento(novo_alimento):
@@ -1288,50 +1244,63 @@ def registrar_alimento_redirect():
 
 
 @app.route('/editar_alimento/<int:id>', methods=['GET', 'POST'])
-@admin_only # Garante que apenas Admin ou Gestão possa editar
+@login_required
+# @medico_required # <- Descomente este decorator se você tiver ele definido
 def editar_alimento(id):
-    # 1. Instancia o formulário e carrega o alimento
-    form = AlimentoForm()
+    # Carrega o alimento
     alimento = db_manager.carregar_alimento_por_id(id)
 
+    # Verificação de existência
     if not alimento:
         flash('Alimento não encontrado.', 'danger')
         return redirect(url_for('alimentos'))
 
-    # 2. Lógica para POST (Salvamento) - WTForms Validation
+    # Instancia o formulário
+    form = AlimentoForm()
+
+    # Processa o envio do formulário (POST)
     if form.validate_on_submit():
         try:
-            # Os dados vêm diretamente do form.data (já validados e convertidos para float!)
             dados_atualizados = {
                 'id': id,
-                'alimento': form.nome.data,
+                # tente mapear ambos os nomes possíveis para compatibilidade
+                'alimento': getattr(form, 'alimento', getattr(form, 'nome', None)).data if (hasattr(form, 'alimento') or hasattr(form, 'nome')) else None,
                 'medida_caseira': form.medida_caseira.data,
-                'peso': form.peso_g.data,
-                'kcal': form.kcal.data,
-                'carbs': form.carbs_100g.data
+                'peso': getattr(form, 'peso', getattr(form, 'peso_g', None)).data if (hasattr(form, 'peso') or hasattr(form, 'peso_g')) else None,
+                'carbs': getattr(form, 'carbs', getattr(form, 'carbs_100g', None)).data if (hasattr(form, 'carbs') or hasattr(form, 'carbs_100g')) else None,
+                'kcal': getattr(form, 'kcal', None).data if hasattr(form, 'kcal') else None,
             }
-            
+
             if db_manager.atualizar_alimento(dados_atualizados):
                 flash('Alimento atualizado com sucesso!', 'success')
                 return redirect(url_for('alimentos'))
             else:
-                flash('Erro ao atualizar o alimento no banco de dados.', 'danger')
+                flash('Erro: Nenhuma alteração salva ou erro no banco de dados.', 'danger')
 
         except Exception as e:
-            # Em caso de erro de conversão, validação ou DB
-            print(f"Erro ao salvar: {e}")
-            flash('Erro ao processar os dados do formulário.', 'danger')
+            flash(f'Erro ao processar a atualização: {e}', 'danger')
 
-    # 3. Lógica para GET (Ou se a validação falhou)
-    elif request.method == 'GET':
-        # Preencher o formulário com os dados atuais do DB
-        form.nome.data = alimento['alimento']
-        form.medida_caseira.data = alimento['medida_caseira']
-        form.peso_g.data = alimento['peso']
-        form.kcal.data = alimento['kcal']
-        form.carbs_100g.data = alimento['carbs']
+    # Preencher o formulário com os dados atuais do DB (GET ou falha)
+    if request.method == 'GET':
+        # Tenta preencher ambos os conjuntos de nomes de campo para compatibilidade
+        try:
+            if hasattr(form, 'nome'):
+                form.nome.data = alimento.get('alimento')
+            if hasattr(form, 'alimento'):
+                form.alimento.data = alimento.get('alimento')
+            if hasattr(form, 'peso_g'):
+                form.peso_g.data = alimento.get('peso')
+            if hasattr(form, 'peso'):
+                form.peso.data = alimento.get('peso')
+            if hasattr(form, 'carbs_100g'):
+                form.carbs_100g.data = alimento.get('carbs')
+            if hasattr(form, 'carbs'):
+                form.carbs.data = alimento.get('carbs')
+            if hasattr(form, 'kcal'):
+                form.kcal.data = alimento.get('kcal')
+        except Exception:
+            pass
 
-    # 4. Renderizar o formulário (AGORA PASSANDO O FORM)
     return render_template('editar_alimento.html', alimento=alimento, form=form)
 # --- ROTAS DE UTILIDADE ---
 
@@ -1419,10 +1388,44 @@ def calculadora_bolus():
 
 # |||||| ---------Calcular FS --------- |||||||#
 
-@app.route('/calcular_fs')
+@app.route('/calcular_fs', methods=['GET', 'POST'])
 @login_required
 def calcular_fs():
-    return render_template('calcular_fs.html')
+    resultado_fs = None # Inicializa o resultado
+
+    if request.method == 'POST':
+        try:
+            # 1. Coleta e Converte os Dados
+            # Garanta que os nomes dos campos correspondem ao seu HTML
+            glicemia_atual = float(request.form.get('glicemia_atual'))
+            tipo_calculo = request.form.get('tipo_calculo') 
+            
+            # (Exemplo) Coleta dados específicos para FS ou Razão IC
+            if tipo_calculo == 'fs':
+                glicemia_alvo = float(request.form.get('glicemia_alvo'))
+                insulina_aplicada = float(request.form.get('insulina_aplicada'))
+                
+                # 2. Realiza o Cálculo do Fator de Sensibilidade (FS)
+                # Fórmula de exemplo: FS = (Glicemia Atual - Glicemia Alvo) / Insulina
+                if insulina_aplicada > 0:
+                    resultado_fs = (glicemia_atual - glicemia_alvo) / insulina_aplicada
+                    flash(f'O seu Fator de Sensibilidade calculado é: {resultado_fs:.2f}', 'success')
+                else:
+                    flash('Erro no cálculo: A insulina aplicada deve ser maior que zero.', 'danger')
+                    
+            # ... (adicionar lógica para calcular Razão IC, se necessário)
+            
+            # 🚨 Mantenha o resultado na tela (NÃO REDIRECIONE AQUI!)
+            # Se você quisesse salvar no DB: db_manager.salvar_fs(current_user.id, resultado_fs)
+            
+        except ValueError:
+            flash('Erro: Por favor, insira valores numéricos válidos.', 'danger')
+        except Exception as e:
+            flash(f'Erro interno no cálculo: {e}', 'danger')
+
+    # 3. Renderiza o Template, PASSANDO O RESULTADO
+    # O template 'calcular_fs.html' usará a variável 'resultado_fs' para exibir o valor.
+    return render_template('calcular_fs.html', resultado_fs=resultado_fs)
 
 @app.route('/guia_insulina')
 @login_required
@@ -1464,16 +1467,16 @@ def buscar_alimentos():
         medida_caseira = item_db.get('medida_caseira', 'Porção')
         
         # Lógica de Cálculo: Usando o peso da porção e o valor por 100g
-        carbs_porcao = (carbs_100g_base * peso_porcao) / 100
-        kcal_porcao = (kcal_100g_base * peso_porcao) / 100
+        carbs = (carbs_100g_base * peso_porcao) / 100
+        kcal = (kcal_100g_base * peso_porcao) / 100
         
         # Monta o dicionário de SAÍDA (o que o JavaScript espera)
         resultados_finais.append({
-            'nome': nome_alimento,          # O JS usa esta chave
+            'nome': alimento,          # O JS usa esta chave
             'medida_caseira': medida_caseira,
-            'peso_g': peso_porcao,          # O JS usa esta chave
-            'carbs_porcao': carbs_porcao,   # O JS usa esta chave
-            'kcal_porcao': kcal_porcao      # O JS usa esta chave
+            'peso': peso,          # O JS usa esta chave
+            'carbs': carbs,   # O JS usa esta chave
+            'kcal': kcal      # O JS usa esta chave
         })
         
     return jsonify({'resultados': resultados_finais})
