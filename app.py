@@ -37,39 +37,52 @@ app.secret_key = 'sua_chave_secreta_aqui'
 
 def get_glicemia_class(valor):
     """Retorna a classe CSS baseada no valor da glicemia."""
-    if valor is None:
-        return 'bg-secondary'
     try:
-        v = float(str(valor).replace(',', '.'))
-        if v < 70: return 'bg-danger'
-        if v <= 140: return 'bg-success'
-        if v <= 180: return 'bg-warning'
-        return 'bg-danger'
-    except (ValueError, TypeError):
-        return 'bg-secondary'
+        from archive.archived_functions_batch7 import get_glicemia_class_original
+        return get_glicemia_class_original(valor)
+    except Exception:
+        if valor is None:
+            return 'bg-secondary'
+        try:
+            v = float(str(valor).replace(',', '.'))
+            if v < 70:
+                return 'bg-danger'
+            if v <= 140:
+                return 'bg-success'
+            if v <= 180:
+                return 'bg-warning'
+            return 'bg-danger'
+        except (ValueError, TypeError):
+            return 'bg-secondary'
 
 def get_agendamento_class(status):
     """Mapeia o status do agendamento para a classe de cor Bootstrap."""
-    if not status:
-        return 'light'
-    s = str(status).lower()
-    mapa = {
-        'agendado': 'info',
-        'confirmado': 'success',
-        'cancelado': 'danger',
-        'realizado': 'secondary'
-    }
-    return mapa.get(s, 'light')
+    try:
+        from archive.archived_functions_batch7 import get_agendamento_class_original
+        return get_agendamento_class_original(status)
+    except Exception:
+        if not status:
+            return 'light'
+        s = str(status).lower()
+        mapa = {
+            'agendado': 'info',
+            'confirmado': 'success',
+            'cancelado': 'danger',
+            'realizado': 'secondary'
+        }
+        return mapa.get(s, 'light')
 
 def get_status_class(value):
     """Wrapper de compatibilidade que decide qual lógica usar baseada no tipo do valor."""
     try:
-        # Se for conversível para número, trata como glicemia
-        float(str(value).replace(',', '.'))
-        return get_glicemia_class(value)
-    except (ValueError, TypeError):
-        # Caso contrário, trata como texto de status
-        return get_agendamento_class(value)
+        from archive.archived_functions_batch7 import get_status_class_original
+        return get_status_class_original(value)
+    except Exception:
+        try:
+            float(str(value).replace(',', '.'))
+            return get_glicemia_class(value)
+        except (ValueError, TypeError):
+            return get_agendamento_class(value)
 
 class AlimentoForm(FlaskForm):
     alimento = StringField('Nome do Alimento', validators=[DataRequired()])
@@ -81,14 +94,16 @@ class AlimentoForm(FlaskForm):
 
 # Filtro/Função para converter JSON em lista/dicionário nos templates
 def from_json_filter(json_string):
-    if json_string:
-        try:
-            # Tenta decodificar a string JSON
-            return json.loads(json_string)
-        except (json.JSONDecodeError, TypeError):
-            # Se a string não for um JSON válido ou for None
-            return []
-    return []
+    try:
+        from archive.archived_functions_batch7 import from_json_filter_original
+        return from_json_filter_original(json_string)
+    except Exception:
+        if json_string:
+            try:
+                return json.loads(json_string)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return []
 
 # Configurações Jinja2
 app.jinja_env.cache = {} 
