@@ -30,12 +30,18 @@ class CanonicalDB:
 
         candidates: lista de nomes de método possíveis no DB real.
         """
-        for name in candidates:
-            if hasattr(self._db, name):
-                func = getattr(self._db, name)
-                if callable(func):
-                    return func(*args, **kwargs)
-        raise NotImplementedError(f"Nenhum dos métodos {candidates} implementado no db_manager")
+        try:
+            # Delegamos à cópia arquivada para facilitar remoção futura
+            from archive.archived_functions_batch2 import _call_original
+            return _call_original(self._db, candidates, *args, **kwargs)
+        except Exception:
+            # Fallback: comportamento original em caso de problema com archive
+            for name in candidates:
+                if hasattr(self._db, name):
+                    func = getattr(self._db, name)
+                    if callable(func):
+                        return func(*args, **kwargs)
+            raise NotImplementedError(f"Nenhum dos métodos {candidates} implementado no db_manager")
 
     # Método canônico: obter_parametros_clinicos
     def obter_parametros_clinicos(self, user_id: int):

@@ -1,10 +1,24 @@
 # service_manager.py
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import math 
 
-from datetime import datetime, timedelta 
-# Garanta que o 'datetime' e 'timedelta' estão importados, se você os usa.
+def parse_data_hora(data_hora_str):
+    """Centraliza a conversão de strings de data/hora para objetos datetime."""
+    if not data_hora_str or not isinstance(data_hora_str, str):
+        return None
+    
+    try:
+        if 'T' in data_hora_str:
+            # Suporta ISO format e Zulu
+            return datetime.fromisoformat(data_hora_str.replace('Z', '+00:00'))
+        elif len(data_hora_str) >= 19:
+            return datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M:%S')
+        else:
+            # Formato sem segundos
+            return datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M')
+    except ValueError:
+        return None
 
 def formatar_registros_para_exibicao(registros_brutos):
     """
@@ -19,18 +33,9 @@ def formatar_registros_para_exibicao(registros_brutos):
         reg = dict(registro_row) 
         
         # --- 1. CONVERSÃO DE DATA E HORA ---
-        data_hora_str = reg.get('data_hora')
-        if data_hora_str and isinstance(data_hora_str, str):
-            try:
-                # Tentativa de converter formatos comuns ('T' ou ' ')
-                if 'T' in data_hora_str:
-                    reg['data_hora'] = datetime.fromisoformat(data_hora_str.replace('Z', '+00:00')) # Suporta Zulu/ISO
-                elif len(data_hora_str) >= 19:
-                    reg['data_hora'] = datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M:%S')
-                else: # Trata o formato sem segundos
-                    reg['data_hora'] = datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M')
-            except ValueError:
-                pass 
+        dt_convertido = parse_data_hora(reg.get('data_hora'))
+        if dt_convertido:
+            reg['data_hora'] = dt_convertido
         
         # --- 2. CLASSIFICAÇÃO DE TIPO (FINAL E INDEPENDENTE) ---
         tipo_bruto = reg.get('tipo', 'Outro')
@@ -115,6 +120,11 @@ class BolusService:
     # Duração de Ação Máxima da insulina (4h para ultrarrápida é um bom padrão)
     DOA_MAX_HORAS = 4.0 
     
+    # Definição de faixas horárias
+    HORA_MANHA = 6
+    HORA_ALMOCO = 12
+    HORA_JANTAR = 18
+
     def __init__(self, db_manager):
         self.db = db_manager 
         # now_fn é uma função que retorna o datetime atual. Permite injeção de tempo para testes.
@@ -133,33 +143,24 @@ class BolusService:
             return self._now_fn()
         return datetime.now()
 
+    def _obter_parametro_por_horario(self, parametros, prefixo):
+        """Método auxiliar para evitar repetição de lógica de fsi/ric por horário."""
+        hora_atual = self._now().hour
+        
+        if self.HORA_MANHA <= hora_atual < self.HORA_ALMOCO:
+            return parametros.get(f'{prefixo}_manha')
+        elif self.HORA_ALMOCO <= hora_atual < self.HORA_JANTAR:
+            return parametros.get(f'{prefixo}_almoco')
+        else:
+            return parametros.get(f'{prefixo}_jantar')
+
     # --- RIC POR HORÁRIO ---
     def obter_ric_por_horario(self, parametros):
-        HORARIO_MANHA = 6
-        HORARIO_ALMOCO = 12
-        HORARIO_JANTAR = 18
-        hora_atual = self._now().hour
-
-        if HORARIO_MANHA <= hora_atual < HORARIO_ALMOCO:
-            return parametros.get('ric_manha')
-        elif HORARIO_ALMOCO <= hora_atual < HORARIO_JANTAR:
-            return parametros.get('ric_almoco')
-        else:
-            return parametros.get('ric_jantar')
+        return self._obter_parametro_por_horario(parametros, 'ric')
 
     # --- FSI POR HORÁRIO ---
     def obter_fsi_por_horario(self, parametros):
-        HORARIO_MANHA = 6
-        HORARIO_ALMOCO = 12
-        HORARIO_JANTAR = 18
-        hora_atual = self._now().hour
-
-        if HORARIO_MANHA <= hora_atual < HORARIO_ALMOCO:
-            return parametros.get('fsi_manha')
-        elif HORARIO_ALMOCO <= hora_atual < HORARIO_JANTAR:
-            return parametros.get('fsi_almoco')
-        else:
-            return parametros.get('fsi_jantar')
+        return self._obter_parametro_por_horario(parametros, 'fsi')
 
     # --- MÉTODO PRINCIPAL ---
     def calcular_bolus_total(self, gc_atual, carboidratos, paciente_id): 
@@ -229,7 +230,8 @@ class BolusService:
             return 0.0
         
         for dose in doses_recentes:
-            dose_ui = dose.get('dose_insulina', 0.0)
+            # Aceita múltiplos nomes históricos para a chave da dose
+            dose_ui = dose.get('dose_aplicada') or dose.get('dose_insulina') or dose.get('dose') or 0.0
             data_aplicacao_str = dose.get('data_hora')
             
             if dose_ui <= 0.0 or not data_aplicacao_str:

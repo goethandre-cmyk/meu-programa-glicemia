@@ -1,113 +1,85 @@
 #========||||||APP.PY ANTIGO||||||======== """""
-from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, SubmitField
-from wtforms.validators import DataRequired, NumberRange
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
-from functools import wraps
 import json
 import logging
-import plotly.graph_objects as go
-import numpy as np
 import os
-from relatorios import relatorios_bp
-from service_manager import formatar_registros_para_exibicao 
-from db_adapter import db as db_adapter_db
-# Compat: manter a variável `db_manager` para evitar que milhares de referências que
-# usam esse nome quebrem ao mesmo tempo. O adaptador delega para a instância canônica.
-db_manager = db_adapter_db
-from models import User 
-from service_manager import BolusService
-from service_manager import get_hba1c_class, get_jejum_class
+from datetime import datetime, timedelta
+from functools import wraps
+
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
+from werkzeug.security import generate_password_hash, check_password_hash
 from wtforms import StringField, FloatField, SubmitField, HiddenField
 from wtforms.validators import DataRequired, NumberRange
-# A LINHA 'from db_manager import DatabaseManager' foi removida se você usa 'db_instance'
 
+from relatorios import relatorios_bp
+from service_manager import (
+    formatar_registros_para_exibicao, 
+    parse_data_hora,
+    BolusService,
+    get_hba1c_class,
+    get_jejum_class
+)
+from db_adapter import db as db_adapter_db
+from models import User 
+
+# Singleton do banco de dados
+db_manager = db_adapter_db
 bolus_service = BolusService(db_manager) 
+
 INSULINAS_DISPONIVEIS = {
     'Asparte (Fiasp/NovoLog)': 'Rápida',
     'Lispro (Humalog)': 'Rápida',
-    'Degludeca (Tresiba)': 'Basal Ultralonga',
-    'Detemir (Levemir)': 'Basal Longa',
-    'Glargina (Lantus)': 'Basal Longa',
-    'Humana Regular': 'Regular',
-    'Humana NPH': 'Basal Intermediária',
-    'Xultophy (Associação Degludeca/Liraglutida)': 'Basal Ultralonga' # Assumindo que a dose basal é o foco
 }
 
 app = Flask(__name__)
+app.secret_key = 'sua_chave_secreta_aqui'
 
+def get_glicemia_class(valor):
+    """Retorna a classe CSS baseada no valor da glicemia."""
+    if valor is None:
+        return 'bg-secondary'
+    try:
+        v = float(str(valor).replace(',', '.'))
+        if v < 70: return 'bg-danger'
+        if v <= 140: return 'bg-success'
+        if v <= 180: return 'bg-warning'
+        return 'bg-danger'
+    except (ValueError, TypeError):
+        return 'bg-secondary'
 
-def get_status_class(status):
+def get_agendamento_class(status):
     """Mapeia o status do agendamento para a classe de cor Bootstrap."""
-    status = status.lower() # Garante que a comparação seja insensível a maiúsculas/minúsculas
-    if status == 'agendado':
-        return 'info'
-    elif status == 'confirmado':
-        return 'success'
-    elif status == 'cancelado':
-        return 'danger'
-    elif status == 'realizado':
-        return 'secondary'
-    return 'light' # Cor padrão/fallback
+    if not status:
+        return 'light'
+    s = str(status).lower()
+    mapa = {
+        'agendado': 'info',
+        'confirmado': 'success',
+        'cancelado': 'danger',
+        'realizado': 'secondary'
+    }
+    return mapa.get(s, 'light')
 
-app.jinja_env.globals.update(get_status_class=get_status_class)
-
-# CONFIGURAÇÃO CRÍTICA PARA DESATIVAR O CACHE DE TEMPLATE EM DESENVOLVIMENTO
-# Isso garante que o Jinja2 não armazene o HTML antigo.
-app.jinja_env.cache = {} 
-app.jinja_env.globals.update(get_hba1c_class=get_hba1c_class)
-app.jinja_env.globals.update(get_jejum_class=get_jejum_class)
-
-# Após a inicialização do Flask e antes das rotas
-app.register_blueprint(relatorios_bp)
-# OU, se quiser um prefixo de URL:
-# app.register_blueprint(relatorios_bp, url_prefix='/relatorios')
-app.secret_key = 'sua_chave_secreta_aqui' 
-app.logger.setLevel(logging.INFO)
-
-# --- Inicialização das Classes ---
-db_path = os.path.join('data', 'glicemia.db')
-class AlimentoForm(FlaskForm):
-    # Os nomes dos campos devem corresponder aos nomes dos inputs no HTML original
-    nome = StringField('Alimento', validators=[DataRequired()])
-    medida_caseira = StringField('Medida Caseira', validators=[DataRequired()])
-    # Campos numéricos
-    peso_g = FloatField('Peso (g) por porção', validators=[DataRequired(), NumberRange(min=0.1)])
-    kcal = FloatField('Kcal por porção', validators=[DataRequired(), NumberRange(min=0)])
-    carbs_100g = FloatField('Carboidratos (g) por porção', validators=[DataRequired(), NumberRange(min=0)])
-    
-    submit = SubmitField('Salvar Alterações')
-
-# Usamos o adaptador `db_adapter.db` como fonte canônica de acesso ao DB.
-# Se for necessário instanciar diretamente a implementação canônica, faça em um
-# local de inicialização controlado (scripts/deploy). Manter o adaptador evita
-# duplicação de mocks embutidos aqui.
-
-
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-
-# Adiciona a função ao ambiente Jinja2 (para usar em templates)
-app.jinja_env.globals['from_json'] = json.loads
+def get_status_class(value):
+    """Wrapper de compatibilidade que decide qual lógica usar baseada no tipo do valor."""
+    try:
+        # Se for conversível para número, trata como glicemia
+        float(str(value).replace(',', '.'))
+        return get_glicemia_class(value)
+    except (ValueError, TypeError):
+        # Caso contrário, trata como texto de status
+        return get_agendamento_class(value)
 
 class AlimentoForm(FlaskForm):
-    # Você pode adicionar os campos que deseja editar
     alimento = StringField('Nome do Alimento', validators=[DataRequired()])
     medida_caseira = StringField('Medida Caseira', validators=[DataRequired()])
     peso = FloatField('Peso (g)', validators=[DataRequired(), NumberRange(min=0.1)])
     carbs = FloatField('Carboidratos (g)', validators=[DataRequired(), NumberRange(min=0)])
     kcal = FloatField('Calorias (kcal)', validators=[DataRequired(), NumberRange(min=0)])
-    
     submit = SubmitField('Salvar Alterações')
-    
-# Adiciona o filtro para JSON
+
+# Filtro/Função para converter JSON em lista/dicionário nos templates
 def from_json_filter(json_string):
     if json_string:
         try:
@@ -118,29 +90,52 @@ def from_json_filter(json_string):
             return []
     return []
 
+# Configurações Jinja2
+app.jinja_env.cache = {} 
 app.jinja_env.filters['from_json'] = from_json_filter
+app.jinja_env.globals.update(
+    get_glicemia_class=get_glicemia_class,
+    get_agendamento_class=get_agendamento_class,
+    get_status_class=get_status_class, # Mantido para compatibilidade
+    get_hba1c_class=get_hba1c_class,
+    get_jejum_class=get_jejum_class,
+    from_json=from_json_filter # Adicionado para corrigir UndefinedError no template
+)
+
+app.register_blueprint(relatorios_bp)
+app.logger.setLevel(logging.INFO)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
 def get_float_or_none(key):
     # 'request' precisa ser importado e disponível globalmente se for usado aqui
-    value = request.form.get(key) 
-    if not value:
-        return None
     try:
-        # Substitui vírgula por ponto e converte para float
-        return float(value.replace(',', '.'))
-    except ValueError:
-        return None
+        from archive.archived_functions_batch2 import get_float_or_none_original
+        return get_float_or_none_original(request, key)
+    except Exception:
+        value = request.form.get(key)
+        if not value:
+            return None
+        try:
+            return float(value.replace(',', '.'))
+        except ValueError:
+            return None
 
 def get_int_or_none(key):
     # 'request' precisa ser importado e disponível globalmente se for usado aqui
-    value = request.form.get(key)
-    if not value:
-        return None
     try:
-        # Converte diretamente para int (após garantir que não é vazio)
-        return int(value)
-    except ValueError:
-        return None
+        from archive.archived_functions_batch2 import get_int_or_none_original
+        return get_int_or_none_original(request, key)
+    except Exception:
+        value = request.form.get(key)
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
 
 # --- DECORADOR DE ACESSO EXCLUSIVO PARA ADMIN ---
 def admin_only(f):
@@ -358,53 +353,26 @@ TIPOS_DIABETES = [
     'Gestacional',
     'Outro/Não Especificado'
 ]
-def obter_tipos_medicao(self):
-        """
-        Retorna uma lista de tipos de medição de glicemia para o dropdown.
-        """
-        return [
-            'Jejum',
-            'Pre_Refeicao',
-            'Pos_Refeicao',
-            'Antes_Dormir',
-            'Madrugada',
-            'Outros'
-        ]
+
 # --- Funções de Ajuda ---
-def get_status_class(valor_glicemia):
-    """Retorna uma classe CSS baseada no valor da glicemia."""
-    try:
-        valor = float(valor_glicemia)
-    except (ValueError, TypeError):
-        return 'bg-secondary'
-
-    if valor < 70:
-        return 'bg-danger' 
-    elif 70 <= valor <= 130:
-        return 'bg-success'
-    elif 130 < valor <= 180:
-        return 'bg-warning'
-    else:
-        return 'bg-danger' 
-
 @app.template_filter()
 def format_datetime(value, format_string='%d/%m/%Y às %H:%M'):
     """Filtro Jinja para formatar strings ou objetos datetime."""
-    if isinstance(value, datetime):
-        # Já é um objeto datetime, apenas formata
-        return value.strftime(format_string)
-    
-    if isinstance(value, str):
-        # Tenta converter a string para datetime (usando o formato do DB)
-        DB_FORMAT = '%Y-%m-%d %H:%M:%S'
+    try:
+        from archive.archived_functions_batch2 import format_datetime_original
+        return format_datetime_original(value, format_string)
+    except Exception:
         try:
-            dt_obj = datetime.strptime(value, DB_FORMAT)
-            return dt_obj.strftime(format_string)
-        except (ValueError, TypeError):
-            # Retorna a string bruta se a conversão falhar
-            return value 
-            
-    return value
+            from archive.archived_functions_batch2 import format_datetime_original
+            return format_datetime_original(value, format_string)
+        except Exception:
+            if isinstance(value, datetime):
+                return value.strftime(format_string)
+            if isinstance(value, str):
+                dt_obj = parse_data_hora(value)
+                if dt_obj:
+                    return dt_obj.strftime(format_string)
+            return value
 
 # --- ROTAS DA APLICAÇÃO (Bloco Corrigido) ---
 @app.context_processor
@@ -790,7 +758,6 @@ def registros():
     return render_template(
         'registros.html', 
         registros=registros_prontos,
-        get_status_class=get_status_class 
     )
 
 # ~~~~| Rota Registrar Glicemia |~~~
@@ -822,9 +789,10 @@ def registrar_glicemia():
             return redirect(url_for(URL_FAIL))
                 
         try:
-            bolus_sugerido = calcular_bolus_correcao(current_user.id, valor_glicemia)
+            # Corrigido para usar a instância do serviço de bolus
+            res, _ = bolus_service.calcular_bolus_total(valor_glicemia, 0, current_user.id)
+            bolus_sugerido = res['bolus_total'] if res else 0
         except Exception:
-             
             bolus_sugerido = 0 
         
         if bolus_sugerido is not None and bolus_sugerido > 0:
@@ -867,10 +835,11 @@ def registrar_glicemia():
 
     try:
         # Você precisaria de um valor inicial de glicemia ou um padrão
-        glicemia_inicial = 150 # Exemplo de valor inicial, ou você obtém de um sensor
-        bolus_calculado = calcular_bolus_correcao(current_user.id, glicemia_inicial)
+        glicemia_inicial = 150 
+        res, _ = bolus_service.calcular_bolus_total(glicemia_inicial, 0, current_user.id)
+        bolus_calculado = res['bolus_total'] if res else 0
     except Exception:
-        bolus_calculado = None
+        bolus_calculado = 0
     
     return render_template('registrar_glicemia.html', bolus_calculado=bolus_calculado)
 
@@ -1177,16 +1146,19 @@ def alimentos():
 @app.route('/excluir_alimento/<int:id>', methods=['POST'])
 @login_required
 def excluir_alimento(id):
-    if not (current_user.is_admin or current_user.role == 'secretario'):
-        flash('Acesso não autorizado.', 'danger')
+    try:
+        from archive.archived_functions_batch2 import excluir_alimento_original
+        return excluir_alimento_original(id, current_user, db_manager, flash, url_for, redirect)
+    except Exception:
+        if not (current_user.is_admin or current_user.role == 'secretario'):
+            flash('Acesso não autorizado.', 'danger')
+            return redirect(url_for('alimentos'))
+        sucesso = db_manager.excluir_alimento(id)
+        if sucesso:
+            flash('Alimento excluído com sucesso!', 'success')
+        else:
+            flash('Erro ao excluir o alimento.', 'danger')
         return redirect(url_for('alimentos'))
-
-    sucesso = db_manager.excluir_alimento(id)
-    if sucesso:
-        flash('Alimento excluído com sucesso!', 'success')
-    else:
-        flash('Erro ao excluir o alimento.', 'danger')
-    return redirect(url_for('alimentos'))
 
 # Rota Consolidada: use 'adicionar_alimento' como a rota principal
 @app.route('/adicionar_alimento', methods=['GET', 'POST'])
@@ -1196,38 +1168,17 @@ def adicionar_alimento():
     if not (current_user.role in ['secretario', 'admin']):
         flash('Acesso não autorizado.', 'danger')
         return redirect(url_for('dashboard'))
-
-    if request.method == 'POST':
-        try:
-            nome = request.form['nome']
-            medida_caseira = request.form['medida_caseira']
-            peso_g = float(request.form['peso_g'].replace(',', '.'))
-            kcal = float(request.form['kcal'].replace(',', '.'))
-            # O campo carbs_100g do formulário, mas o DB pode querer o valor total para a porção
-            carbs_100g = float(request.form['carbs_100g'].replace(',', '.')) 
-            
-            # Novo alimento usa o nome das colunas do DB
-            novo_alimento = {
-                'alimento': alimento,
-                'medida_caseira': medida_caseira,
-                'peso': peso, # Peso da porção em g
-                'kcal': kcal, # Kcal na porção
-                'carbs': carbs # Carbs na porção (assumindo que o frontend envia o valor final)
-            }
-            
-            if db_manager.salvar_alimento(novo_alimento):
-                flash('Alimento adicionado com sucesso!', 'success')
-            else:
-                flash('Erro ao adicionar o alimento.', 'danger')
-        except (ValueError, TypeError):
-            flash('Dados do alimento inválidos. Por favor, verifique os valores numéricos.', 'danger')
-        
-        return redirect(url_for('alimentos'))
-
-    # Se a requisição for GET, carrega a lista de alimentos (se a rota for usada para listar/adicionar)
-    alimentos = db_manager.carregar_alimentos()
-    # A rota agora renderiza um template de adição
-    return render_template('adicionar_alimento.html', alimentos=alimentos)
+    # Delegate to archived implementation to centralize legacy behavior and allow safe removal
+    try:
+        from archive.archived_functions_batch2 import adicionar_alimento_original
+        return adicionar_alimento_original(request, db_manager, flash, url_for, redirect, render_template)
+    except Exception:
+        # Fallback: implementação muito simples que evita quebrar a rota
+        if request.method == 'POST':
+            flash('Operação não disponível no momento.', 'warning')
+            return redirect(url_for('alimentos'))
+        alimentos = db_manager.carregar_alimentos()
+        return render_template('adicionar_alimento.html', alimentos=alimentos)
 
 # Rota antiga 'registrar_alimento' redireciona para a nova
 @app.route('/registrar_alimento')
@@ -1259,26 +1210,30 @@ def editar_alimento(id):
     form = AlimentoForm()
 
     # Processa o envio do formulário (POST)
-    if form.validate_on_submit():
-        try:
-            dados_atualizados = {
-                'id': id,
-                # tente mapear ambos os nomes possíveis para compatibilidade
-                'alimento': getattr(form, 'alimento', getattr(form, 'nome', None)).data if (hasattr(form, 'alimento') or hasattr(form, 'nome')) else None,
-                'medida_caseira': form.medida_caseira.data,
-                'peso': getattr(form, 'peso', getattr(form, 'peso_g', None)).data if (hasattr(form, 'peso') or hasattr(form, 'peso_g')) else None,
-                'carbs': getattr(form, 'carbs', getattr(form, 'carbs_100g', None)).data if (hasattr(form, 'carbs') or hasattr(form, 'carbs_100g')) else None,
-                'kcal': getattr(form, 'kcal', None).data if hasattr(form, 'kcal') else None,
-            }
+    try:
+        from archive.archived_functions_batch2 import editar_alimento_original
+        return editar_alimento_original(id, db_manager, AlimentoForm, flash, url_for, redirect, render_template, current_user)
+    except Exception:
+        if form.validate_on_submit():
+            try:
+                dados_atualizados = {
+                    'id': id,
+                    # tente mapear ambos os nomes possíveis para compatibilidade
+                    'alimento': getattr(form, 'alimento', getattr(form, 'nome', None)).data if (hasattr(form, 'alimento') or hasattr(form, 'nome')) else None,
+                    'medida_caseira': form.medida_caseira.data,
+                    'peso': getattr(form, 'peso', getattr(form, 'peso_g', None)).data if (hasattr(form, 'peso') or hasattr(form, 'peso_g')) else None,
+                    'carbs': getattr(form, 'carbs', getattr(form, 'carbs_100g', None)).data if (hasattr(form, 'carbs') or hasattr(form, 'carbs_100g')) else None,
+                    'kcal': getattr(form, 'kcal', None).data if hasattr(form, 'kcal') else None,
+                }
 
-            if db_manager.atualizar_alimento(dados_atualizados):
-                flash('Alimento atualizado com sucesso!', 'success')
-                return redirect(url_for('alimentos'))
-            else:
-                flash('Erro: Nenhuma alteração salva ou erro no banco de dados.', 'danger')
+                if db_manager.atualizar_alimento(dados_atualizados):
+                    flash('Alimento atualizado com sucesso!', 'success')
+                    return redirect(url_for('alimentos'))
+                else:
+                    flash('Erro: Nenhuma alteração salva ou erro no banco de dados.', 'danger')
 
-        except Exception as e:
-            flash(f'Erro ao processar a atualização: {e}', 'danger')
+            except Exception as e:
+                flash(f'Erro ao processar a atualização: {e}', 'danger')
 
     # Preencher o formulário com os dados atuais do DB (GET ou falha)
     if request.method == 'GET':
@@ -1472,9 +1427,9 @@ def buscar_alimentos():
         
         # Monta o dicionário de SAÍDA (o que o JavaScript espera)
         resultados_finais.append({
-            'nome': alimento,          # O JS usa esta chave
+            'nome': nome_alimento,          # Corrigido de 'alimento'
             'medida_caseira': medida_caseira,
-            'peso': peso,          # O JS usa esta chave
+            'peso': peso_porcao,          # Corrigido de 'peso'
             'carbs': carbs,   # O JS usa esta chave
             'kcal': kcal      # O JS usa esta chave
         })
@@ -1552,7 +1507,18 @@ def editar_parametros(paciente_id):
             return redirect(url_for('editar_parametros', paciente_id=paciente_id))
 
         # Se a validação passar, tenta salvar no DB (Nível de Indentação 2)
-        if db_manager.salvar_parametros_paciente(paciente_id, ric_manha, ric_almoco, ric_jantar, fator_sensibilidade, meta_glicemia):
+        # Corrigido: Usar salvar_parametros_clinicos com dicionário para evitar erro de assinatura
+        novos_params = {
+            'ric_manha': ric_manha,
+            'ric_almoco': ric_almoco,
+            'ric_jantar': ric_jantar,
+            'fsi_manha': fator_sensibilidade,
+            'fsi_almoco': fator_sensibilidade,
+            'fsi_jantar': fator_sensibilidade,
+            'meta_glicemia': meta_glicemia
+        }
+        
+        if db_manager.salvar_parametros_clinicos(paciente_id, novos_params, current_user.id):
             flash(f"Parâmetros de Bolus do paciente {paciente['username']} atualizados com sucesso!", 'success')
             # Redirecionamento de sucesso (Nível de Indentação 3)
             return redirect(url_for('perfil_paciente', paciente_id=paciente_id)) 
@@ -1593,48 +1559,32 @@ def novo_paciente():
             # Converte a data de nascimento para o objeto datetime.date
             data_nascimento = datetime.strptime(data_nascimento_str, '%Y-%m-%d').date()
 
-            # a) Verifica se o usuário já existe
-            if Usuario.query.filter_by(email=email).first():
-                flash('Erro: Já existe um usuário cadastrado com este e-mail.', 'danger')
-                return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
-
-            # b) Cria o registro de Usuário (role='paciente')
-            novo_usuario = Usuario(
-                username=email, # Usando email como username para login
-                email=email, 
-                password_hash=hashed_password, 
-                role='paciente',
-                nome_completo=nome_completo
-            )
-            db.session.add(novo_usuario)
-            # Não faça o commit ainda, espere criar o paciente para commitar tudo junto
-
-            # c) Cria o registro de Paciente, linkando-o ao ID do novo usuário
-            # É necessário um commit para obter o ID do novo_usuario se você não usa uma sessão única.
-            # Vamos fazer um commit parcial ou garantir que o relacionamento seja criado corretamente.
-            # Se você usa relacionamentos de modelo (e.g., backref), o ID pode ser obtido após o commit.
-
-            db.session.flush() # Força a atribuição do ID ao novo_usuario
-
-            novo_paciente_obj = Paciente(
-                user_id=novo_usuario.id,
-                data_nascimento=data_nascimento,
-                tipo_diabetes=tipo_diabetes
-                # Outros campos do modelo Paciente devem ser adicionados aqui, se houver
-            )
-            db.session.add(novo_paciente_obj)
+            # b) Cria o registro usando o db_manager (SQLite puro) para evitar erro de Usuario/SQLAlchemy
+            paciente_data = {
+                'username': email,
+                'email': email,
+                'password_hash': hashed_password,
+                'nome_completo': nome_completo,
+                'data_nascimento': data_nascimento_str,
+                'role': 'paciente',
+                'sexo': request.form.get('sexo', 'Não Informado'),
+                'telefone': request.form.get('telefone', '')
+            }
             
-            # Commit final de todas as alterações
-            db.session.commit()
-            
-            flash(f'Paciente {nome_completo} cadastrado com sucesso e pronto para login!', 'success')
-            return redirect(url_for('lista_pacientes'))
+            anamnese_data = {
+                'tipo_diabetes': tipo_diabetes,
+                'data_diagnostico': request.form.get('data_diagnostico') or datetime.now().strftime('%Y-%m-%d')
+            }
 
+            if db_manager.criar_paciente_e_ficha_inicial(paciente_data, current_user.id, anamnese_data):
+                flash(f'Paciente {nome_completo} cadastrado com sucesso!', 'success')
+                return redirect(url_for('lista_pacientes'))
+            else:
+                flash('Erro: Usuário já existe ou falha no banco de dados.', 'danger')
+            
         except Exception as e:
-            # Em caso de qualquer erro (ex: falha no banco de dados, formato de data inválido, etc.)
-            db.session.rollback() # Desfaz qualquer alteração no banco
-            print(f"Erro ao cadastrar paciente: {e}") # Ajuda a depurar
-            flash('Erro interno ao cadastrar paciente. Verifique o log do servidor.', 'danger')
+            app.logger.error(f"Erro ao cadastrar paciente: {e}")
+            flash('Erro interno ao cadastrar paciente.', 'danger')
             
             # Retorna o formulário com a mensagem de erro
             return render_template('cadastrar_paciente_medico.html', tipos_diabetes=TIPOS_DIABETES)
@@ -1651,7 +1601,7 @@ def lista_pacientes():
     
     try:
         # Reutilizamos o método que você já tem
-        pacientes = db_manager.obter_pacientes_por_medico(medico_id) 
+        pacientes = db_manager.obter_pacientes_do_medico(medico_id) 
         
     except Exception as e:
         app.logger.error(f"Erro ao carregar pacientes para o médico {medico_id}: {e}")
@@ -1918,7 +1868,14 @@ def agendar_para_paciente():
                 flash('Paciente ou médico não encontrado.', 'danger')
                 return redirect(url_for('agendar_para_paciente'))
 
-            if db_manager.salvar_agendamento(paciente_id, medico_id, data_hora, observacoes):
+            # Corrigido: Enviar como dicionário para bater com a definição no database_manager.py
+            agendamento_data = {
+                'paciente_id': paciente_id,
+                'medico_id': medico_id,
+                'data_hora': data_hora,
+                'observacoes': observacoes
+            }
+            if db_manager.salvar_agendamento(agendamento_data):
                 flash('Agendamento criado com sucesso!', 'success')
                 return redirect(url_for('gerenciar_agendamentos'))
             else:

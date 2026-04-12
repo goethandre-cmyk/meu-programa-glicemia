@@ -76,12 +76,16 @@ class DatabaseManager:
 
     def carregar_todos_usuarios(self):
         """Carrega todos os usuários do banco de dados, excluindo a senha."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, username, email, role, is_active FROM users")
-            usuarios = cursor.fetchall()
-            return [dict(usuario) for usuario in usuarios]
+        try:
+            from archive.archived_functions_batch2 import carregar_todos_usuarios_original
+            return carregar_todos_usuarios_original(self.db_path)
+        except Exception:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, username, email, role, is_active FROM users")
+                usuarios = cursor.fetchall()
+                return [dict(usuario) for usuario in usuarios]
 
     def excluir_usuario(self, username):
         """Exclui um usuário e todos os seus dados relacionados."""
@@ -115,55 +119,61 @@ class DatabaseManager:
 
     def salvar_registro(self, user_id, tipo, valor, carboidratos, observacoes, alimentos_refeicao, data_hora):
         """Salva um novo registro no banco de dados, incluindo a lista de alimentos."""
-        # Converte a lista de alimentos para uma string JSON antes de salvar
-        alimentos_json = json.dumps(alimentos_refeicao, ensure_ascii=False)
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO registros (user_id, tipo, valor, carboidratos, observacoes, alimentos_refeicao, data_hora)
-                VALUES (?, ?, ?, ?, ?, ?, ?);
-            """, (user_id, tipo, valor, carboidratos, observacoes, alimentos_json, data_hora))
-            conn.commit()
-            return cursor.lastrowid
+        try:
+            from archive.archived_functions_batch5 import salvar_registro_original
+            return salvar_registro_original(self.db_path, user_id, tipo, valor, carboidratos, observacoes, alimentos_refeicao, data_hora)
+        except Exception:
+            alimentos_json = json.dumps(alimentos_refeicao, ensure_ascii=False)
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO registros (user_id, tipo, valor, carboidratos, observacoes, alimentos_refeicao, data_hora)
+                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                """, (user_id, tipo, valor, carboidratos, observacoes, alimentos_json, data_hora))
+                conn.commit()
+                return cursor.lastrowid
     
     def atualizar_registro(self, id, tipo, valor, carboidratos, observacoes, alimentos_refeicao, data_hora):
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Converte a lista de alimentos para uma string JSON antes de salvar
-                alimentos_json = json.dumps(alimentos_refeicao, ensure_ascii=False)
-                
-                cursor.execute(
-                    "UPDATE registros SET tipo = ?, valor = ?, carboidratos = ?, observacoes = ?, alimentos_refeicao = ?, data_hora = ? WHERE id = ?",
-                    (tipo, valor, carboidratos, observacoes, alimentos_json, data_hora, id)
-                )
-                conn.commit()
-            return True
-        except sqlite3.OperationalError as e:
-            print(f"Erro no banco de dados: {e}")
-            return False
+            from archive.archived_functions_batch5 import atualizar_registro_original
+            return atualizar_registro_original(self.db_path, id, tipo, valor, carboidratos, observacoes, alimentos_refeicao, data_hora)
+        except Exception:
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    alimentos_json = json.dumps(alimentos_refeicao, ensure_ascii=False)
+                    cursor.execute(
+                        "UPDATE registros SET tipo = ?, valor = ?, carboidratos = ?, observacoes = ?, alimentos_refeicao = ?, data_hora = ? WHERE id = ?",
+                        (tipo, valor, carboidratos, observacoes, alimentos_json, data_hora, id)
+                    )
+                    conn.commit()
+                return True
+            except sqlite3.OperationalError:
+                return False
 
     def carregar_registros_por_usuario(self, username):
         """Carrega todos os registros de um usuário específico."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT 
-                    r.*, 
-                    u.username 
-                FROM registros r
-                JOIN users u ON r.user_id = u.id
-                WHERE u.username = ?
-                ORDER BY r.data_hora DESC;
-            """, (username,))
-            registros = cursor.fetchall()
-            # Converte a string JSON de alimentos para uma lista Python
-            return [
-                {**dict(reg), 'alimentos_refeicao': json.loads(reg['alimentos_refeicao']) if reg['alimentos_refeicao'] else []}
-                for reg in registros
-            ]
+        try:
+            from archive.archived_functions_batch2 import carregar_registros_por_usuario_original
+            return carregar_registros_por_usuario_original(self.db_path, username)
+        except Exception:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT 
+                        r.*, 
+                        u.username 
+                    FROM registros r
+                    JOIN users u ON r.user_id = u.id
+                    WHERE u.username = ?
+                    ORDER BY r.data_hora DESC;
+                """, (username,))
+                registros = cursor.fetchall()
+                return [
+                    {**dict(reg), 'alimentos_refeicao': json.loads(reg['alimentos_refeicao']) if reg['alimentos_refeicao'] else []}
+                    for reg in registros
+                ]
 
     def excluir_registro(self, id):
         """Exclui um registro pelo ID."""
@@ -175,40 +185,35 @@ class DatabaseManager:
 
     def encontrar_registro_por_id(self, id):
         """Encontra um registro pelo ID, incluindo o nome de usuário e convertendo a data."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            query = """
-            SELECT r.*, u.username
-            FROM registros r
-            JOIN users u ON r.user_id = u.id
-            WHERE r.id = ?
-            """
-            
-            cursor.execute(query, (id,))
-            registro = cursor.fetchone()
-            
-            if registro:
-                registro_dict = dict(registro)
-                
-                # Converte a string de data para um objeto datetime
-                if isinstance(registro_dict.get('data_hora'), str):
-                    try:
-                        registro_dict['data_hora'] = datetime.fromisoformat(registro_dict['data_hora'])
-                    except (ValueError, TypeError):
-                        pass # Se a conversão falhar, mantém a string
-                
-                # Converte a string JSON de alimentos para uma lista de Python
-                if isinstance(registro_dict.get('alimentos_refeicao'), str):
-                    try:
-                        registro_dict['alimentos_refeicao'] = json.loads(registro_dict['alimentos_refeicao'])
-                    except (json.JSONDecodeError, TypeError):
-                        registro_dict['alimentos_refeicao'] = []
-                
-                return registro_dict
-            
-            return None
+        try:
+            from archive.archived_functions_batch5 import encontrar_registro_por_id_original
+            return encontrar_registro_por_id_original(self.db_path, id)
+        except Exception:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                query = """
+                SELECT r.*, u.username
+                FROM registros r
+                JOIN users u ON r.user_id = u.id
+                WHERE r.id = ?
+                """
+                cursor.execute(query, (id,))
+                registro = cursor.fetchone()
+                if registro:
+                    registro_dict = dict(registro)
+                    if isinstance(registro_dict.get('data_hora'), str):
+                        try:
+                            registro_dict['data_hora'] = datetime.fromisoformat(registro_dict['data_hora'])
+                        except (ValueError, TypeError):
+                            pass
+                    if isinstance(registro_dict.get('alimentos_refeicao'), str):
+                        try:
+                            registro_dict['alimentos_refeicao'] = json.loads(registro_dict['alimentos_refeicao'])
+                        except (json.JSONDecodeError, TypeError):
+                            registro_dict['alimentos_refeicao'] = []
+                    return registro_dict
+                return None
 
     def carregar_pacientes_do_medico(self, medico_id):
         """Carrega todos os usuários com o papel 'paciente' associados a um médico."""
@@ -223,20 +228,26 @@ class DatabaseManager:
             return [dict(pac) for pac in pacientes]
 
     def carregar_pacientes(self):
-        """Carrega todos os usuários com o papel 'paciente'."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM users WHERE role = 'paciente'")
-            return cursor.fetchall()
+        try:
+            from archive.archived_functions_batch5 import carregar_pacientes_original
+            return carregar_pacientes_original(self.db_path)
+        except Exception:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, username FROM users WHERE role = 'paciente'")
+                return cursor.fetchall()
 
     def carregar_medicos(self):
-        """Carrega todos os usuários com o papel 'medico'."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, username FROM users WHERE role = 'medico'")
-            return cursor.fetchall()
+        try:
+            from archive.archived_functions_batch5 import carregar_medicos_original
+            return carregar_medicos_original(self.db_path)
+        except Exception:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, username FROM users WHERE role = 'medico'")
+                return cursor.fetchall()
 
     def carregar_ficha_medica(self, paciente_id):
         """Carrega a ficha médica de um paciente."""
@@ -271,59 +282,67 @@ class DatabaseManager:
     def criar_agendamento(self, paciente_id, medico_id, data_hora, observacoes):
         """Cria um novo agendamento."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO agendamentos (paciente_id, medico_id, data_hora, observacoes)
-                    VALUES (?, ?, ?, ?);
-                """, (paciente_id, medico_id, data_hora, observacoes))
-                conn.commit()
-            return True
-        except sqlite3.Error as e:
-            print(f"Erro ao criar agendamento: {e}")
-            return False
+            from archive.archived_functions_batch5 import criar_agendamento_original
+            return criar_agendamento_original(self.db_path, paciente_id, medico_id, data_hora, observacoes)
+        except Exception:
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO agendamentos (paciente_id, medico_id, data_hora, observacoes)
+                        VALUES (?, ?, ?, ?);
+                    """, (paciente_id, medico_id, data_hora, observacoes))
+                    conn.commit()
+                return True
+            except sqlite3.Error:
+                return False
 
     def carregar_agendamentos(self, medico_id=None, role=None):
         """Carrega agendamentos, filtrando por médico se aplicável."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-
-            query = """
-                SELECT 
-                    a.id, a.data_hora, a.observacoes, a.status,
-                    p.username as paciente_username,
-                    m.username as medico_username
-                FROM agendamentos a
-                JOIN users p ON a.paciente_id = p.id
-                JOIN users m ON a.medico_id = m.id
-            """
-            
-            if role == 'medico' and medico_id:
-                query += " WHERE a.medico_id = ? ORDER BY a.data_hora DESC"
-                cursor.execute(query, (medico_id,))
-            else:
-                query += " ORDER BY a.data_hora DESC"
-                cursor.execute(query)
-
-            return cursor.fetchall()
+        try:
+            from archive.archived_functions_batch5 import carregar_agendamentos_original
+            return carregar_agendamentos_original(self.db_path, medico_id, role)
+        except Exception:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                query = """
+                    SELECT 
+                        a.id, a.data_hora, a.observacoes, a.status,
+                        p.username as paciente_username,
+                        m.username as medico_username
+                    FROM agendamentos a
+                    JOIN users p ON a.paciente_id = p.id
+                    JOIN users m ON a.medico_id = m.id
+                """
+                if role == 'medico' and medico_id:
+                    query += " WHERE a.medico_id = ? ORDER BY a.data_hora DESC"
+                    cursor.execute(query, (medico_id,))
+                else:
+                    query += " ORDER BY a.data_hora DESC"
+                    cursor.execute(query)
+                return cursor.fetchall()
 
     def carregar_agendamentos_paciente(self, paciente_username):
         """Carrega os agendamentos de um paciente específico."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT
-                    a.id, a.data_hora, a.observacoes, a.status,
-                    m.username as medico_username
-                FROM agendamentos a
-                JOIN users p ON a.paciente_id = p.id
-                JOIN users m ON a.medico_id = m.id
-                WHERE p.username = ?
-                ORDER BY a.data_hora DESC;
-            """, (paciente_username,))
-            return cursor.fetchall()
+        try:
+            from archive.archived_functions_batch5 import carregar_agendamentos_paciente_original
+            return carregar_agendamentos_paciente_original(self.db_path, paciente_username)
+        except Exception:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT
+                        a.id, a.data_hora, a.observacoes, a.status,
+                        m.username as medico_username
+                    FROM agendamentos a
+                    JOIN users p ON a.paciente_id = p.id
+                    JOIN users m ON a.medico_id = m.id
+                    WHERE p.username = ?
+                    ORDER BY a.data_hora DESC;
+                """, (paciente_username,))
+                return cursor.fetchall()
 
     def atualizar_status_agendamento(self, agendamento_id, novo_status):
         """Atualiza o status de um agendamento."""
@@ -488,12 +507,16 @@ class AppCore:
         """
         Carrega todos os alimentos do arquivo JSON.
         """
-        file_path = 'data/alimentos.json'  # Verifique se o caminho do seu arquivo está correto
-        if not os.path.exists(file_path):
-            return []
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data.get("alimentos", [])
+        try:
+            from archive.archived_functions_batch2 import carregar_todos_alimentos_original
+            return carregar_todos_alimentos_original()
+        except Exception:
+            file_path = 'data/alimentos.json'  # Verifique se o caminho do seu arquivo está correto
+            if not os.path.exists(file_path):
+                return []
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("alimentos", [])
 
     def listar_alimentos_simples(self):
         """
@@ -501,12 +524,15 @@ class AppCore:
         Útil para preencher caixas de seleção ou autocompletar no frontend.
         """
         try:
-            alimentos_completos = self.carregar_todos_alimentos()
-            lista_simples = [alimento['ALIMENTO'] for alimento in alimentos_completos]
-            return lista_simples
-        except Exception as e:
-            print(f"Erro ao listar alimentos simples: {e}")
-            return []
+            from archive.archived_functions_batch2 import listar_alimentos_simples_original
+            return listar_alimentos_simples_original()
+        except Exception:
+            try:
+                alimentos_completos = self.carregar_todos_alimentos()
+                lista_simples = [alimento['ALIMENTO'] for alimento in alimentos_completos]
+                return lista_simples
+            except Exception:
+                return []
         
     def adicionar_registro(self, user_id, dados):
         """
@@ -647,92 +673,103 @@ def processar_dados_registro(form_data):
 # --- Funções de Ajuda (utilitárias) ---
 def get_cor_glicemia(valor):
     """Retorna uma classe CSS com base no valor da glicemia."""
-    if valor < 70:
-        return 'bg-warning text-dark'
-    elif valor >= 70 and valor <= 140:
-        return 'bg-success text-white'
-    elif valor > 140 and valor <= 200:
-        return 'bg-primary text-white'
-    else:
-        return 'bg-danger text-white'
+    try:
+        from archive.archived_functions_batch2 import get_cor_glicemia_original
+        return get_cor_glicemia_original(valor)
+    except Exception:
+        # Fallback local implementation em caso de problema com archive
+        if valor < 70:
+            return 'bg-warning text-dark'
+        elif valor >= 70 and valor <= 140:
+            return 'bg-success text-white'
+        elif valor > 140 and valor <= 200:
+            return 'bg-primary text-white'
+        else:
+            return 'bg-danger text-white'
 
 def get_cor_classificacao(valor):
     """Retorna a cor para a classificação do valor de glicemia."""
-    if valor < 70:
-        return 'text-danger'
-    elif valor >= 70 and valor <= 140:
-        return 'text-success'
-    elif valor > 140 and valor <= 200:
-        return 'text-warning'
-    else:
-        return 'text-danger'
+    try:
+        from archive.archived_functions_batch2 import get_cor_classificacao_original
+        return get_cor_classificacao_original(valor)
+    except Exception:
+        if valor < 70:
+            return 'text-danger'
+        elif valor >= 70 and valor <= 140:
+            return 'text-success'
+        elif valor > 140 and valor <= 200:
+            return 'text-warning'
+        else:
+            return 'text-danger'
 
 def get_status_class(valor):
     """Retorna a classe CSS para o status de glicemia."""
-    if valor < 70:
-        return 'status-baixa'
-    elif valor >= 70 and valor <= 140:
-        return 'status-normal'
-    else:
-        return 'status-alta'
+    try:
+        from archive.archived_functions_batch2 import get_status_class_original
+        return get_status_class_original(valor)
+    except Exception:
+        if valor < 70:
+            return 'status-baixa'
+        elif valor >= 70 and valor <= 140:
+            return 'status-normal'
+        else:
+            return 'status-alta'
 
 def calcular_fator_sensibilidade(dtdi, tipo_insulina):
     """Calcula o fator de sensibilidade à insulina (FS) pela regra de 500/1800."""
-    if tipo_insulina == 'rapida' and dtdi:
-        return 500 / dtdi
-    elif tipo_insulina == 'ultrarapida' and dtdi:
-        return 1800 / dtdi
-    return None
+    try:
+        from archive.archived_functions_batch2 import calcular_fator_sensibilidade_original
+        return calcular_fator_sensibilidade_original(dtdi, tipo_insulina)
+    except Exception:
+        if tipo_insulina == 'rapida' and dtdi:
+            return 500 / dtdi
+        elif tipo_insulina == 'ultrarapida' and dtdi:
+            return 1800 / dtdi
+        return None
 
 def calcular_bolus_detalhado(carboidratos, glicemia_atual, meta_glicemia, razao_ic, fator_sensibilidade):
     """Calcula a dose de insulina (bolus) com correção."""
-    if not all([carboidratos, glicemia_atual, meta_glicemia, razao_ic, fator_sensibilidade]):
-        return None
-    
-    # Bolus para carboidratos
-    bolus_carbs = carboidratos / razao_ic
-
-    # Fator de correção
-    fator_correcao = (glicemia_atual - meta_glicemia) / fator_sensibilidade
-
-    # Bolus total
-    bolus_total = bolus_carbs + fator_correcao
-    
-    return {
-        'bolus_carbs': round(bolus_carbs, 2),
-        'fator_correcao': round(fator_correcao, 2),
-        'bolus_total': max(0, round(bolus_total, 2))  # Evita bolus negativo
-    }
+    try:
+        from archive.archived_functions_batch2 import calcular_bolus_detalhado_original
+        return calcular_bolus_detalhado_original(carboidratos, glicemia_atual, meta_glicemia, razao_ic, fator_sensibilidade)
+    except Exception:
+        if not all([carboidratos, glicemia_atual, meta_glicemia, razao_ic, fator_sensibilidade]):
+            return None
+        bolus_carbs = carboidratos / razao_ic
+        fator_correcao = (glicemia_atual - meta_glicemia) / fator_sensibilidade
+        bolus_total = bolus_carbs + fator_correcao
+        return {
+            'bolus_carbs': round(bolus_carbs, 2),
+            'fator_correcao': round(fator_correcao, 2),
+            'bolus_total': max(0, round(bolus_total, 2))
+        }
 
 def processar_dados_registro(form_data):
     """
     Processa dados de formulário para registros de glicemia e refeição,
     agora compatível com as chaves do formulário HTML.
     """
-    valor = float(form_data.get('valor_glicemia', 0))
-    data_hora_str = form_data.get('data_hora')
-    observacoes = form_data.get('observacoes', '')
-    
-    # A lista de alimentos já foi convertida em app.py
-    alimentos_refeicao = form_data.get('alimentos_refeicao', [])
-    
     try:
-        data_hora = datetime.fromisoformat(data_hora_str)
-    except (ValueError, TypeError):
-        data_hora = datetime.now()
-
-    total_carbs = 0
-    
-    # Percorre a lista de alimentos (que já é uma lista de Python)
-    for item in alimentos_refeicao:
-        carbs = float(item.get('carbs', 0))
-        quantidade = float(item.get('quantidade', 0))
-        total_carbs += carbs * quantidade
-
-    return {
-        "valor": valor,
-        "total_carbs": total_carbs,
-        "observacoes": observacoes,
-        "data_hora": data_hora,
-        "alimentos_refeicao": alimentos_refeicao
-    }
+        from archive.archived_functions_batch2 import processar_dados_registro_original
+        return processar_dados_registro_original(form_data)
+    except Exception:
+        valor = float(form_data.get('valor_glicemia', 0))
+        data_hora_str = form_data.get('data_hora')
+        observacoes = form_data.get('observacoes', '')
+        alimentos_refeicao = form_data.get('alimentos_refeicao', [])
+        try:
+            data_hora = datetime.fromisoformat(data_hora_str)
+        except (ValueError, TypeError):
+            data_hora = datetime.now()
+        total_carbs = 0
+        for item in alimentos_refeicao:
+            carbs = float(item.get('carbs', 0))
+            quantidade = float(item.get('quantidade', 0))
+            total_carbs += carbs * quantidade
+        return {
+            "valor": valor,
+            "total_carbs": total_carbs,
+            "observacoes": observacoes,
+            "data_hora": data_hora,
+            "alimentos_refeicao": alimentos_refeicao
+        }
