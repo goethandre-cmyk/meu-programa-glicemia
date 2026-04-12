@@ -36,7 +36,19 @@ Verifique que todos os testes passam (16 testes no meu ambiente local).
 
 ## Notas para o revisor
 
-- Este PR não remove o código antigo; apenas o move para `archive/` e adiciona delegadores. A remoção será proposta em PRs separados, por batch, após revisão e validação adicional.
-- Sugestão: revisar por arquivos (batch) e rodar testes após cada aprovação incremental.
 
 Obrigado! Se quiser, abro um PR description menor/mais técnico ou adiciono pontos específicos para validação manual (templates, endpoints).
+ 
+## Reviewers e Labels sugeridos
+
+- Reviewers sugeridos:
+	- @goethandre-cmyk
+	- @team/backend (se existir)
+
+- Labels sugeridos:
+	- `refactor`
+	- `tech-debt`
+	- `needs-review`
+	- `database`
+
+Adicione ou substitua conforme o fluxo do repositório.
